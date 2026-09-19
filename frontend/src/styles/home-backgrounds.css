@@ -1,0 +1,78 @@
+/* Keep the supplied pixels unchanged; contrast belongs to a separate overlay. */
+.hero-scene .hero-backdrop .media-slot {
+  filter: none;
+}
+
+.hero-scene .hero-backdrop > .image-shade {
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 50%), transparent 30%, rgb(0 0 0 / 12%) 60%, rgb(0 0 0 / 52%)),
+    radial-gradient(ellipse at 50% 60%, rgb(0 0 0 / 32%), rgb(0 0 0 / 8%) 70%);
+}
+
+.hero-scene .hero-heading,
+.hero-scene .scroll-cue,
+.hero-scene .menu-about {
+  text-shadow: 0 2px 20px rgb(0 0 0 / 55%);
+}
+
+.shared-menu-background .menu-panorama,
+.shared-menu-background .menu-portrait {
+  position: absolute;
+  inset: 0;
+}
+
+.shared-menu-background .menu-portrait {
+  display: none;
+}
+
+.shared-menu-background > .image-shade {
+  background: linear-gradient(180deg, rgb(0 0 0 / 10%), transparent 45%, rgb(0 0 0 / 44%));
+}
+
+.shared-menu-background .media-slot {
+  transition: transform 800ms ease;
+}
+
+/* Two CSS windows onto the same photograph preserve piano and film sides on
+   tall screens. No stretching, raster compositing, baked-in logo or text. */
+@media (max-aspect-ratio: 4/5) {
+  .shared-menu-background .menu-panorama {
+    display: none;
+  }
+
+  .shared-menu-background .menu-portrait {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .menu-portrait-half {
+    min-width: 0;
+    overflow: clip;
+  }
+
+  .menu-portrait-half:first-child img {
+    object-position: 0% 50% !important;
+  }
+
+  .menu-portrait-half:last-child img {
+    object-position: 100% 50% !important;
+  }
+
+  .hero-scene .hero-backdrop img {
+    object-position: 60% 50% !important;
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .scene-sticky:has(.logo-choice:hover) .shared-menu-background .media-slot {
+    transform: scale(1.015);
+  }
+}
+
+/* Clear the permanent bottom dock on portrait tablets as well as phones. */
+@media (min-width: 601px) and (max-width: 800px) {
+  .hero-scene .scroll-cue,
+  .hero-scene .menu-about {
+    bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+}

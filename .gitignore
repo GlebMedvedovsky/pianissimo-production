@@ -1,0 +1,72 @@
+# Installed dependencies and local caches
+node_modules/
+.cache/
+# Inspected: downloaded Pillow/PyMuPDF packages and binaries only.
+# Project-owned tools elsewhere remain eligible for Git.
+/.tools/python/
+
+# Build output, browser artifacts and logs (test source stays in Git)
+/frontend/dist/
+/frontend/.astro/
+/.local-builds/
+test-results/
+playwright-report/
+/docs/qa/
+*.log
+
+# Local environment files; examples must contain empty values, never secrets.
+.env*
+!.env.example
+!.env.template
+
+# Local task packages and questionnaires; keep the files on disk.
+/SEBASTIAN_*_STARTER/
+/SEBASTIAN_*_STARTER.zip
+/SEBASTIAN_CODEX_*.md
+Pianissimo_Fragen_*
+Pianissimo_Rueckfragen_*
+SEBASTIAN_ANSWERS_*
+/docs/materials-*/input/
+# Both Unicode spellings of the original design PDF.
+/v1_Website_Design_Präsentation.pdf
+/v1_Website_Design_Präsentation.pdf
+
+# Historical instructions and local implementation/audit reports.
+/README_RU.md
+/docs/STATUS.md
+/docs/ASSETS_NEEDED.md
+/docs/QA_REPORT.md
+/docs/QA_02D_RU.md
+/docs/IMPLEMENTED_AND_PENDING_02D_RU.md
+/docs/GLEB_HERO_LOOP_02D_RU.md
+/docs/research/
+
+# Local originals/reference images; web derivatives remain in frontend/public.
+/images/source/
+/images/reference/
+/images/Rollen_am_Klavier.png
+/images/Sebastian.png
+/images/Sebastian3.png
+/images/Sebastian4.png
+/content/imported/
+
+# Local Laravel CMS: keep sources/configuration, never credentials or runtime data.
+/backend/vendor/
+/backend/node_modules/
+/backend/bootstrap/cache/*.php
+/backend/storage/*
+!/backend/storage/.gitignore
+/backend/public/storage
+/backend/public/hot
+/backend/.phpunit.result.cache
+/backend/.phpunit.cache/
+/backend/exports/
+/backend/backups/
+/backend/database/*.sqlite*
+/backend/docker/data/
+/backend/public/js/filament/
+/backend/public/css/filament/
+/backend/public/fonts/filament/
+
+/.local-builds/
+/docs/qa/04A/incoming/

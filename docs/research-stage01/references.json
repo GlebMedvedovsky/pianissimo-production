@@ -1,0 +1,18 @@
+[
+  {
+    "name": "pianissimo",
+    "error": "TimeoutError: page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://pianissimo-production.de/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+  },
+  {
+    "name": "hauschka",
+    "error": "TimeoutError: page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://hauschka-net.de/#projects-volker-bertelmann\", waiting until \"domcontentloaded\"\u001b[22m\n"
+  },
+  {
+    "name": "brenner",
+    "error": "TimeoutError: page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://brenner-images.de/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+  },
+  {
+    "name": "vincent",
+    "error": "TimeoutError: page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://vincentruhl.com/index.html\", waiting until \"domcontentloaded\"\u001b[22m\n"
+  }
+]

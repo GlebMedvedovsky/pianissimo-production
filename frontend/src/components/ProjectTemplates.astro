@@ -1,0 +1,6 @@
+---
+import {content} from '../lib/content/data';import ProjectDetail from './ProjectDetail.astro';
+interface Props {context?:'music'|'directing'}
+const {context='music'}=Astro.props;
+---
+{content.projects.map(project=><template data-project-template={project.id}><ProjectDetail project={project} context={context}/></template>)}

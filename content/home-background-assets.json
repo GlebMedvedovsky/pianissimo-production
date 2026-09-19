@@ -1,0 +1,16 @@
+[
+  {
+    "source": "images/source/home-hero-poster.png",
+    "sha256": "ae015cd97f7ad49035edc95967c37e82e904acd543568e532bc88caa4fab91a9",
+    "derivative": "media/home-hero-poster.webp",
+    "width": 949,
+    "height": 534
+  },
+  {
+    "source": "images/source/split-menu-background.jpg",
+    "sha256": "af998f11e02a736ebebf981a6b49fe9ee2a8fa8aacf17f60e5482165d2350b7c",
+    "derivative": "media/split-menu-background.webp",
+    "width": 1264,
+    "height": 842
+  }
+]

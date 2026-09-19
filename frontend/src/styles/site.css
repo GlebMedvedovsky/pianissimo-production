@@ -1,0 +1,7 @@
+/* Keep the cascade in one entry: client navigation must not reorder Vite's
+   reused individual style tags and put base rules after the 04A overrides. */
+@import './local-draft.css';
+@import './tokens.css';
+@import './global.css';
+@import './feedback-04a.css';
+@import './scene-about.css';

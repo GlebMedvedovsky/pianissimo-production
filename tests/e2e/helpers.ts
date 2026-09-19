@@ -1,0 +1,4 @@
+import {expect,type Page,type TestInfo} from '@playwright/test';
+export async function ready(page:Page,path:string){await page.goto(path);await page.locator('html.js').waitFor();await expect(page.locator('.cookie-notice')).toBeVisible();await page.getByRole('button',{name:'Keep off',exact:true}).click();await page.evaluate(()=>document.fonts.ready);}
+export async function shot(page:Page,name:string,info:TestInfo){await page.waitForTimeout(550);await page.screenshot({path:`docs/qa/${process.env.QA_LABEL||'dev'}-${info.project.name}-${name}.png`});}
+export async function noOverflow(page:Page){expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect(await page.locator('img[src]').evaluateAll(images=>images.filter(i=>(i as HTMLImageElement).complete&&(i as HTMLImageElement).naturalWidth===0).map(i=>(i as HTMLImageElement).src))).toEqual([]);}

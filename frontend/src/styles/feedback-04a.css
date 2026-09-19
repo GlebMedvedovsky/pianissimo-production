@@ -1,0 +1,39 @@
+/* Sebastian's 04A feedback. Source photographs and logo paths stay unchanged. */
+.card-image video{object-fit:cover}
+.logo-title{font-size:68px}
+.logo-choice{transform-box:fill-box;transform-origin:center;transition:transform 360ms ease}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){
+ .hero-scene:not(.is-about-revealing) .logo-choice:hover,.hero-scene:not(.is-about-revealing) .logo-choice:focus-visible{transform:scale(1.055)}
+}
+.track-wave{flex:1 1 0;min-width:50px;width:auto}
+.track-description{flex:0 1 250px}
+.compact .track-description{flex:1}
+.player-track strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-dialog{padding-bottom:var(--player-space,0px)}
+.project-dialog>.player{z-index:6}
+@media(min-width:801px){
+ .player{left:50%;bottom:24px;transform:translateX(-50%);width:clamp(460px,34vw,650px);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px 12px;padding:14px 16px;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 35px #0004}
+ .player-track,.player[data-source=showreel] .player-track{min-width:0;max-width:none}
+ .player-track>img{width:36px;height:36px}
+ .player-buttons{justify-self:end}
+ .player-buttons .icon-button{width:32px;height:32px}
+ .player-progress{grid-column:1/-1;min-width:0}
+ .player-more{grid-column:1/-1;justify-content:flex-end;gap:9px}
+ .player-more .icon-button{height:28px;width:28px}
+ .player-more .volume-label{display:flex;align-items:center;gap:8px;margin-right:auto}
+ .player-platforms{max-width:none}
+ .player-error{grid-column:1/-1}
+ .section-switch{top:12svh;height:78svh;width:46px;right:0;padding:30px 8px;align-items:center;justify-content:center;gap:25px;border-radius:90% 0 0 35% / 35% 0 0 65%;transform-origin:right center;transition:transform 350ms ease;box-shadow:0 0 0 1px var(--border)}
+ .section-switch strong{font-size:27px}
+ .section-switch span{font-size:8px}
+ .switch-left{left:0;right:auto;border-radius:0 90% 35% 0 / 0 65% 35% 0;transform-origin:left center}
+ .section-switch:hover,.section-switch:focus-visible{transform:scaleX(1.12)}
+ .social-rail{right:58px}
+ html[data-direction=left]{--transition-offset:-40%}
+ html[data-direction=right]{--transition-offset:40%}
+}
+@media(max-width:800px){.track-description{flex:1}.track-wave{display:none}.logo-title{font-size:68px}}
+@media(max-width:800px){
+ html[data-section=home] body:has(.player:not([hidden])) .cookie-notice{top:calc(var(--header-height) + 12px);bottom:auto}
+}
+@media(prefers-reduced-motion:reduce){.logo-choice:hover,.section-switch:hover{transform:none}}

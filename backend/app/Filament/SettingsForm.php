@@ -1,0 +1,25 @@
+<?php
+namespace App\Filament;
+use Filament\Forms\Components\{TextInput,Textarea,Toggle,Select,Repeater,ColorPicker};
+use Filament\Schemas\Components\Section;
+class SettingsForm
+{
+    public static function media(): array { return [Fields::media('media.image','Bild','image'),Fields::media('media.video','Video','video'),Fields::media('media.poster','Poster','image')]; }
+    public static function fields(string $key): array
+    {
+        return match($key) {
+            'site'=>[TextInput::make('title')->label('Website-Titel')->required(),Textarea::make('description')->label('Beschreibung'),TextInput::make('productionDomain')->label('Künftige Production-Domain')->url()->helperText('Kein Deployment durch Speichern.')],
+            'home'=>[...self::media(),Toggle::make('loop')->label('Hero unbegrenzt wiederholen')->default(true)->accepted()->helperText('Glebs bestätigte Loop-Vorgabe bleibt bestehen.'),Toggle::make('autoplayMuted')->label('Automatisch, zunächst ohne Ton')->default(true)->accepted()],
+            'music','directing'=>[TextInput::make('label')->label('Menübezeichnung')->required(),...self::media()],
+            'about'=>[TextInput::make('title')->label('Überschrift')->required(),Repeater::make('biography')->label('Biografie – Absätze in Reihenfolge')->simple(Textarea::make('paragraph')->required())->defaultItems(0),...self::media(),TextInput::make('getInTouch')->label('Get-in-touch-Text'),Toggle::make('visible')->label('Im Paket sichtbar')->default(true),Select::make('theme')->label('Öffentliche About-Farbwelt')->options(['follow-section'=>'Bereich folgen','dark'=>'Dunkel','light'=>'Hell'])->required()->helperText('Unabhängig von Ihrem Admin-Design; Frontend-Anbindung bleibt ein späterer Schritt.')],
+            'contact'=>[TextInput::make('email')->label('Öffentliche E-Mail')->email(),TextInput::make('recipient')->label('Interner Formular-Empfänger')->email()->helperText('Wird niemals exportiert. Kein Mailversand in 03A.'),TextInput::make('instagram')->label('Instagram')->url(),TextInput::make('spotify')->label('Spotify')->url(),TextInput::make('samples')->label('Samples-Kollektiv')->url(),Textarea::make('footer')->label('Footer-Text'),Textarea::make('legalIdentity')->label('Öffentliche Anbieteridentität')],
+            'social'=>Fields::links('artistLinks'),
+            'impressum','privacy','licenses'=>[Textarea::make('reviewDraft')->label('Privater Prüfentwurf (nicht exportiert)')->rows(18)->helperText('Nicht juristisch geprüft. Erst nach separater Prüfung in den freizugebenden Text übernehmen.'),Textarea::make('text')->label('Text')->rows(16)->helperText('Redaktioneller Text, keine automatisch geprüfte Rechtsberatung.')->dehydrateStateUsing(fn($state)=>(string)$state),Select::make('status')->label('Prüfstatus')->options(['draft'=>'Entwurf','reviewed'=>'Geprüft','published'=>'Für Paket freigegeben'])->default('draft')->required()],
+            'consent'=>[Toggle::make('essential')->label('Notwendige Funktionen (immer aktiv)')->default(true)->accepted(),Toggle::make('externalMedia')->label('Externe Medien benötigen Einwilligung')->default(true)->accepted(),Toggle::make('analytics')->label('Optionale Analyse-Kategorie anbieten')->default(false),Toggle::make('marketing')->label('Optionale Marketing-Kategorie anbieten')->default(false),Textarea::make('bannerText')->label('Banner-Text'),TextInput::make('privacyLink')->label('Relativer Datenschutz-Link')->required()->regex('#^/[a-z0-9/-]+$#'),Select::make('status')->label('Prüfstatus')->options(['draft'=>'Entwurf','reviewed'=>'Geprüft','published'=>'Freigegeben'])->required()],
+            'seo'=>[TextInput::make('titleTemplate')->label('Titelvorlage (%s = Seitentitel)')->required(),Textarea::make('description')->label('Standard-Meta-Beschreibung'),TextInput::make('canonicalBase')->label('Canonical-Basis')->url(),Fields::media('ogAssetId','Standard-OG-Bild','image'),Select::make('robots')->label('Robots-Vorgabe')->options(Fields::options(['noindex, nofollow','index, follow','noindex, follow']))->required(),Toggle::make('sitemap')->label('Sitemap vorgesehen')->default(false),Toggle::make('index')->label('Indexierung vorgesehen')->default(false)],
+            'analytics'=>[Toggle::make('enabled')->label('Konfiguration für späteren Einsatz aktivieren')->default(false)->helperText('Keine Einbindung oder Besucheraufzeichnung in 03A.'),Select::make('provider')->label('Anbieter')->options(['none'=>'Keiner','ga4'=>'Google Analytics 4','plausible'=>'Plausible'])->default('none')->required(),TextInput::make('measurementId')->label('Öffentliche Messkennung / Domain')->regex('/^[A-Za-z0-9.-]{1,100}$/')],
+            'appearance'=>[ColorPicker::make('dark')->label('Dunkler Website-Hintergrund')->required(),ColorPicker::make('light')->label('Heller Website-Hintergrund')->required(),ColorPicker::make('accent')->label('Website-Akzent')->required()],
+            default=>throw new \LogicException('Unknown settings page'),
+        };
+    }
+}

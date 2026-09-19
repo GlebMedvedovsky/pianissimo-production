@@ -1,0 +1,343 @@
+PAGE 1
+Pianissimo Production 
+Website Design Guide
+
+LINKS: []
+
+PAGE 2
+Grundanforderungen
+• „Zwei Websites in einer“: Man kann leicht zwischen meinem Regie Portfolio und meinem 
+Kompositionsportfolio wechseln, jedoch liegt beides getrennt voneinander vor - (Beispiel: Website Hauschka) 
+• Möglichkeit des Zugriffs auf die Projektdatenbank, um Projekte hinzufügen oder entfernen zu können und 
+bestehende Projekte im Text oder den Audios verändern zu können; Zugriff auf Inhalte der „About me“ Seite 
+• Schnellzugriff auf Kontakt (Mail) und Social Media Accounts über Symbole von überall zu jeder Zeit auf der 
+Seite 
+• Statt eines Ladebalken wird das Logo gezeigt (siehe Beispiel) 
+• Cookie Fenster 
+• Impressum 
+• Datenschutzerklärung
+
+LINKS: [{"kind": 2, "xref": 15, "from": "Rect(1497.6910400390625, 332.0, 1773.083984375, 371.07257080078125)", "uri": "https://hauschka-net.de/#about-volker-bertelmann", "id": ""}, {"kind": 2, "xref": 16, "from": "Rect(864.006103515625, 613.4200439453125, 1067.6280517578125, 693.20263671875)", "uri": "https://brenner-images.de", "id": ""}]
+
+PAGE 3
+Anforderungen - Kompositionsseite
+•
+Filterbare Projektseite mit quadratischen Covern (1:1) 
+•
+Filter sind: All (Default), Fiction Film, Documentary, Commercial, Solo 
+Work 
+•
+Gerne mit Animation, wenn die quadratischen Cover laden (siehe hier) 
+•
+Hover over Effekt (Text erscheint; Hintergrund: entweder Zoom in des 
+Covers oder kurzes Videosnippet, siehe hier) 
+•
+Per Klick öffnen sich als Pop up Window detailliertere 
+Projektinformationen plus eine Playlist mit den Titeln des Soundtracks 
+(https://vincentruhl.com/index.html) 
+•
+Kann ich irgendwie priorisieren, welche Projekte zuerst angezeigt 
+werden, damit die besten zuerst erscheinen?
+Projektübersicht
+
+LINKS: [{"kind": 2, "xref": 24, "from": "Rect(1006.0960083007812, 452.0, 1138.7139892578125, 534.1320190429688)", "uri": "https://pianissimo-production.de", "id": ""}, {"kind": 2, "xref": 25, "from": "Rect(656.9429931640625, 618.0, 789.5609741210938, 655.1319580078125)", "uri": "https://pianissimo-production.de", "id": ""}, {"kind": 1, "xref": 26, "from": "Rect(750.656005859375, 656.0, 928.0380249023438, 736.0)", "page": 3, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}, {"kind": 1, "xref": 27, "from": "Rect(181.0, 739.0, 468.09100341796875, 741.0)", "page": 3, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}, {"kind": 1, "xref": 28, "from": "Rect(750.656005859375, 736.0, 928.0380249023438, 739.0)", "page": 3, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}, {"kind": 1, "xref": 29, "from": "Rect(181.0, 741.0, 468.09100341796875, 776.1319580078125)", "page": 3, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}, {"kind": 2, "xref": 30, "from": "Rect(189.0290069580078, 777.0, 664.5070190429688, 814.1319580078125)", "uri": "https://vincentruhl.com/index.html", "id": ""}]
+
+PAGE 4
+Anforderungen - Kompositionsseite
+Detaillierte Projektinformationen 
+• Cover 
+• Titel 
+• Art der Produktion (Film/Kurzfilm/Werbung) 
+• Director (Regisseur) 
+• Production Company 
+• Composer 
+• Mixing/Mastering (optional) 
+• Musicians (optional) 
+• Festivals und Auszeichnungen (optional) 
+• Bilder zum Entstehungsprozess (optional) 
+• Link zum Film/Einbindung über YouTube (optional) 
+• Link zu Spotify, Tidal, Deezer, Apple Music (optional) -> wird automatisch 
+auch mit den einzelnen Tracks verlinkt (wegen Musik Player) 
+• Synopsis 
+• Playlist mit Musiktiteln
+Projektübersicht
+
+LINKS: [{"kind": 1, "xref": 39, "from": "Rect(512.8505859375, 854.2000122070312, 693.3654174804688, 877.6361083984375)", "page": 0, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}]
+
+PAGE 5
+Anforderungen - Kompositionsseite
+Musik Player 
+• Eine große Playlist mit vielen Musiktiteln, 
+filterbar nach Emotionen und Genre  
+• Filtersektion Genre: Orchestral, Electronic, 
+Experimental, Jazz, Ambient, Acoustic, Songs 
+• Filtersektion Emotion: uplifting, empowering, 
+happy, sorrowful, dark, epic, gritty 
+• Enthält alle Tracks, die auch in der 
+Projektübersicht zu sehen sind 
+• Player Window öffnet sich im unteren 
+Bildbereich 
+• Albumcover, Waveform, Länge , 
+„Emotionsfilter“ werden mit angezeigt
+Music Player
+Audiio.com
+
+LINKS: [{"kind": 2, "xref": 49, "from": "Rect(1372.9530029296875, 961.0731201171875, 1474.093017578125, 984.5130615234375)", "uri": "https://audiio.com/browse", "id": ""}]
+
+PAGE 6
+Anforderungen - Kompositionsseite
+Musik Player 
+• Möglichkeit die Tracks nacheinander oder 
+per Shuffle abzuspielen 
+• Play/Pause Button, next Song, last Song 
+• Button, über den man an mehr 
+Informationen zum Projekt kommt (selbes 
+Pop-up Window wie hier) 
+• Möglichkeit zur Lautstärkenregelung 
+• Wiedergabe stoppt erst, wenn andere 
+Seite geladen wird oder auf Pause 
+gedrückt wird. 
+• Option, den Player über ein X zu schließen
+Music Player
+
+LINKS: [{"kind": 1, "xref": 58, "from": "Rect(491.8020935058594, 615.1500244140625, 547.5374145507812, 654.2030029296875)", "page": 3, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}]
+
+PAGE 7
+Anforderungen - Regieseite
+•
+Filterbare Projektseite mit Covern in 16:9 
+•
+Maximal zwei Projekte nebeneinander 
+•
+Filter sind: Director, Assistant Director 
+•
+Gerne mit Animation, wenn die Cover laden 
+(siehe hier) 
+•
+Hover over Effekt (Text erscheint; Hintergrund: 
+entweder Zoom in des Covers oder kurzes 
+Videosnippet, siehe hier) 
+•
+Per Klick öffnen sich als Pop up Window mit 
+genaueren Produktionsdetails 
+•
+Kann ich irgendwie priorisieren, welche 
+Projekte zuerst angezeigt werden, damit die 
+besten zuerst erscheinen?
+Portfolio
+
+LINKS: [{"kind": 2, "xref": 67, "from": "Rect(184.52540588378906, 521.5, 315.43218994140625, 557.6431884765625)", "uri": "https://pianissimo-production.de", "id": ""}, {"kind": 2, "xref": 68, "from": "Rect(372.16461181640625, 673.0, 503.0714111328125, 709.1431884765625)", "uri": "https://pianissimo-production.de", "id": ""}, {"kind": 1, "xref": 69, "from": "Rect(329.0798034667969, 787.5, 582.9985961914062, 823.6431884765625)", "page": 7, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}]
+
+PAGE 8
+Anforderungen - Regieseite
+Projektinformationen (Pop-up) 
+•
+Director 
+•
+Assistant Director (optional) 
+•
+Writer 
+•
+Producer 
+•
+Year of Production 
+•
+Synopsis 
+•
+Festivals & Awards 
+•
+Trailer/Film embedded from YouTube/Vimeo 
+•
+Film poster 
+•
+Film Stills (Bilder aus dem Film)
+Portfolio
+Gleiches Design wie bei dem Musik Pop up Window - nur für Film
+
+LINKS: []
+
+PAGE 9
+Anforderungen - About me
+Design 
+•
+Simples Design mit Bild oder Video von 
+mir im Hintergrund 
+•
+Lebenslauf (bitte auch hier Zugriff drauf 
+geben, damit ich diesen aktualisieren 
+kann) 
+•
+Get-in-touch Button (öffnet 
+Kontaktformular)
+
+LINKS: []
+
+PAGE 10
+Anforderungen - About me
+Mein Lebenslauf 
+•
+2023-2027 - Filmakademie Baden-Württemberg 
+Diploma in Film Music  
+•
+2026 - World Premiere of Cello at tba 
+•
+2026 - Concert premiere of Entering Wonderland with Stuttgarter Philharmoniker 
+(conducted bei Frank Strobel) 
+•
+Since 2024 - Founding member of Filmmusik collective Samples unterm Sofa 
+•
+Since 2023 - Orchestra Compositions and Recordings 
+(including Deutsches Filmorchester Babelsberg, Four Music Session Orchestra 
+Sofia, Symphonica Recording Orchestra Bratislava) 
+•
+2020 - Filmschau Baden-Württemberg - Winner of Youth Film Award with Leaving 
+Earth 
+•
+2018-2023 - Stuttgart Media University 
+B.A. in Media Engineering, Audiovisual Media 
+•
+2021 - Leeds Beckett University  
+Erasmus student, Music Technology and Music Production 
+•
+2017-2018 - University of Protestant Church Music Bayreuth 
+Visiting student, Piano studies, harmony and counterpoint, and ear training 
+•
+2012-2015 - Trumpet Studies with Johannes Potzl (Member of Neue Philharmonie 
+Westfalen) 
+•
+2006-2018 - Piano Studies with Marie-Luise Alcántara , Michaela-Proebstl-Kraß, 
+Barbara Sachs
+
+LINKS: [{"kind": 2, "xref": 86, "from": "Rect(599.0866088867188, 451.20001220703125, 769.7161865234375, 495.10498046875)", "uri": "https://samples-unterm-sofa.de", "id": ""}, {"kind": 2, "xref": 87, "from": "Rect(414.0299987792969, 909.0, 591.5017700195312, 952.905029296875)", "uri": "http://marieluisealcantara.de", "id": ""}]
+
+PAGE 11
+Designvorstellungen
+Menu Page 
+•
+Logo 
+•
+Showreel (Video) groß im Hintergrund (mit 
+Option, das Audio dazu anzuschalten. 
+Wenn das Audio angeschaltet wurde und 
+weitergescrollt wird, erscheint unten die 
+Music Player Leiste. Die Musik läuft 
+weiter, kann aber über diese Leiste 
+pausiert oder gemutet werden.  
+•
+Menü oben rechts 
+•
+Scroll Anweisung nach unten
+
+LINKS: [{"kind": 1, "xref": 96, "from": "Rect(181.0, 634.0, 476.3240051269531, 673.0479736328125)", "page": 5, "to": "Point(0.0, 0.0)", "zoom": 0.0, "id": ""}]
+
+PAGE 12
+Designvorstellungen
+Main Menu Page 
+•
+Durch Scrollen wird das Logo vergrößert und 
+darauf das Hauptmenü eingeblendet 
+•
+Das Showreel verschwindet und wird im Zuge 
+einer Animation durch zwei Videos ersetzt, die 
+repräsentativ für Musik und Directing stehen.  
+•
+Hovereffekt: Das jeweilige Video spielt immer 
+dann weiter ab, sobald man mit der Maus 
+über der jeweiligen Bildhälfte hovert. Zudem 
+wächst die Bildhälfte etwas an 
+•
+Innerhalb des Logos wird klar zwischen der 
+Composer und der Director Tätigkeit getrennt 
+•
+Beim Klicken „gleitet“ die Seite entweder nach 
+links oder rechts (siehe Beispiel)
+
+LINKS: [{"kind": 2, "xref": 109, "from": "Rect(421.7445068359375, 939.75, 611.963623046875, 975.8836669921875)", "uri": "https://hauschka-net.de/#projects-volker-bertelmann", "id": ""}]
+
+PAGE 13
+Designvorstellungen
+Composer’s/Director’s Menu Page 
+•
+Hier werden nun entweder die Albumcover 
+oder die Filmstills angezeigt 
+•
+Die Film Music Seite hätte entsprechend einen 
+schwarzen, die Directing Page einen weißen 
+Hintergrund 
+•
+In Abhängigkeit davon, in welche Richtung 
+man im Menü davor gegangen ist, erscheint 
+entweder am linken oder am rechten Bildrand 
+eine Schaltfläche, die einen in das jeweils 
+andere Portfolio führt 
+•
+Jeweils unten soll ein Button stehen, der zur 
+„About me“ Seite führt. Wenn man von der 
+About me Seite wieder nach oben scrollt, 
+kommt man ins Hauptmenü
+
+LINKS: []
+
+PAGE 14
+Designvorstellungen
+Seitenstruktur
+Scroll
+Click
+Click
+Scroll
+Scroll
+Click
+Click
+Click
+Click
+
+LINKS: []
+
+PAGE 15
+P I A N I S S I M O  
+Logo Schrift Option 1
+Cormorant Garamond 
+(Zeichenabstand +23%)
+P I A N I S S I M O 
+P R O D U C T I O N
+Logo Schrift Option 2
+Bodoni 72 (+23%)
+P I A N I S S I M O 
+P R O D U C T I O N
+Unterüberschrift
+Savoye LET
+Director’s Work
+Fließtext Option 1
+Inter Regular
+Lorem ipsum dolor stabat 
+mater
+Fließtext Option 2
+Neue Haas Grotesk Display Pro
+Lorem ipsum dolor stabat 
+mater 
+
+LINKS: []
+
+PAGE 16
+P I A N I S S I M O  
+Hauptfarbe Dunkel
+# 1 4 1 4 1 4
+Hauptfarbe Hell
+# F 3 F 0 E A
+Akzentfarbe
+# A 6 6 A 3 F
+
+LINKS: []
+
+PAGE 17
+Ergänzende Bemerkungen
+• Symbole zu Social Media Verlinkungen (Mail und Instagram), 
+Musikplattform (Spotify) sowie zu Samples unterm Sofa sollen überall zu 
+sehen sein 
+• Übergänge zwischen den Seiten so smooth und elegant animiert wie 
+möglich 
+• Impressum und Datenschutzerklärung bitte ergänzen 
+• Website soll über netcup gehostet werden 
+• Bei Fragen einfach anrufen :))
+
+LINKS: []

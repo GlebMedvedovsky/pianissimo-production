@@ -1,0 +1,18 @@
+---
+import {ClientRouter} from 'astro:transitions';
+import '@fontsource/cormorant-garamond/400.css';import '@fontsource/cormorant-garamond/400-italic.css';import '@fontsource/cormorant-garamond/500.css';import '@fontsource/inter/400.css';import '@fontsource/inter/500.css';
+import '../styles/site.css'; // One ordered cascade on initial load and client navigation.
+import MediaSlot from '../components/MediaSlot.astro';
+import Header from '../components/Header.astro';import Dialogs from '../components/Dialogs.astro';import Player from '../components/Player.astro';import Logo from '../components/Logo.astro';
+import ProjectTemplates from '../components/ProjectTemplates.astro';
+import {content} from '../lib/content/data';import {siteConfig,type Section,type Theme} from '../config/site.config';
+interface Props {title?:string;section?:Section;theme?:Theme;description?:string}
+const {title,section='home',theme='dark',description=content.site.description}=Astro.props;
+---
+<!doctype html><html lang="en" data-theme={theme} data-section={section} data-about-mode={siteConfig.about.themeMode} data-about-default={siteConfig.about.defaultTheme}>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/><meta name="robots" content="noindex, nofollow"/><meta name="description" content={description}/><meta name="theme-color" content={theme==='light'?'#F3F0EA':'#141414'}/><meta property="og:title" content={title?`${title} — Pianissimo Production`:content.site.title}/><meta property="og:description" content={description}/><title>{title?`${title} — Pianissimo Production`:'Pianissimo Production — Sebastian Greim'}</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+<script is:inline>window.addEventListener('popstate',function(e){const id=e.state?.ppModal;const modal=document.querySelector('#project-dialog');if(modal?.open||(typeof id==='string'&&/^[a-z0-9-]+$/.test(id)&&document.querySelector('template[data-project-template="'+id+'"]'))){e.stopImmediatePropagation();window.dispatchEvent(new CustomEvent('pianissimo:modal-pop',{detail:e.state}));}},true);</script><ClientRouter fallback="swap"/>
+<script is:inline>document.documentElement.classList.add('js');if(location.hash==='#about'){const r=document.documentElement;const m=r.dataset.aboutMode;const t=m==='follow-section'?(history.state?.aboutContext==='directing'?'light':r.dataset.aboutDefault):m;r.dataset.theme=t||'dark';r.dataset.aboutTheme=t||'dark'}</script>
+<script is:inline type="application/json" id="site-content" set:html={JSON.stringify(content).replace(/</g,'\\u003c')}/>
+</head>
+<body>{section!=='home'&&<div hidden data-hero-parking><MediaSlot name="hero"/></div>}<Header section={section}/><main id="content"><slot/></main><footer class="site-footer"><div class="footer-wordmark">PIANISSIMO <span>PRODUCTION</span></div><div><span>© {new Date().getFullYear()} Sebastian Greim</span><a href="/legal/">Legal Notice</a><a href="/privacy/">Privacy Policy</a><button data-consent-settings>Cookie Settings</button><span class="prototype-label">Portfolio</span></div></footer><Dialogs/><Player/><ProjectTemplates context={section==='directing'?'directing':'music'}/><div class="navigation-loader" aria-hidden="true"><Logo/></div><script>import '../lib/app';</script></body></html>

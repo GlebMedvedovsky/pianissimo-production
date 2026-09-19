@@ -1,0 +1,16 @@
+---
+import Logo from './Logo.astro';import Icon from './Icon.astro';import {siteConfig} from '../config/site.config';import {content} from '../lib/content/data';
+const {section}=Astro.props;
+const contacts=content.site.contacts;
+---
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+ <a class="brand" href="/" aria-label="Pianissimo Production home"><Logo/><span>PIANISSIMO<small>PRODUCTION</small></span></a>
+ <nav aria-label="Main navigation"><a href="/film-music/" aria-current={section==='music'?'page':undefined} data-direction="left">{siteConfig.navigation.music}</a><a href="/directing/" aria-current={section==='directing'?'page':undefined} data-direction="right">{siteConfig.navigation.directing}</a><a href="/#about" data-about>{siteConfig.navigation.about}</a><button data-contact>{siteConfig.navigation.contact}</button></nav>
+</header>
+<aside class="social-rail" aria-label="Contact and social links">
+ <button data-contact aria-label="Contact by email" title="Contact"><Icon name="mail"/></button>
+ {contacts.instagram&&<a href={contacts.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram"><Icon name="instagram"/></a>}
+ {contacts.spotify?<a href={contacts.spotify} target="_blank" rel="noreferrer" aria-label="Spotify"><Icon name="music"/></a>:<button class="unavailable-link" aria-label="Spotify profile awaiting confirmation" title="Spotify profile awaiting confirmation" disabled><Icon name="music"/></button>}
+ {contacts.samples&&<a href={contacts.samples} target="_blank" rel="noreferrer" aria-label="Samples unterm Sofa" title="Samples unterm Sofa"><Icon name="sofa"/></a>}
+</aside>

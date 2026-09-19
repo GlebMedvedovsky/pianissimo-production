@@ -1,0 +1,19 @@
+---
+import type {Project} from '../../../contracts/content';import {content,asset} from '../lib/content/data';import TrackList from './TrackList.astro';import Icon from './Icon.astro';
+interface Props {project:Project; context?:'music'|'directing'}
+const {project,context='music'}=Astro.props;
+const cover=asset((project.memberships[context]||project.memberships.music||project.memberships.directing)?.coverAssetId);
+const tracks=project.tracks.toSorted((a,b)=>a.order-b.order).map(t=>content.tracks.find(x=>x.id===t.trackId)!).filter(t=>t?.status==='published');
+---
+<article class="project-detail" data-project-detail={project.id}>
+ <div class="detail-intro"><div class="detail-cover">{cover&&project.id!=='kinnhakenhank'&&<img src={'/'+cover.path} width={cover.width} height={cover.height} alt={cover.alt}/>}<p class="eyebrow">{project.productionType} {project.year&&` / ${project.year}`}</p><h1>{project.title}</h1>{project.presentationStatus==='placeholder'&&<p class="prototype-note">Temporary cover. Further project material is forthcoming.</p>}<dl>{project.credits.toSorted((a,b)=>Number(b.role==='Director')-Number(a.role==='Director')).map(c=><div><dt>{c.role}</dt><dd>{c.name}</dd></div>)}</dl></div>
+ <div class="detail-story">{project.synopsis&&<><h2>The Story</h2></>}{project.synopsis.split('\n\n').map(p=><p>{p}</p>)}
+ {project.awards.length>0&&<section class="awards"><h3>Festivals & awards</h3><ul>{project.awards.map(a=><li>{a}</li>)}</ul></section>}
+ {project.memberships.music&&<section class="soundtrack"><h3>Soundtrack</h3><TrackList tracks={tracks} compact/></section>}
+ {Object.keys(project.platformLinks).length>0&&<div class="platform-links">{Object.entries(project.platformLinks).map(([name,url])=><a href={url} target="_blank" rel="noreferrer">{url?.includes('/track/')?'Track':'Album'} on {name} ↗</a>)}</div>}
+ {project.externalLinks?.instagram&&<a class="text-link" href={project.externalLinks.instagram} target="_blank" rel="noreferrer">Watch the Instagram reel ↗</a>}
+ {project.localTrailerAssetId&&<section class="local-trailer"><h3>Watch the trailer</h3><video data-local-trailer src={'/'+asset(project.localTrailerAssetId)!.path} poster={project.localTrailerPosterId?'/'+asset(project.localTrailerPosterId)!.path:undefined} controls playsinline preload="none" aria-label={project.title+' — V2 trailer'}/></section>}
+ {project.externalFilm&&<section class="external-film" data-provider={project.externalFilm.provider} data-video-id={project.externalFilm.videoId}><div class="embed-placeholder"><p class="eyebrow">WATCH THE FILM</p><h3>{project.title}</h3><p>External media stays off until you allow it.</p><button class="outline-button" data-activate-film><Icon name="play"/> Load {project.externalFilm.provider==='youtube'?'YouTube':'Vimeo'} film</button><a href={project.externalFilm.url} target="_blank" rel="noreferrer">Open on {project.externalFilm.provider==='youtube'?'YouTube':'Vimeo'} ↗</a></div><button class="embed-settings text-link" data-consent-settings>Media settings</button></section>}
+ </div></div>
+ {project.gallery.length>0&&<section class="film-stills"><h3>{project.id==='kinnhakenhank'?'Behind the Scenes':'Gallery'}</h3><div>{[...new Set([...(project.id==='kinnhakenhank'&&cover?[cover.id]:[]),...project.gallery])].map(id=>{const im=asset(id)!;return <img src={'/'+im.path} width={im.width} height={im.height} loading="lazy" alt={im.alt}/>})}</div></section>}
+</article>

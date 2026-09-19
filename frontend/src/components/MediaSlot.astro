@@ -1,0 +1,11 @@
+---
+import {content,asset} from '../lib/content/data';
+interface Props {name:keyof typeof content.site.mediaSlots; eager?:boolean; class?:string}
+const {name,eager=false,class:className=''}=Astro.props;
+const slot=content.site.mediaSlots[name];const picture=asset(slot.poster||slot.image);const video=asset(slot.video);
+---
+<div class:list={['media-slot',className]} data-slot={name}>
+ {picture&&<img src={'/'+picture.path} srcset={`/${picture.path.replace('.webp','-480.webp')} 480w, /${picture.path} ${picture.width}w`} sizes={name==='about'||name.endsWith('Menu')?'(max-width: 800px) 1600px, 100vw':'100vw'} width={picture.width} height={picture.height} alt={name==='about'?picture.alt:''} loading={eager?'eager':'lazy'} fetchpriority={eager?'high':'auto'} style={`object-position:${picture.crop.x}% ${picture.crop.y}%`} />}
+ {video&&<video transition:persist={name==='hero'?'hero-showreel':undefined} transition:persist-props={name==='hero'} data-slot-video={name} src={'/'+video.path} poster={picture?'/'+picture.path:undefined} muted playsinline loop preload="none" aria-label={name==='hero'?'Showreel':'Silent background preview'} />}
+ {picture?.credit&&<span class="photo-credit">Photo: {picture.credit}</span>}
+</div>

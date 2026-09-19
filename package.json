@@ -1,0 +1,32 @@
+{
+  "name": "pianissimo-production",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run content:validate && npm run build --workspace frontend && node scripts/check-dist.mjs",
+    "preview": "npm run preview --workspace frontend",
+    "check": "npm run check --workspace frontend && tsc --noEmit -p tsconfig.json",
+    "test": "node scripts/run-ts.mjs --test",
+    "test:e2e": "playwright test",
+    "content:validate": "node scripts/run-ts.mjs scripts/validate-content.ts",
+    "content:release": "node scripts/run-ts.mjs scripts/validate-content.ts --release",
+    "test:fixtures": "node scripts/generate-fixtures.mjs",
+    "build:local-draft": "node scripts/build-local-draft.mjs",
+    "import:local-02d": "node scripts/run-ts.mjs scripts/import-local-02d.ts"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.3",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.3"
+  }
+}
