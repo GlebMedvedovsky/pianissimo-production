@@ -1,6 +1,18 @@
 <style>
     .fi-body { background: #F3F0EA; }
     .dark .fi-body { background: #141414; }
+    .cms-topbar-theme { flex-shrink: 0; }
+    .fi-topbar-end { min-width: 0; }
+    .fi-topbar .fi-global-search-ctn { min-width: 0; }
+    @media (max-width: 639px) {
+        .fi-topbar-end { flex: 1; margin-inline-start: .75rem; gap: .5rem; }
+        .fi-topbar .fi-global-search-ctn { flex: 1; }
+        .fi-topbar .fi-global-search { min-width: 0; }
+        .fi-topbar .fi-global-search .fi-input-wrp { min-width: 0; }
+        .fi-topbar .fi-global-search input { width: 100%; min-width: 0; }
+        .cms-topbar-theme .fi-theme-switcher { gap: 0; }
+        .cms-topbar-theme .fi-theme-switcher-btn { padding: .375rem; }
+    }
 </style>
 @auth
 <script>

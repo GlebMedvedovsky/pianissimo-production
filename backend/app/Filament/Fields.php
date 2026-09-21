@@ -69,5 +69,16 @@ class Fields
     }
     public static function cv(): array { return [self::id(),TextInput::make('date')->label('Zeitraum')->required(),TextInput::make('title')->label('Titel / Eintrag')->required(),TextInput::make('institution')->label('Institution'),Textarea::make('description')->label('Beschreibung'),TextInput::make('link')->label('Link')->url(),TextInput::make('link_text')->label('Nur diesen Namen verlinken')->helperText('Exakter Ausschnitt des angezeigten Texts; leer = kompletter Eintrag.'),TextInput::make('sort_order')->label('Reihenfolge')->integer()->default(0)->required(),self::status()]; }
     public static function externalService(): array { return [TextInput::make('name')->label('Name')->required(),Select::make('provider')->label('Anbieter')->options(self::options(['youtube','vimeo','spotify','tidal','deezer','appleMusic','ga4','plausible']))->required(),Select::make('category')->label('Consent-Kategorie')->options(['externalMedia'=>'Externe Medien','analytics'=>'Analyse','marketing'=>'Marketing'])->required(),Textarea::make('purpose')->label('Zweck')->required(),Textarea::make('description')->label('Beschreibung'),TextInput::make('privacy_url')->label('Datenschutz-URL')->url()->required(),Textarea::make('storage_description')->label('Speicherung / Cookies'),Toggle::make('requires_consent')->label('Einwilligung erforderlich')->default(true)->accepted(),Toggle::make('enabled')->label('Für späteren Export aktivieren')->default(false),TextInput::make('provider_id')->label('Anbieterkennung (kein Script)')->regex('/^[A-Za-z0-9._-]{1,100}$/'),TextInput::make('sort_order')->label('Reihenfolge')->integer()->default(0)->required()]; }
-    public static function user(): array { return [TextInput::make('name')->label('Name')->required(),TextInput::make('email')->label('E-Mail')->email()->required()->unique(ignoreRecord:true),TextInput::make('password')->label('Neues Passwort')->password()->revealable()->minLength(12)->requiredOn('create')->dehydrated(fn($state)=>filled($state)),Select::make('admin_theme')->label('Persönliches Admin-Design')->options(['dark'=>'Dark','light'=>'Light','system'=>'System'])->default('dark')->required()]; }
+    public static function user(): array
+    {
+        return [
+            TextInput::make('name')->label('Name')->required()->maxLength(255),
+            TextInput::make('email')->label('E-Mail')->email()->required()->maxLength(255)->unique(ignoreRecord:true),
+            TextInput::make('password')->label('Neues Passwort')->password()->revealable()->autocomplete('new-password')
+                ->minLength(12)->required(fn (string $operation): bool => $operation === 'create')
+                ->afterStateHydrated(fn (TextInput $component) => $component->state(''))
+                ->dehydrated(fn ($state): bool => filled($state)),
+            Select::make('admin_theme')->label('Persönliches Admin-Design')->options(['dark'=>'Dark','light'=>'Light','system'=>'System'])->default('dark')->required(),
+        ];
+    }
 }
