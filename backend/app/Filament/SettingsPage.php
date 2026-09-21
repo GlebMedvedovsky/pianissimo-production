@@ -14,6 +14,10 @@ abstract class SettingsPage extends Page implements HasForms
     public ?array $data=[];
     public function mount(): void { $this->form->fill(Setting::read(static::$settingsKey)); }
     public function form(Schema $schema): Schema { return $schema->components(SettingsForm::fields(static::$settingsKey))->statePath('data'); }
+    protected function getHeaderActions(): array
+    {
+        return [\Filament\Actions\Action::make('save')->label('Entwurf speichern')->action(fn () => $this->save())];
+    }
     public function save(): void
     {
         Setting::put(static::$settingsKey,array_replace(Setting::read(static::$settingsKey),$this->form->getState()));
