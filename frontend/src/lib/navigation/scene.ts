@@ -1,6 +1,7 @@
 import gsap from 'gsap';
 import {ScrollTrigger} from 'gsap/ScrollTrigger';
 import {siteConfig} from '../../config/site.config';
+import {logoFocus} from './logo-geometry';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -19,29 +20,65 @@ export function initScene(){
  const about=scene.querySelector<HTMLElement>('.about-section')!;
  const visuals=scene.querySelector<HTMLElement>('.scene-visuals')!;
  const logo=scene.querySelector<HTMLElement>('.scene-logo')!;
+ const mark=logo.querySelector<SVGSVGElement>('svg')!;
+ const composition=mark.querySelector<SVGGElement>('.logo-composition')!;
+ const aperture=scene.querySelector<SVGPathElement>('#scene-about-aperture path')!;
  const choices=scene.querySelectorAll<SVGAElement>('.logo-choice');
  const match=gsap.matchMedia();
- match.add({motion:'(prefers-reduced-motion: no-preference)',desktop:'(min-width:801px)'},context=>{
+ match.add({motion:'(prefers-reduced-motion: no-preference)'},context=>{
   if(!context.conditions?.motion)return;
   const select=gsap.utils.selector(scene);
   const revealStart=1.15;
+  const reveal={progress:0};
+  // A conservative inscribed circle guarantees the entire viewport (not just
+  // its centre or sampled corners) fits inside this curved aperture at the end.
+  const length=aperture.getTotalLength();
+  let radius=Infinity;
+  for(let distance=0;distance<=Math.ceil(length);distance++){
+   const point=aperture.getPointAtLength(Math.min(distance,length));
+   radius=Math.min(radius,Math.hypot(point.x-logoFocus.x,point.y-logoFocus.y));
+  }
+  radius=Math.max(1,radius-1); // Sampling step is <= 1 SVG unit.
+  const renderReveal=()=>{
+   const progress=reveal.progress;
+   const complete=progress>=1;
+   about.style.visibility=progress>0?'visible':'hidden';
+   about.style.clipPath=complete?'none':'url(#scene-about-aperture)';
+   about.inert=!complete;
+   visuals.style.visibility=complete?'hidden':'visible';
+   // This CTM includes the responsive SVG viewBox and the menu's placement.
+   // Translate it into About-local coordinates, then apply the very same zoom
+   // to both halves and the aperture. About itself receives no transform.
+   const base=mark.getScreenCTM();
+   if(!base)return;
+   const bounds=about.getBoundingClientRect();
+   const focus=new DOMPoint(logoFocus.x,logoFocus.y).matrixTransform(base);
+   const farthest=Math.max(...[[0,0],[innerWidth,0],[0,innerHeight],[innerWidth,innerHeight]]
+    .map(([x,y])=>Math.hypot(x!-focus.x,y!-focus.y)));
+   const endScale=Math.max(1,farthest/(radius*base.a))*1.02;
+   const scale=endScale**progress;
+   const zoom=new DOMMatrix().translate(logoFocus.x,logoFocus.y).scale(scale).translate(-logoFocus.x,-logoFocus.y);
+   const mask=new DOMMatrix().translate(-bounds.left,-bounds.top).multiply(base).multiply(zoom);
+   composition.setAttribute('transform',zoom.toString());
+   aperture.setAttribute('transform',mask.toString());
+  };
   let previousPhase='';
   const syncPhase=()=>{
+   renderReveal();
    const time=timeline.time();
-   const phase=time>=revealStart?'about':time>=.95?'menu':'hero';
+   const phase=time>revealStart?'about':time>=.95?'menu':'hero';
    if(phase===previousPhase)return;
    previousPhase=phase;
    scene.dataset.phase=phase;
    scene.classList.toggle('is-about-revealing',phase==='about');
    visuals.inert=phase==='about';
-   about.inert=phase!=='about';
    choices.forEach(link=>link.setAttribute('tabindex',phase==='menu'?'0':'-1'));
    document.dispatchEvent(new Event('pianissimo:scene-change'));
   };
   const timeline=gsap.timeline({onUpdate:syncPhase,scrollTrigger:{
    trigger:scene,start:'top top',
    end:()=>`+=${Math.max(1,scene.offsetHeight-scene.querySelector<HTMLElement>('.scene-sticky')!.offsetHeight)}`,
-   scrub:true,invalidateOnRefresh:true,
+   scrub:true,invalidateOnRefresh:true,onRefresh:renderReveal,
   }});
   // Native scroll: the spacer is exactly the animation's travel. Once revealed,
   // this same About continues in normal document flow, directly to the footer.
@@ -52,13 +89,7 @@ export function initScene(){
    .to(select('.logo-label'),{opacity:1,duration:.3},.7)
    .to(select('.menu-about'),{autoAlpha:1,duration:.25},.75)
    .to(select('.logo-label,.menu-about'),{autoAlpha:0,duration:.15},revealStart)
-   .fromTo(about,{autoAlpha:0,clipPath:'inset(0 48% 0 48%)'},
-    {autoAlpha:1,clipPath:'inset(0 0% 0 0%)',duration:.65,ease:'power1.out'},revealStart)
-   .to(select('.split-backdrop'),{opacity:0,duration:.35},revealStart)
-   .to(logo,{scale:context.conditions.desktop?2.8:1.8,transformOrigin:'48% 51%',duration:1.1,ease:'power1.inOut'},revealStart)
-   .to(select('.logo-half-black'),{y:()=>-(innerHeight*730/logo.offsetWidth+690),duration:1.1,ease:'power2.inOut'},revealStart)
-   .to(select('.logo-half-cream'),{y:()=>innerHeight*730/logo.offsetWidth+690,duration:1.1,ease:'power2.inOut'},revealStart)
-   .set(visuals,{visibility:'hidden'},revealStart+1.1);
+   .to(reveal,{progress:1,duration:1.1,ease:'none'},revealStart);
   syncPhase();
   return()=>{
    timeline.kill();
@@ -66,6 +97,11 @@ export function initScene(){
    scene.classList.remove('is-about-revealing');
    visuals.inert=false;
    about.inert=false;
+   about.style.removeProperty('visibility');
+   about.style.removeProperty('clip-path');
+   visuals.style.removeProperty('visibility');
+   composition.removeAttribute('transform');
+   aperture.removeAttribute('transform');
    choices.forEach(link=>link.removeAttribute('tabindex'));
    document.dispatchEvent(new Event('pianissimo:scene-change'));
   };

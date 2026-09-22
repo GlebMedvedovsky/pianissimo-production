@@ -1,11 +1,13 @@
 ---
 import Logo from './Logo.astro';import MediaSlot from './MediaSlot.astro';import Icon from './Icon.astro';import About from './About.astro';import {content} from '../lib/content/data';
 import '../styles/home-backgrounds.css';
+import {logoAperture} from '../lib/navigation/logo-geometry';
 const {composerMenu,directingMenu}=content.site.mediaSlots;
 const sharedMenuImage=!composerMenu.video&&!directingMenu.video&&(composerMenu.poster||composerMenu.image)===(directingMenu.poster||directingMenu.image);
 ---
 <section class="hero-scene" aria-label="Pianissimo — music and film">
  <div class="scene-sticky">
+  <svg class="scene-aperture" width="0" height="0" aria-hidden="true" focusable="false"><defs><clipPath id="scene-about-aperture" clipPathUnits="userSpaceOnUse"><path d={logoAperture}/></clipPath></defs></svg>
   <About/>
   <div class="scene-visuals">
   <div class="hero-backdrop"><MediaSlot name="hero" eager/><div class="image-shade"></div></div>
