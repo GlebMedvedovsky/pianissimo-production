@@ -4,6 +4,10 @@
 .hero-scene .background-half .image-shade{background:linear-gradient(#0005,#0003 50%,#0006)}
 .hero-controls{position:absolute;z-index:4;right:var(--page-gutter);bottom:145px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;max-width:calc(100% - 48px)}
 .hero-controls button,.hero-full-close{border:1px solid #fff9;padding:10px 14px;background:#141414cc;color:#f3f0ea;font-size:11px;min-height:42px}
+.hero-controls button{position:relative;display:grid;place-items:center;width:44px;height:44px;min-width:44px;padding:0;cursor:pointer}
+.hero-controls button svg{width:19px;height:19px}
+.hero-control-icon{display:contents}.hero-control-icon--pause,.hero-control-icon--sound{display:none}.hero-controls [data-hero-toggle][data-state=pause] .hero-control-icon--play,.hero-controls [data-showreel-sound][data-state=on] .hero-control-icon--sound-off{display:none}.hero-controls [data-hero-toggle][data-state=pause] .hero-control-icon--pause,.hero-controls [data-showreel-sound][data-state=on] .hero-control-icon--sound{display:contents}
+.hero-controls button::after{position:absolute;right:0;bottom:calc(100% + 8px);z-index:1;padding:6px 8px;background:#141414;color:#f3f0ea;content:attr(data-tooltip);font-size:10px;line-height:1;white-space:nowrap;opacity:0;pointer-events:none;transform:translateY(3px);transition:opacity .15s,transform .15s}.hero-controls button:focus-visible::after{opacity:1;transform:translateY(0)}@media(hover:hover){.hero-controls button:hover::after{opacity:1;transform:translateY(0)}}.hero-controls button:focus-visible,.hero-full-close:focus-visible{outline:2px solid #f3f0ea;outline-offset:3px}
 .hero-controls [role=status]{flex-basis:100%;text-align:right;font-size:10px;color:#fff}
 .hero-full-close{position:fixed;right:20px;top:20px;z-index:152}
 .hero-scene.is-full-frame{z-index:150}
@@ -16,8 +20,8 @@
 .project-card:has(video) .card-overlay{pointer-events:none}
 .local-trailer{margin-top:32px}.local-trailer video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#000}
 .platform-links{flex-wrap:wrap}
-@media(max-width:800px){.hero-controls{bottom:180px;left:24px;right:24px;justify-content:center}.hero-controls [role=status]{text-align:center}.hero-controls button{font-size:10px;padding:8px 10px}.photo-credit{font-size:8px;bottom:14px;left:10px}.player[data-source=showreel] .player-track{min-width:0}}
-@media(max-height:550px) and (orientation:landscape){.hero-controls{bottom:64px;left:auto}.hero-controls button{min-height:34px;padding:6px 10px}.hero-controls [role=status]{display:none}}
-@media(prefers-reduced-motion:reduce){.hero-controls{bottom:160px}.is-full-frame .hero-backdrop{display:block!important}}
+@media(max-width:800px){.hero-controls{top:calc(54% + 105px);bottom:auto;left:calc(24px + env(safe-area-inset-left));right:calc(24px + env(safe-area-inset-right));justify-content:center;gap:10px}.hero-controls [role=status]{text-align:center}.hero-controls button{font-size:10px;padding:0}.photo-credit{font-size:8px;bottom:14px;left:10px}.player[data-source=showreel] .player-track{min-width:0}}
+@media(max-height:550px) and (orientation:landscape){.hero-controls{top:auto;bottom:64px;left:auto}.hero-controls button{min-height:34px;padding:6px 10px}.hero-controls [role=status]{display:none}}
+@media(prefers-reduced-motion:reduce){.hero-controls{top:auto;bottom:160px}.is-full-frame .hero-backdrop{display:block!important}}
 
 @media(max-width:800px) and (orientation:portrait){.split-backdrop [data-slot=composerMenu] img{object-position:42% 50%!important}.split-backdrop [data-slot=directingMenu] img{object-position:54% 50%!important}.split-backdrop .photo-credit{bottom:76px;max-width:calc(100% - 20px);font-size:8px}}
