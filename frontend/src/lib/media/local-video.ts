@@ -12,7 +12,7 @@ export function initLocalVideo(signal:AbortSignal) {
  const close=scene?.querySelector<HTMLButtonElement>('[data-hero-close]');
  let observer:IntersectionObserver|undefined;
  let wasOverflow='';
- const render=()=>{if(!hero)return;if(toggle)toggle.textContent=hero.paused?'Play showreel':'Pause showreel';if(sound){sound.textContent=hero.muted?'Enable sound':'Mute sound';sound.setAttribute('aria-pressed',String(!hero.muted))}if(status)status.textContent=hero.error?'Video unavailable. Please try again.':hero.paused?'Showreel paused':'';};
+ const render=()=>{if(!hero)return;if(toggle){const label=hero.paused?'Play showreel':'Pause showreel';toggle.dataset.state=hero.paused?'play':'pause';toggle.dataset.tooltip=label;toggle.setAttribute('aria-label',label)}if(sound){const label=hero.muted?'Enable sound':'Mute sound';sound.dataset.state=hero.muted?'off':'on';sound.dataset.tooltip=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(!hero.muted))}if(status)status.textContent=hero.error?'Video unavailable. Please try again.':hero.paused?'Showreel paused':'';};
  const closeFull=()=>{if(!scene?.classList.contains('is-full-frame'))return;scene.classList.remove('is-full-frame');scene.removeAttribute('role');scene.removeAttribute('aria-modal');hero!.controls=false;hero!.removeAttribute('tabindex');close!.hidden=true;document.documentElement.style.overflow=wasOverflow;full?.focus({preventScroll:true});};
  if(hero){
   for(const event of ['play','pause','volumechange','error','loadedmetadata'])hero.addEventListener(event,render,{signal});

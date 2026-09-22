@@ -725,8 +725,10 @@ p {
     font: 400 clamp(44px, 5vw, 80px) var(--font-serif)
 }
 
-.about-invitation>a>span {
-    font: 40px var(--font-serif)
+.about-invitation-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: currentColor
 }
 
 .music-library {
@@ -775,6 +777,13 @@ select {
     color: var(--text);
     background: var(--background);
     font-size: 12px
+}
+
+.library-filters select {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding-right: 36px
 }
 
 .library-filters .text-link {
@@ -1147,6 +1156,19 @@ html:has(dialog[open]) {
     gap: 15px;
     margin-top: 15px;
     font-size: 11px
+}
+
+.streaming-link-icon {
+    display: inline-flex;
+    width: .9em;
+    height: .9em;
+    margin-left: .18em;
+    vertical-align: -.06em
+}
+
+.streaming-link-icon svg {
+    width: 100%;
+    height: 100%
 }
 
 .external-film {
@@ -1924,13 +1946,14 @@ html[data-direction=right] {
     }
 
     .library-filters {
-        flex-wrap: wrap;
-        gap: 20px
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px
     }
 
     .library-filters label {
         min-width: 0;
-        flex: 1
+        width: 100%
     }
 
     .library-filters .text-link {

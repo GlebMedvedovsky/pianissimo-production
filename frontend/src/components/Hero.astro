@@ -21,7 +21,7 @@ const sharedMenuImage=!composerMenu.video&&!directingMenu.video&&(composerMenu.p
   <div class="hero-heading"><p class="eyebrow">SEBASTIAN GREIM</p><h1>PIANISSIMO<span>PRODUCTION</span></h1></div>
   <div class="scene-logo"><Logo menu/></div>
   <div class="hero-note"><span>COMPOSER & FILMMAKER</span><span>{content.site.mediaSlots.hero.video?'SHOWREEL':'A MOMENT IN THE STUDIO'}</span></div>
-  {content.site.mediaSlots.hero.video&&<div class="hero-controls"><button data-hero-toggle>Play showreel</button><button data-showreel-sound aria-pressed="false">Enable sound</button><button data-hero-full>View full frame</button><span data-hero-status role="status"></span></div>}
+  {content.site.mediaSlots.hero.video&&<div class="hero-controls"><button data-hero-toggle data-state="play" data-tooltip="Play showreel" aria-label="Play showreel"><span class="hero-control-icon hero-control-icon--play"><Icon name="play"/></span><span class="hero-control-icon hero-control-icon--pause"><Icon name="pause"/></span></button><button data-showreel-sound data-state="off" data-tooltip="Enable sound" aria-label="Enable sound" aria-pressed="false"><span class="hero-control-icon hero-control-icon--sound"><Icon name="sound"/></span><span class="hero-control-icon hero-control-icon--sound-off"><Icon name="soundOff"/></span></button><button data-hero-full data-tooltip="View full frame" aria-label="View full frame"><Icon name="expand"/></button><span data-hero-status role="status"></span></div>}
   <a class="scroll-cue" href="#main-menu"><span>Scroll</span><Icon name="down"/></a>
   <a class="menu-about" href="#about" data-about>THE PERSON BEHIND THE WORK <Icon name="down"/></a>
   </div>
