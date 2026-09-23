@@ -1,39 +1,478 @@
 /* Sebastian's 04A feedback. Source photographs and logo paths stay unchanged. */
-.card-image video{object-fit:cover}
-.logo-title{font-size:68px}
-.logo-choice{transform-box:fill-box;transform-origin:center;transition:transform 360ms ease}
-@media(hover:hover) and (prefers-reduced-motion:no-preference){
- .hero-scene:not(.is-about-revealing) .logo-choice:hover,.hero-scene:not(.is-about-revealing) .logo-choice:focus-visible{transform:scale(1.055)}
+.card-image video {
+   object-fit: cover
 }
-.track-wave{flex:1 1 0;min-width:50px;width:auto}
-.track-description{flex:0 1 250px}
-.compact .track-description{flex:1}
-.player-track strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.project-dialog{padding-bottom:var(--player-space,0px)}
-.project-dialog>.player{z-index:6}
-@media(min-width:801px){
- .player{left:50%;bottom:24px;transform:translateX(-50%);width:clamp(460px,34vw,650px);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px 12px;padding:14px 16px;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 35px #0004}
- .player-track,.player[data-source=showreel] .player-track{min-width:0;max-width:none}
- .player-track>img{width:36px;height:36px}
- .player-buttons{justify-self:end}
- .player-buttons .icon-button{width:32px;height:32px}
- .player-progress{grid-column:1/-1;min-width:0}
- .player-more{grid-column:1/-1;justify-content:flex-end;gap:9px}
- .player-more .icon-button{height:28px;width:28px}
- .player-more .volume-label{display:flex;align-items:center;gap:8px;margin-right:auto}
- .player-platforms{max-width:none}
- .player-error{grid-column:1/-1}
- .section-switch{top:12svh;height:78svh;width:46px;right:0;padding:30px 8px;align-items:center;justify-content:center;gap:25px;border-radius:90% 0 0 35% / 35% 0 0 65%;transform-origin:right center;transition:transform 350ms ease;box-shadow:0 0 0 1px var(--border)}
- .section-switch strong{font-size:27px}
- .section-switch span{font-size:8px}
- .switch-left{left:0;right:auto;border-radius:0 90% 35% 0 / 0 65% 35% 0;transform-origin:left center}
- .section-switch:hover,.section-switch:focus-visible{transform:scaleX(1.12)}
- .social-rail{right:58px}
- html[data-direction=left]{--transition-offset:-40%}
- html[data-direction=right]{--transition-offset:40%}
+
+.logo-title {
+   font-size: 68px
 }
-@media(max-width:800px){.track-description{flex:1}.track-wave{display:none}.logo-title{font-size:68px}}
-@media(max-width:800px){
- html[data-section=home] body:has(.player:not([hidden])) .cookie-notice{top:calc(var(--header-height) + 12px);bottom:auto}
+
+.logo-choice {
+   transform-box: fill-box;
+   transform-origin: center;
+   transition: transform 360ms ease
 }
-@media(prefers-reduced-motion:reduce){.logo-choice:hover,.section-switch:hover{transform:none}}
+
+@media(hover:hover) and (prefers-reduced-motion:no-preference) {
+
+   .hero-scene:not(.is-about-revealing) .logo-choice:hover,
+   .hero-scene:not(.is-about-revealing) .logo-choice:focus-visible {
+      transform: scale(1.055)
+   }
+}
+
+.track-wave {
+   flex: 1 1 0;
+   min-width: 50px;
+   width: auto
+}
+
+.track-description {
+   flex: 0 1 250px
+}
+
+.compact .track-description {
+   flex: 1
+}
+
+.player {
+   position: fixed;
+   z-index: 50;
+   left: 50%;
+   bottom: 24px;
+   transform: translateX(-50%);
+   box-sizing: border-box;
+   width: min(900px, calc(100vw - 48px));
+   display: grid;
+   grid-template-columns: minmax(130px, 1fr) auto minmax(150px, 1.2fr) auto;
+   grid-template-areas: 'track buttons progress actions';
+   align-items: center;
+   gap: 10px;
+   padding: 10px 14px;
+   background: var(--player-bg);
+   color: var(--player-text);
+   border: 1px solid var(--border);
+   border-radius: 12px;
+   box-shadow: 0 8px 28px #0003
+}
+
+.player-track,
+.player[data-source=showreel] .player-track {
+   grid-area: track;
+   min-width: 0;
+   max-width: none;
+   gap: 10px
+}
+
+.player-track>img {
+   width: 42px;
+   height: 42px;
+   flex: none;
+   border-radius: 4px
+}
+
+.player-track strong {
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap
+}
+
+.player-track span {
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap
+}
+
+.player-buttons {
+   grid-area: buttons;
+   justify-self: center;
+   gap: 2px
+}
+
+.player-buttons .icon-button,
+.player-more .icon-button {
+   width: 34px;
+   height: 34px;
+   padding: 6px
+}
+
+.play-button {
+   width: 42px !important;
+   height: 42px !important;
+   display: grid !important;
+   place-items: center;
+   padding: 0 !important
+}
+
+.play-button>span {
+   display: grid;
+   place-items: center;
+   width: 100%;
+   height: 100%
+}
+
+.play-button [hidden] {
+   display: none
+}
+
+.play-button [data-play-icon] svg {
+   transform: translateX(1px)
+}
+
+.player-progress {
+   grid-area: progress;
+   min-width: 0;
+   gap: 7px
+}
+
+.player-progress span {
+   font-variant-numeric: tabular-nums;
+   white-space: nowrap
+}
+
+.player-more {
+   grid-area: actions;
+   justify-self: end;
+   gap: 7px;
+   white-space: nowrap
+}
+
+.player-more .volume-label {
+   display: flex;
+   align-items: center;
+   gap: 7px
+}
+
+.player-more .volume-label input {
+   width: 68px
+}
+
+.player-platforms {
+   max-width: 150px;
+   gap: 7px;
+   flex-wrap: nowrap;
+   overflow: hidden;
+   white-space: nowrap
+}
+
+.player-more-trigger,
+.player-secondary {
+   display: none
+}
+
+.player-error {
+   grid-area: error;
+   margin: 0
+}
+
+.player:has(.player-error:not([hidden])) {
+   grid-template-areas: 'track buttons progress actions' 'error error error error'
+}
+
+.player[data-source=showreel] .player-track span {
+   display: none
+}
+
+.project-dialog[open] {
+   display: grid;
+   grid-template-rows: minmax(0, 1fr) auto;
+   width: min(1180px, 92vw);
+   height: min(90svh, 900px);
+   max-height: 90svh;
+   overflow: hidden;
+   padding: 0
+}
+
+.project-dialog[open]>.dialog-close {
+   position: absolute;
+   top: 15px;
+   right: 15px;
+   margin: 0
+}
+
+#project-dialog[open] #project-dialog-content {
+   min-height: 0;
+   overflow: auto
+}
+
+#project-dialog[open] #project-dialog-player-slot {
+   min-width: 0;
+   display: flex;
+   justify-content: center;
+   padding: 0 16px 12px
+}
+
+.project-dialog[open]>#project-dialog-player-slot>.player {
+   position: relative;
+   left: auto;
+   bottom: auto;
+   transform: none;
+   width: min(900px, 100%);
+   margin: 0;
+   z-index: 6
+}
+
+@media(min-width:801px) {
+
+   /* A visible shared player occupies the lower part of the viewport. Keep the
+    hero's complete video frame above it, so lower-third captions stay in the
+    visible frame instead of being covered or cropped by object-fit: cover. */
+   body:has(.player:not([hidden])) .hero-scene:not(.is-full-frame) .hero-backdrop video {
+      inset: 0 0 calc(var(--player-space) + 12px);
+      height: auto;
+      object-fit: contain;
+      object-position: center bottom
+   }
+
+   .hero-scene:not(.is-full-frame) .hero-backdrop video {
+      object-position: center bottom
+   }
+
+   .section-switch {
+      top: 12svh;
+      height: 78svh;
+      width: 46px;
+      right: 0;
+      padding: 30px 8px;
+      align-items: center;
+      justify-content: center;
+      gap: 25px;
+      border-radius: 90% 0 0 35% / 35% 0 0 65%;
+      transform-origin: right center;
+      transition: transform 350ms ease;
+      box-shadow: 0 0 0 1px var(--border)
+   }
+
+   .section-switch strong {
+      font-size: 27px
+   }
+
+   .section-switch span {
+      font-size: 8px
+   }
+
+   .switch-left {
+      left: 0;
+      right: auto;
+      border-radius: 0 90% 35% 0 / 0 65% 35% 0;
+      transform-origin: left center
+   }
+
+   .section-switch:hover,
+   .section-switch:focus-visible {
+      transform: scaleX(1.12)
+   }
+
+   .social-rail {
+      right: 58px
+   }
+
+   html[data-direction=left] {
+      --transition-offset: -40%
+   }
+
+   html[data-direction=right] {
+      --transition-offset: 40%
+   }
+}
+
+@media(max-width:800px) {
+   .track-description {
+      flex: 1
+   }
+
+   .track-wave {
+      display: none
+   }
+
+   .logo-title {
+      font-size: 68px
+   }
+
+   .player {
+      left: 12px;
+      right: 12px;
+      bottom: calc(52px + env(safe-area-inset-bottom));
+      transform: none;
+      width: auto;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      grid-template-areas: 'track buttons more close' 'progress progress progress progress';
+      gap: 6px 7px;
+      padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+      min-height: 88px
+   }
+
+   .player-track {
+      gap: 8px
+   }
+
+   .player-track>img {
+      width: 36px;
+      height: 36px
+   }
+
+   .player-track span {
+      display: none
+   }
+
+   .player-buttons {
+      gap: 0
+   }
+
+   .player-buttons .track-only {
+      display: none
+   }
+
+   .player-buttons .icon-button {
+      width: 42px;
+      height: 42px
+   }
+
+   .play-button {
+      width: 44px !important;
+      height: 44px !important
+   }
+
+   .player-progress {
+      min-height: 26px;
+      gap: 6px
+   }
+
+   .player-progress span {
+      font-size: 9px
+   }
+
+   .player-more {
+      display: flex;
+      grid-area: close;
+      justify-self: end
+   }
+
+   .player-more>:not([data-player=close]) {
+      display: none
+   }
+
+   .player-more .icon-button {
+      width: 42px;
+      height: 42px;
+      padding: 9px
+   }
+
+   .player-more-trigger {
+      grid-area: more;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      min-width: 44px;
+      height: 42px;
+      padding: 0 4px;
+      font-size: 9px
+   }
+
+   .player-secondary {
+      position: absolute;
+      right: 10px;
+      bottom: calc(100% + 8px);
+      box-sizing: border-box;
+      width: min(288px, calc(100vw - 24px));
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+      padding: 10px;
+      background: var(--player-bg);
+      color: var(--player-text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 28px #0004
+   }
+
+   .player-secondary[hidden] {
+      display: none
+   }
+
+   .player-secondary-transport {
+      display: flex;
+      gap: 2px
+   }
+
+   .player-secondary .icon-button {
+      width: 40px;
+      height: 40px;
+      padding: 8px
+   }
+
+   .player-secondary .volume-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 9px
+   }
+
+   .player-secondary .volume-label input {
+      width: 82px
+   }
+
+   .player-secondary .player-platforms {
+      flex-basis: 100%;
+      max-width: 100%;
+      flex-wrap: wrap;
+      white-space: normal;
+      overflow: visible
+   }
+
+   .player:has(.player-error:not([hidden])) {
+      grid-template-areas: 'track buttons more close' 'progress progress progress progress' 'error error error error'
+   }
+
+   .project-dialog[open] {
+      width: 100%;
+      height: 100svh;
+      max-height: 100svh;
+      border: 0
+   }
+
+   .project-dialog[open]>.dialog-close {
+      top: 12px;
+      right: 12px
+   }
+
+   .project-dialog[open]>#project-dialog-player-slot {
+      padding: 0 12px 8px
+   }
+}
+
+@media(max-width:360px) {
+   .player-track>img {
+      display: none
+   }
+
+   .player {
+      grid-template-columns: minmax(0, 1fr) auto auto auto
+   }
+
+   .player-more-trigger {
+      min-width: 40px;
+      font-size: 8px
+   }
+
+   .player-progress span {
+      font-size: 8px
+   }
+}
+
+@media(max-width:800px) {
+   html[data-section=home] body:has(.player:not([hidden])) .cookie-notice {
+      top: calc(var(--header-height) + 12px);
+      bottom: auto
+   }
+}
+
+@media(prefers-reduced-motion:reduce) {
+
+   .logo-choice:hover,
+   .section-switch:hover {
+      transform: none
+   }
+}

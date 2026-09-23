@@ -1,4 +1,99 @@
-import {test,expect} from '@playwright/test';import {ready,shot} from './helpers';
-test('filters, modal history, focus and direct project reload',async({page},info)=>{await ready(page,'/film-music/');await page.getByRole('button',{name:'Documentary',exact:true}).click();await expect(page.locator('.portfolio-empty')).toBeVisible();await page.getByRole('button',{name:'Fiction Film',exact:true}).click();const card=page.locator('[data-project-card]:visible').first();await card.scrollIntoViewIfNeeded();const y=await page.evaluate(()=>scrollY);await card.click();await expect(page.locator('#project-dialog')).toBeVisible();await expect(page).toHaveURL(/\/projects\/kinnhakenhank\/$/);await shot(page,'project-modal',info);await page.keyboard.press('Tab');expect(await page.evaluate(()=>!!document.activeElement?.closest('#project-dialog'))).toBe(true);await page.goBack();await expect(page.locator('#project-dialog')).not.toBeVisible();expect(await page.evaluate(()=>scrollY)).toBeCloseTo(y,-1);await expect(card).toBeFocused();await expect(page.getByRole('button',{name:'Fiction Film',exact:true})).toHaveAttribute('aria-pressed','true');await page.goForward();await expect(page.locator('#project-dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#project-dialog')).not.toBeVisible();await card.click();await page.reload();await expect(page.locator('.direct-project')).toBeVisible();await expect(page.locator('#project-dialog')).not.toBeVisible();await expect(page.locator('.direct-project h1')).toHaveText('Kinnhakenhank');});
-test('contextual About theme, navigation and history',async({page},info)=>{await ready(page,'/directing/');await page.getByRole('button',{name:'Assistant Director',exact:true}).click();await expect(page.locator('.portfolio-empty')).toBeVisible();await page.locator('header [data-about]').click();await expect(page).toHaveURL(/\/#about$/);await expect(page.locator('#about')).toBeInViewport();await expect(page.locator('#about')).toHaveAttribute('data-theme','light');await expect(page.locator('html')).toHaveAttribute('data-theme','light');await shot(page,'about-light',info);await page.goBack();await expect(page).toHaveURL(/\/directing\/$/);await expect(page.getByRole('button',{name:'Assistant Director',exact:true})).toHaveAttribute('aria-pressed','true');await page.goForward();await expect(page.locator('#about')).toHaveAttribute('data-theme','light');await page.locator('.back-menu').click();await expect(page).toHaveURL(/\/#main-menu$/);await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await page.getByRole('link',{name:'Explore Film Music'}).click();await expect(page).toHaveURL(/\/film-music\/$/);await page.locator('header [data-about]').click();await expect(page.locator('#about')).toHaveAttribute('data-theme','dark');});
-test('catalog combines filters, no fake audio and no handler accumulation',async({page},info)=>{await ready(page,'/film-music/');await page.locator('#genre-filter').selectOption('Jazz');await page.locator('#emotion-filter').selectOption('uplifting');await expect(page.locator('.music-library [data-track-row]:visible')).toHaveCount(1);await page.locator('#emotion-filter').selectOption('dark');await expect(page.locator('.library-empty')).toBeVisible();await page.locator('[data-reset-tracks]').click();await expect(page.locator('.music-library [data-track-row]:visible')).toHaveCount(5);await expect(page.locator('[data-play-track]')).toHaveCount(0);await shot(page,'catalog',info);for(let i=0;i<3;i++){await page.locator('.section-switch').click();await expect(page).toHaveURL(/\/directing\/$/);await page.locator('.section-switch').click();await expect(page).toHaveURL(/\/film-music\/$/);}await expect(page.locator('#shared-audio')).toHaveCount(1);await expect(page.locator('.player')).toHaveCount(1);await expect(page.locator('#project-dialog')).toHaveCount(1);await page.locator('[data-project-card]').first().click();await expect(page.locator('#project-dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page).toHaveURL(/\/film-music\/$/);});
+import { test, expect } from "@playwright/test";
+import { ready, shot } from "./helpers";
+test("filters, modal history, focus and direct project reload", async ({
+  page,
+}, info) => {
+  await ready(page, "/film-music/");
+  await page.getByRole("button", { name: "Documentary", exact: true }).click();
+  await expect(page.locator(".portfolio-empty")).toBeVisible();
+  await page.getByRole("button", { name: "Fiction Film", exact: true }).click();
+  const card = page.locator("[data-project-card]:visible").first();
+  await card.scrollIntoViewIfNeeded();
+  const y = await page.evaluate(() => scrollY);
+  await card.click();
+  await expect(page.locator("#project-dialog")).toBeVisible();
+  await expect(page).toHaveURL(/\/projects\/kinnhakenhank\/$/);
+  await shot(page, "project-modal", info);
+  await page.keyboard.press("Tab");
+  expect(
+    await page.evaluate(
+      () => !!document.activeElement?.closest("#project-dialog"),
+    ),
+  ).toBe(true);
+  await page.goBack();
+  await expect(page.locator("#project-dialog")).not.toBeVisible();
+  expect(await page.evaluate(() => scrollY)).toBeCloseTo(y, -1);
+  await expect(card).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Fiction Film", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.goForward();
+  await expect(page.locator("#project-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#project-dialog")).not.toBeVisible();
+  await card.click();
+  await page.reload();
+  await expect(page.locator(".direct-project")).toBeVisible();
+  await expect(page.locator("#project-dialog")).not.toBeVisible();
+  await expect(page.locator(".direct-project h1")).toHaveText("Kinnhakenhank");
+});
+test("contextual About theme, navigation and history", async ({
+  page,
+}, info) => {
+  await ready(page, "/directing/");
+  await page
+    .getByRole("button", { name: "Assistant Director", exact: true })
+    .click();
+  await expect(page.locator(".portfolio-empty")).toBeVisible();
+  await page.locator("header [data-about]").click();
+  await expect(page).toHaveURL(/\/#about$/);
+  await expect(page.locator("#about")).toBeInViewport();
+  await expect(page.locator("#about")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await shot(page, "about-light", info);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/directing\/$/);
+  await expect(
+    page.getByRole("button", { name: "Assistant Director", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.goForward();
+  await expect(page.locator("#about")).toHaveAttribute("data-theme", "light");
+  await page.locator(".back-menu").click();
+  await expect(page).toHaveURL(/\/#main-menu$/);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("link", { name: "Explore Film Music" }).click();
+  await expect(page).toHaveURL(/\/film-music\/$/);
+  await page.locator("header [data-about]").click();
+  await expect(page.locator("#about")).toHaveAttribute("data-theme", "dark");
+});
+test("catalog combines filters, no fake audio and no handler accumulation", async ({
+  page,
+}, info) => {
+  await ready(page, "/film-music/");
+  await page.locator("#genre-filter").selectOption("Jazz");
+  await page.locator("#emotion-filter").selectOption("uplifting");
+  await expect(
+    page.locator(".music-library [data-track-row]:visible"),
+  ).toHaveCount(1);
+  await page.locator("#emotion-filter").selectOption("dark");
+  await expect(page.locator(".library-empty")).toBeVisible();
+  await page.locator("[data-reset-tracks]").click();
+  await expect(
+    page.locator(".music-library [data-track-row]:visible"),
+  ).toHaveCount(5);
+  await expect(page.locator("[data-play-track]")).toHaveCount(0);
+  await shot(page, "catalog", info);
+  for (let i = 0; i < 3; i++) {
+    await page.locator(".section-switch").click();
+    await expect(page).toHaveURL(/\/directing\/$/);
+    await page.locator(".section-switch").click();
+    await expect(page).toHaveURL(/\/film-music\/$/);
+  }
+  await expect(page.locator("#shared-audio")).toHaveCount(1);
+  await expect(page.locator(".player")).toHaveCount(1);
+  await expect(page.locator("#project-dialog")).toHaveCount(1);
+  await page.locator("[data-project-card]").first().click();
+  await expect(page.locator("#project-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/film-music\/$/);
+});

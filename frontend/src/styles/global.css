@@ -1342,26 +1342,6 @@ form .form-status {
     line-height: 2
 }
 
-.navigation-loader {
-    position: fixed;
-    right: 25px;
-    top: 22px;
-    width: 30px;
-    z-index: 100;
-    display: none
-}
-
-.is-loading .navigation-loader {
-    display: block;
-    animation: breathe .8s ease-in-out infinite alternate
-}
-
-@keyframes breathe {
-    to {
-        opacity: .3
-    }
-}
-
 .player {
     position: fixed;
     bottom: 0;

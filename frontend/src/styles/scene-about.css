@@ -1,39 +1,145 @@
 /* The single, opaque About sits above the menu, visible only inside the SVG
    aperture. Its own layout never scales; after the reveal it scrolls normally. */
-.hero-scene,.js .hero-scene{height:auto;min-height:0}
-.scene-sticky,.js .scene-sticky{height:auto;min-height:0;overflow:visible;position:relative}
-.scene-visuals{position:relative;height:100svh;min-height:620px;isolation:isolate;overflow:clip;background:var(--color-dark)}
-.scene-aperture{position:absolute;pointer-events:none}
-.hero-scene .about-section{position:relative;min-height:100svh}
-.scene-sticky{display:flex;flex-direction:column}
-.scene-visuals{order:-1}
+.hero-scene,
+.js .hero-scene {
+   height: auto;
+   min-height: 0
+}
 
-@media(prefers-reduced-motion:no-preference){
- .js .hero-scene{--scene-travel:155svh}
- .js .hero-scene::after{content:'';display:block;height:var(--scene-travel)}
- .js .scene-sticky{position:sticky;top:0;display:block}
- .js .scene-visuals{position:absolute;inset:0 0 auto;height:100svh;min-height:0;z-index:1}
- .js .hero-scene .about-section{visibility:hidden;clip-path:url(#scene-about-aperture);z-index:2}
- .js .menu-anchor{top:72svh}
- .is-about-revealing .scene-logo,.is-about-revealing .menu-about{pointer-events:none}
- .is-about-revealing .logo-choice{transform:none;transition:none}
- .is-about-revealing .logo-choice path{stroke:none}
- .is-about-revealing .split-backdrop .media-slot{transform:none!important;transition:none}
+.scene-sticky,
+.js .scene-sticky {
+   height: auto;
+   min-height: 0;
+   overflow: visible;
+   position: relative
+}
+
+.scene-visuals {
+   position: relative;
+   height: 100svh;
+   min-height: 620px;
+   isolation: isolate;
+   overflow: clip;
+   background: var(--color-dark)
+}
+
+.scene-aperture {
+   position: absolute;
+   pointer-events: none
+}
+
+.hero-scene .about-section {
+   position: relative;
+   min-height: 100svh
+}
+
+.scene-sticky {
+   display: flex;
+   flex-direction: column
+}
+
+.scene-visuals {
+   order: -1
+}
+
+@media(prefers-reduced-motion:no-preference) {
+   .js .hero-scene {
+      --scene-travel: 155svh
+   }
+
+   .js .hero-scene::after {
+      content: '';
+      display: block;
+      height: var(--scene-travel)
+   }
+
+   .js .scene-sticky {
+      position: sticky;
+      top: 0;
+      display: block
+   }
+
+   .js .scene-visuals {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 100svh;
+      min-height: 0;
+      z-index: 1
+   }
+
+   .js .hero-scene .about-section {
+      visibility: hidden;
+      clip-path: url(#scene-about-aperture);
+      z-index: 2
+   }
+
+   .js .menu-anchor {
+      top: 72svh
+   }
+
+   .is-about-revealing .scene-logo,
+   .is-about-revealing .menu-about {
+      pointer-events: none
+   }
+
+   .is-about-revealing .logo-choice {
+      transform: none;
+      transition: none
+   }
+
+   .is-about-revealing .logo-choice path {
+      stroke: none
+   }
+
+   .is-about-revealing .split-backdrop .media-slot {
+      transform: none !important;
+      transition: none
+   }
 }
 
 /* Keep About copy clear of the existing desktop social rail, including 820px. */
-@media(min-width:801px){
- .about-content{padding-right:max(112px,5vw)}
+@media(min-width:801px) {
+   .about-content {
+      padding-right: max(112px, 5vw)
+   }
 }
-@media(max-width:600px){
- .hero-scene .about-portrait{height:34svh;min-height:220px;position:relative}
- .hero-scene .about-content{padding-top:30px}
- .hero-scene .about-content h2{font-size:clamp(46px,13vw,64px);margin:15px 0}
+
+@media(max-width:600px) {
+   .hero-scene .about-portrait {
+      height: 34svh;
+      min-height: 220px;
+      position: relative
+   }
+
+   .hero-scene .about-content {
+      padding-top: 30px
+   }
+
+   .hero-scene .about-content h2 {
+      font-size: clamp(46px, 13vw, 64px);
+      margin: 15px 0
+   }
 }
-@media(prefers-reduced-motion:reduce){
- .hero-scene .about-portrait{position:relative}
- .scene-visuals{min-height:100svh}
+
+@media(prefers-reduced-motion:reduce) {
+   .hero-scene .about-portrait {
+      position: relative
+   }
+
+   .scene-visuals {
+      min-height: 100svh
+   }
 }
-.site-footer>div:last-child,.site-footer button{font-size:11px}
-.footer-wordmark span{font-size:9px}
-.prototype-label{font-size:10px}
+
+.site-footer>div:last-child,
+.site-footer button {
+   font-size: 11px
+}
+
+.footer-wordmark span {
+   font-size: 9px
+}
+
+.prototype-label {
+   font-size: 10px
+}

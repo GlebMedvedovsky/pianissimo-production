@@ -1,1 +1,6 @@
-{"extends":"astro/tsconfigs/strict","include":[".astro/types.d.ts","**/*","../contracts/**/*.ts"],"exclude":["dist"],"compilerOptions":{"types":["node"]}}
+{
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "**/*", "../contracts/**/*.ts"],
+  "exclude": ["dist"],
+  "compilerOptions": { "types": ["node"] }
+}

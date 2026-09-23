@@ -3,7 +3,7 @@ import {ClientRouter} from 'astro:transitions';
 import '@fontsource/cormorant-garamond/400.css';import '@fontsource/cormorant-garamond/400-italic.css';import '@fontsource/cormorant-garamond/500.css';import '@fontsource/inter/400.css';import '@fontsource/inter/500.css';
 import '../styles/site.css'; // One ordered cascade on initial load and client navigation.
 import MediaSlot from '../components/MediaSlot.astro';
-import Header from '../components/Header.astro';import Dialogs from '../components/Dialogs.astro';import Player from '../components/Player.astro';import Logo from '../components/Logo.astro';
+import Header from '../components/Header.astro';import Dialogs from '../components/Dialogs.astro';import Player from '../components/Player.astro';
 import ProjectTemplates from '../components/ProjectTemplates.astro';
 import {content} from '../lib/content/data';import {siteConfig,type Section,type Theme} from '../config/site.config';
 interface Props {title?:string;section?:Section;theme?:Theme;description?:string}
@@ -15,4 +15,4 @@ const {title,section='home',theme='dark',description=content.site.description}=A
 <script is:inline>document.documentElement.classList.add('js');if(location.hash==='#about'){const r=document.documentElement;const m=r.dataset.aboutMode;const t=m==='follow-section'?(history.state?.aboutContext==='directing'?'light':r.dataset.aboutDefault):m;r.dataset.theme=t||'dark';r.dataset.aboutTheme=t||'dark'}</script>
 <script is:inline type="application/json" id="site-content" set:html={JSON.stringify(content).replace(/</g,'\\u003c')}/>
 </head>
-<body>{section!=='home'&&<div hidden data-hero-parking><MediaSlot name="hero"/></div>}<Header section={section}/><main id="content"><slot/></main><footer class="site-footer"><div class="footer-wordmark">PIANISSIMO <span>PRODUCTION</span></div><div><span>© {new Date().getFullYear()} Sebastian Greim</span><a href="/legal/">Legal Notice</a><a href="/privacy/">Privacy Policy</a><button data-consent-settings>Cookie Settings</button><span class="prototype-label">Portfolio</span></div></footer><Dialogs/><Player/><ProjectTemplates context={section==='directing'?'directing':'music'}/><div class="navigation-loader" aria-hidden="true"><Logo/></div><script>import '../lib/app';</script></body></html>
+<body>{section!=='home'&&<div hidden data-hero-parking><MediaSlot name="hero"/></div>}<Header section={section}/><main id="content"><slot/></main><footer class="site-footer"><div class="footer-wordmark">PIANISSIMO <span>PRODUCTION</span></div><div><span>© {new Date().getFullYear()} Sebastian Greim</span><a href="/legal/">Legal Notice</a><a href="/privacy/">Privacy Policy</a><button data-consent-settings>Cookie Settings</button><span class="prototype-label">Portfolio</span></div></footer><Dialogs/><Player/><ProjectTemplates context={section==='directing'?'directing':'music'}/><script>import '../lib/app';</script></body></html>
