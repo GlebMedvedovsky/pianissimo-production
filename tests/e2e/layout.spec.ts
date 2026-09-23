@@ -1,5 +1,63 @@
 import { test, expect } from "@playwright/test";
 import { ready, shot, noOverflow } from "./helpers";
+test("mobile portfolio header stays pinned without covering content", async ({ page }, info) => {
+  if (info.project.name === "narrow") await page.setViewportSize({ width: 320, height: 568 });
+  await ready(page, "/film-music/");
+  const header = page.locator(".site-header--portfolio");
+  await expect(header).toHaveCSS("position", "fixed");
+  const initial = await page.evaluate(() => {
+    const header = document.querySelector<HTMLElement>(".site-header")!;
+    const intro = document.querySelector<HTMLElement>(".portfolio-intro")!;
+    return { header: header.getBoundingClientRect(), intro: intro.getBoundingClientRect() };
+  });
+  expect(initial.intro.top).toBeGreaterThanOrEqual(initial.header.bottom);
+  await page.evaluate(() => scrollTo({ top: 1400, behavior: "instant" }));
+  await expect.poll(() => header.evaluate((element) => element.getBoundingClientRect().top)).toBeCloseTo(0, 0);
+  await shot(page, "sticky-music-scroll", info);
+  await noOverflow(page);
+  const navigationFits = await page.locator(".site-header nav a, .site-header nav button").evaluateAll((items) =>
+    items.every((item) => {
+      const box = item.getBoundingClientRect();
+      return box.left >= 0 && box.right <= innerWidth;
+    }),
+  );
+  expect(navigationFits).toBe(true);
+  await page.locator('header a[href="/directing/"]').click();
+  await expect(page).toHaveURL(/\/directing\/$/);
+  await expect(page.locator("header [aria-current=page]")).toHaveText("Directing");
+  await expect(header).toHaveCSS("position", "fixed");
+  await page.evaluate(() => scrollTo({ top: 1400, behavior: "instant" }));
+  await expect.poll(() => header.evaluate((element) => element.getBoundingClientRect().top)).toBeCloseTo(0, 0);
+  await shot(page, "sticky-directing-scroll", info);
+  await page.locator('header a[href="/film-music/"]').click();
+  await expect(page).toHaveURL(/\/film-music\/$/);
+  await expect(page.locator("header [aria-current=page]")).toHaveText("Film Music");
+  await expect(header).toHaveCSS("position", "fixed");
+  await page.locator('header a[href="/directing/"]').click();
+  await expect(page).toHaveURL(/\/directing\/$/);
+  await page.locator("[data-project-card]").first().click();
+  await expect(page.locator("#project-dialog")).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement?.closest("#project-dialog") !== null)).toBe(true);
+  expect(
+    await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>(".site-header")!;
+      const dialog = document.querySelector<HTMLDialogElement>("#project-dialog")!;
+      const point = header.getBoundingClientRect();
+      return document.elementFromPoint(point.left + 8, point.top + 8)?.closest("#project-dialog") === dialog;
+    }),
+  ).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#project-dialog")).not.toBeVisible();
+  await page.locator("header [data-brand-home]").click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".site-header--portfolio")).toHaveCount(0);
+});
+
+test("desktop portfolio header keeps its original positioning", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop-only layout assertion");
+  await ready(page, "/film-music/");
+  await expect(page.locator(".site-header--portfolio")).toHaveCSS("position", "absolute");
+});
 test("hero, reversible logo and viewport layouts", async ({ page }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

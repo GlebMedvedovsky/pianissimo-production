@@ -8,6 +8,14 @@ let cleanup=()=>{};let navigationDirection='right';let initialLoad=true;
 const currentSection=()=>document.documentElement.dataset.section as Section;
 function init(){cleanup();const controller=new AbortController();const signal=controller.signal;const removeScene=initScene();const removeVideo=initLocalVideo(signal);initFilters(signal);initProjectModal();initConsent();coordinator.section(location.hash==='#about'?'about':currentSection());renderPlayer();
  const root=document.documentElement;root.classList.add('js');root.classList.remove('is-loading');root.style.setProperty('--transition-duration',`${siteConfig.motion.transitionDuration}ms`);
+ const header=document.querySelector<HTMLElement>('.site-header--portfolio');
+ let headerObserver:ResizeObserver|undefined;
+ if(header){
+  const syncHeaderSpace=()=>root.style.setProperty('--portfolio-header-height',`${header.getBoundingClientRect().height}px`);
+  headerObserver=new ResizeObserver(syncHeaderSpace);
+  headerObserver.observe(header);
+  syncHeaderSpace();
+ }
  if(location.hash==='#about'||initialLoad&&location.hash){requestAnimationFrame(()=>{if(location.hash==='#about'&&scrollToSceneAbout())return;document.getElementById(location.hash.slice(1))?.scrollIntoView({behavior:'instant'});});}initialLoad=false;
  const about=document.querySelector<HTMLElement>('#about');let aboutObserver:IntersectionObserver|undefined;
  if(about){
@@ -25,7 +33,14 @@ function init(){cleanup();const controller=new AbortController();const signal=co
   if(location.hash==='#about')root.dataset.theme=theme;
  }
  document.querySelectorAll<HTMLDialogElement>('.small-dialog').forEach(dialog=>{dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()},{signal});});
- cleanup=()=>{controller.abort();removeScene();removeVideo();aboutObserver?.disconnect();};
+ cleanup=()=>{
+  controller.abort();
+  removeScene();
+  removeVideo();
+  aboutObserver?.disconnect();
+  headerObserver?.disconnect();
+  root.style.removeProperty('--portfolio-header-height');
+ };
 }
 document.addEventListener('astro:page-load',init);
 document.addEventListener('astro:before-preparation',event=>{
