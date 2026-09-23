@@ -10,6 +10,7 @@ export const siteConfig = {
     pauseOnSections: ["directing", "about"] as Section[],
     hidePanelOnSections: ["directing", "about"] as Section[],
     volume: 0.65,
+    showreelFadeDuration: 1000,
   },
   motion: {
     respectReducedMotion: true,

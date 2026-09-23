@@ -1,4 +1,5 @@
 import {coordinator} from './player';
+import {prepareShowreelAudio} from './showreel-audio';
 
 /** The hero element persists between Astro pages. Looping belongs exclusively
  * to HTMLMediaElement.loop: no ended handler, source reset, or loop timer. */
@@ -17,7 +18,14 @@ export function initLocalVideo(signal:AbortSignal) {
  if(hero){
   for(const event of ['play','pause','volumechange','error','loadedmetadata'])hero.addEventListener(event,render,{signal});
   toggle?.addEventListener('click',()=>{if(hero.paused)void coordinator.useShowreel(hero,false);else coordinator.pause();},{signal});
-  sound?.addEventListener('click',()=>{if(hero.muted)void coordinator.useShowreel(hero);else hero.muted=true;},{signal});
+  const enableShowreelAudio=()=>{
+   try{
+    const gain=prepareShowreelAudio(hero);
+    if(gain){coordinator.setShowreelGain(hero,gain);coordinator.resumeShowreelAudio(hero);}
+   }catch(error){console.warn('Showreel Web Audio could not be prepared.',error);}
+  };
+  sound?.addEventListener('click',()=>{if(hero.muted){enableShowreelAudio();void coordinator.useShowreel(hero);}else coordinator.mute();},{signal});
+  document.addEventListener('click',event=>{const mute=(event.target as Element).closest('[data-player=mute]');if(mute&&coordinator.currentMedia===hero&&!hero.muted)enableShowreelAudio();},{signal});
   full?.addEventListener('click',()=>{wasOverflow=document.documentElement.style.overflow;document.documentElement.style.overflow='hidden';scene!.classList.add('is-full-frame');scene!.setAttribute('role','dialog');scene!.setAttribute('aria-modal','true');hero.controls=true;hero.tabIndex=0;close!.hidden=false;close!.focus({preventScroll:true});},{signal});
   close?.addEventListener('click',closeFull,{signal});
   document.addEventListener('keydown',event=>{if(!scene?.classList.contains('is-full-frame'))return;if(event.key==='Escape'){event.preventDefault();closeFull()}if(event.key==='Tab'){event.preventDefault();if(document.activeElement===close)hero?.focus();else close?.focus()}},{signal});

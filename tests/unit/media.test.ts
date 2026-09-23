@@ -3,9 +3,15 @@ import assert from "node:assert/strict";
 import {
   MediaCoordinator,
   adjacentIndex,
+  type FadeClock,
   type MediaPort,
   type Playable,
 } from "../../frontend/src/lib/media/coordinator";
+import {
+  createShowreelGain,
+  type AudioContextPort,
+  type ShowreelGainController,
+} from "../../frontend/src/lib/media/showreel-audio";
 class FakeMedia extends EventTarget implements MediaPort {
   src = "";
   currentTime = 0;
@@ -13,6 +19,7 @@ class FakeMedia extends EventTarget implements MediaPort {
   volume = 1;
   muted = false;
   paused = true;
+  readyState = 1;
   fail = false;
   async play() {
     if (this.fail) throw Error("blocked");
@@ -26,6 +33,70 @@ class FakeMedia extends EventTarget implements MediaPort {
   load() {}
   removeAttribute() {
     this.src = "";
+  }
+}
+class FakeFadeClock implements FadeClock {
+  private frame = 0;
+  private callbacks = new Map<number, FrameRequestCallback>();
+  time = 0;
+  now() {
+    return this.time;
+  }
+  requestFrame(callback: FrameRequestCallback) {
+    const frame = ++this.frame;
+    this.callbacks.set(frame, callback);
+    return frame;
+  }
+  cancelFrame(frame: number) {
+    this.callbacks.delete(frame);
+  }
+  tick(time: number) {
+    this.time = time;
+    const callbacks = [...this.callbacks.values()];
+    this.callbacks.clear();
+    callbacks.forEach(callback => callback(time));
+  }
+}
+class FakeShowreelGain implements ShowreelGainController {
+  fadeDurations: number[] = [];
+  restores = 0;
+  resumes = 0;
+  fadeOut(duration: number) {
+    this.fadeDurations.push(duration);
+  }
+  restore() {
+    this.restores++;
+  }
+  async resume() {
+    this.resumes++;
+  }
+}
+class FakeAudioContext implements AudioContextPort {
+  currentTime = 4;
+  state = "suspended";
+  destination = {};
+  sourceConnections: unknown[] = [];
+  gainConnections: unknown[] = [];
+  gainCalls: Array<[string, number, number]> = [];
+  resumes = 0;
+  createMediaElementSource() {
+    return { connect: (destination: unknown) => this.sourceConnections.push(destination) };
+  }
+  createGain() {
+    return {
+      gain: {
+        cancelScheduledValues: (time: number) => this.gainCalls.push(["cancel", time, 0]),
+        setValueAtTime: (value: number, time: number) =>
+          this.gainCalls.push(["set", value, time]),
+        linearRampToValueAtTime: (value: number, time: number) =>
+          this.gainCalls.push(["ramp", value, time]),
+      },
+      connect: (destination: unknown) => this.gainConnections.push(destination),
+    };
+  }
+  async resume() {
+    this.resumes++;
+    this.state = "running";
   }
 }
 const queue: Playable[] = [
@@ -135,7 +206,7 @@ test("closed player does not reopen on ordinary route changes", async () => {
   assert.equal(c.state.visible, false);
 });
 
-test("hero resumes only a navigation pause, keeping time and explicit sound choice", async () => {
+test("hero resumes a navigation pause only after return to Home", async () => {
   const audio = new FakeMedia(),
     video = new FakeMedia(),
     c = new MediaCoordinator(audio);
@@ -145,14 +216,18 @@ test("hero resumes only a navigation pause, keeping time and explicit sound choi
   c.section("directing");
   assert.equal(c.showreelPauseReason, "navigation");
   await c.resumeShowreelFromNavigation(video);
+  assert.equal(video.paused, true);
+  assert.equal(c.state.visible, false);
+  c.section("home");
+  await c.resumeShowreelFromNavigation(video);
   assert.equal(video.paused, false);
   assert.equal(video.currentTime, 23);
   assert.equal(video.muted, true);
-  video.muted = false;
   c.section("about");
   await c.resumeShowreelFromNavigation(video);
-  assert.equal(video.muted, false);
-  assert.equal(c.state.visible, true);
+  assert.equal(video.paused, true);
+  assert.equal(video.muted, true);
+  assert.equal(c.state.visible, false);
   assert.equal(audio.paused, true);
   c.pause();
   c.section("directing");
@@ -175,4 +250,132 @@ test("native manual pause and another audio source cannot be overridden by hero 
   assert.equal(video.paused, true);
   assert.equal(c.currentMedia, audio);
   assert.equal(audio.paused, false);
+});
+test("hero navigation fade schedules GainNode silence before it pauses", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    clock = new FakeFadeClock(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio, clock);
+  video.volume = 0.7;
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  assert.equal(c.fadeShowreelForNavigation(video), true);
+  assert.deepEqual(gain.fadeDurations, [1000]);
+  clock.tick(500);
+  assert.equal(video.volume, 0.7);
+  assert.equal(video.paused, false);
+  clock.tick(1000);
+  assert.equal(video.paused, true);
+  assert.equal(c.showreelPauseReason, "navigation");
+  assert.equal(gain.restores, 1);
+});
+test("About hides a sounding showreel and uses the existing GainNode fade", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    clock = new FakeFadeClock(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio, clock);
+  video.currentTime = 17;
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  c.section("about");
+  assert.equal(c.state.visible, false);
+  assert.deepEqual(gain.fadeDurations, [1000]);
+  clock.tick(500);
+  assert.equal(video.paused, false);
+  clock.tick(1000);
+  assert.equal(video.paused, true);
+  assert.equal(video.currentTime, 17);
+});
+test("muted and paused showreels enter About without starting a fade", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio);
+  video.muted = true;
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  c.section("about");
+  assert.equal(video.paused, true);
+  assert.equal(c.state.visible, false);
+  assert.deepEqual(gain.fadeDurations, []);
+  c.section("home");
+  c.pause();
+  c.section("about");
+  assert.deepEqual(gain.fadeDurations, []);
+});
+test("showreel stays hidden and paused outside Home while music tracks keep their panel", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    c = new MediaCoordinator(audio);
+  await c.useShowreel(video, false);
+  c.hideShowreelPanelForNavigation();
+  assert.equal(video.paused, false);
+  assert.equal(c.state.visible, false);
+  c.section("music");
+  assert.equal(video.paused, true);
+  assert.equal(c.state.visible, false);
+  video.dispatchEvent(new Event("timeupdate"));
+  c.exposePanel();
+  assert.equal(c.state.visible, false);
+  c.section("directing");
+  c.section("music");
+  assert.equal(c.state.visible, false);
+  await c.select(queue[0]!, queue);
+  c.section("music");
+  assert.equal(c.state.track?.id, "one");
+  assert.equal(c.state.visible, true);
+  assert.equal(audio.paused, false);
+});
+test("a newer source selection cancels a hero fade before it can pause that source", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    clock = new FakeFadeClock(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio, clock);
+  video.volume = 0.7;
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  c.fadeShowreelForNavigation(video);
+  clock.tick(500);
+  await c.select(queue[0]!, queue);
+  clock.tick(1000);
+  assert.equal(audio.paused, false);
+  assert.equal(c.currentMedia, audio);
+  assert.equal(gain.restores, 1);
+});
+test("header restart seeks the persisted showreel once and keeps its sound choice", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    c = new MediaCoordinator(audio);
+  video.muted = true;
+  video.currentTime = 28;
+  c.restartShowreel(video);
+  await Promise.resolve();
+  assert.equal(video.currentTime, 0);
+  assert.equal(video.muted, true);
+  assert.equal(video.paused, false);
+  assert.equal(c.state.kind, "showreel");
+});
+test("Web Audio showreel graph ramps a single GainNode and resumes in a gesture", async () => {
+  const context = new FakeAudioContext();
+  const graph = createShowreelGain(
+    new FakeMedia() as unknown as HTMLMediaElement,
+    () => context,
+  );
+  assert.ok(graph);
+  graph.fadeOut(1000);
+  graph.restore();
+  await graph.resume();
+  assert.equal(context.sourceConnections.length, 1);
+  assert.equal(context.gainConnections.length, 1);
+  assert.deepEqual(context.gainCalls.slice(-5), [
+    ["cancel", 4, 0],
+    ["set", 1, 4],
+    ["ramp", 0, 5],
+    ["cancel", 4, 0],
+    ["set", 1, 4],
+  ]);
+  assert.equal(context.resumes, 1);
 });

@@ -6,7 +6,7 @@ import {initScene,scrollToSceneAbout} from './navigation/scene';import {initFilt
 import {initLocalVideo} from './media/local-video';
 let cleanup=()=>{};let navigationDirection='right';let initialLoad=true;
 const currentSection=()=>document.documentElement.dataset.section as Section;
-function init(){cleanup();const controller=new AbortController();const signal=controller.signal;const removeScene=initScene();const removeVideo=initLocalVideo(signal);initFilters(signal);initProjectModal();initConsent();coordinator.section(currentSection());renderPlayer();
+function init(){cleanup();const controller=new AbortController();const signal=controller.signal;const removeScene=initScene();const removeVideo=initLocalVideo(signal);initFilters(signal);initProjectModal();initConsent();coordinator.section(location.hash==='#about'?'about':currentSection());renderPlayer();
  const root=document.documentElement;root.classList.add('js');root.classList.remove('is-loading');root.style.setProperty('--transition-duration',`${siteConfig.motion.transitionDuration}ms`);
  if(location.hash==='#about'||initialLoad&&location.hash){requestAnimationFrame(()=>{if(location.hash==='#about'&&scrollToSceneAbout())return;document.getElementById(location.hash.slice(1))?.scrollIntoView({behavior:'instant'});});}initialLoad=false;
  const about=document.querySelector<HTMLElement>('#about');let aboutObserver:IntersectionObserver|undefined;
@@ -28,10 +28,44 @@ function init(){cleanup();const controller=new AbortController();const signal=co
  cleanup=()=>{controller.abort();removeScene();removeVideo();aboutObserver?.disconnect();};
 }
 document.addEventListener('astro:page-load',init);
-document.addEventListener('astro:before-preparation',event=>{const e=event as TransitionBeforePreparationEvent;document.documentElement.classList.add('is-loading');if(e.navigationType==='traverse'){navigationDirection=e.to.pathname==='/film-music/'?'left':e.to.pathname==='/directing/'?'right':currentSection()==='music'?'right':'left';}document.documentElement.dataset.direction=navigationDirection;});
+document.addEventListener('astro:before-preparation',event=>{
+ const e=event as TransitionBeforePreparationEvent;
+ document.documentElement.classList.add('is-loading');
+ const leavingHomeForShowreelDestination=currentSection()==='home'&&(
+  e.to.pathname==='/film-music/'||
+  e.to.pathname==='/directing/'||
+  e.to.pathname==='/'&&e.to.hash==='#about'
+ );
+ if(leavingHomeForShowreelDestination){
+  const hero=document.querySelector<HTMLVideoElement>('[data-slot-video=hero]');
+  coordinator.hideShowreelPanelForNavigation();
+  if(hero&&!coordinator.fadeShowreelForNavigation(hero)){
+   coordinator.pauseShowreelForNavigation(hero);
+  }
+ }else coordinator.cancelShowreelFade();
+ if(e.navigationType==='traverse'){
+  navigationDirection=e.to.pathname==='/film-music/'?'left':e.to.pathname==='/directing/'?'right':currentSection()==='music'?'right':'left';
+ }
+ document.documentElement.dataset.direction=navigationDirection;
+});
 document.addEventListener('astro:before-swap',event=>{const e=event as TransitionBeforeSwapEvent;cleanup();e.newDocument.documentElement.classList.add('js');e.newDocument.documentElement.dataset.direction=navigationDirection;if(e.to.pathname==='/'&&e.to.hash==='#about'){const context=e.info?.aboutContext??history.state?.aboutContext??null;const theme=aboutTheme(context);e.newDocument.documentElement.dataset.theme=theme;e.newDocument.documentElement.dataset.aboutTheme=theme;const about=e.newDocument.querySelector<HTMLElement>('#about');if(about)about.dataset.theme=theme;}e.newDocument.documentElement.style.setProperty('--transition-duration',`${siteConfig.motion.transitionDuration}ms`);});
 // Resolve the sticky About destination after the router's native hash scroll.
-document.addEventListener('click',event=>{const el=event.target as Element;const about=el.closest<HTMLAnchorElement>('[data-about]');if(about){event.preventDefault();event.stopImmediatePropagation();const section=currentSection();const context=section==='directing'?'directing':section==='music'?'music':null;void navigate('/#about',{state:{aboutContext:context},info:{aboutContext:context}}).then(()=>{requestAnimationFrame(()=>scrollToSceneAbout());});return;}const link=el.closest<HTMLElement>('[data-direction]');if(link)navigationDirection=link.dataset.direction||'right';},true);
+document.addEventListener('click',event=>{
+ const el=event.target as Element;
+ const brand=el.closest<HTMLAnchorElement>('[data-brand-home]');
+ if(brand&&event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey){
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const hero=document.querySelector<HTMLVideoElement>('[data-slot-video=hero]');
+  if(hero)coordinator.restartShowreel(hero);
+  void navigate('/');
+  return;
+ }
+ const about=el.closest<HTMLAnchorElement>('[data-about]');
+ if(about){event.preventDefault();event.stopImmediatePropagation();const section=currentSection();const context=section==='directing'?'directing':section==='music'?'music':null;void navigate('/#about',{state:{aboutContext:context},info:{aboutContext:context}}).then(()=>{requestAnimationFrame(()=>scrollToSceneAbout());});return;}
+ const link=el.closest<HTMLElement>('[data-direction]');
+ if(link)navigationDirection=link.dataset.direction||'right';
+},true);
 document.addEventListener('click',event=>{const el=event.target as Element;const contact=el.closest('[data-contact]');if(contact){document.querySelector<HTMLDialogElement>('#contact-dialog')!.showModal();}const close=el.closest('[data-close-dialog]');if(close)close.closest('dialog')?.close();const track=el.closest<HTMLElement>('[data-play-track]');if(track){const list=track.closest('.track-list');const ids=Array.from(list?.querySelectorAll<HTMLElement>('[data-track-row]:not([hidden])')||[]).map(row=>row.dataset.trackRow!);void coordinator.select(playable(track.dataset.playTrack!),ids.map(playable));}});
 document.addEventListener('submit',event=>{const form=event.target as HTMLFormElement;if(form.id!=='contact-form')return;event.preventDefault();if(form.reportValidity())form.querySelector('.form-status')!.textContent='Your message is ready. Nothing has been sent: delivery is disabled in this local prototype.';});
 window.addEventListener('pageshow',()=>document.documentElement.classList.remove('is-loading'));
