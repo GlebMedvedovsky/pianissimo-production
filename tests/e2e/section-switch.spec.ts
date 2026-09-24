@@ -171,7 +171,7 @@ async function expectTitleInsideShape(page: Page) {
 }
 
 async function pathGeometry(page: Page) {
-  return page.locator('.section-switch-body').evaluate((path) => {
+  return page.locator('.section-switch-body').evaluate((path: SVGPathElement) => {
     const svg = path.ownerSVGElement!;
     const transform = path.transform.baseVal.consolidate()?.matrix;
     const samples = Array.from({ length: 11 }, (_, index) => {

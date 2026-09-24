@@ -33,6 +33,21 @@
   transition: transform 800ms ease;
 }
 
+/* Keep the split-menu artwork monochrome only for precise hover devices.
+   The filter belongs to the image itself so logo, copy and overlays retain
+   their existing colour, while the media-slot keeps its current scale motion. */
+@media (hover: hover) and (pointer: fine) {
+  .hero-scene .split-backdrop .background-half .media-slot > img {
+    filter: grayscale(1);
+    transition: filter 400ms ease;
+  }
+
+  .scene-sticky:has(.composer-choice:hover, .composer-choice:focus-visible) .music-half .media-slot > img,
+  .scene-sticky:has(.director-choice:hover, .director-choice:focus-visible) .directing-half .media-slot > img {
+    filter: grayscale(0);
+  }
+}
+
 /* Two CSS windows onto the same photograph preserve piano and film sides on
    tall screens. No stretching, raster compositing, baked-in logo or text. */
 @media (max-aspect-ratio: 4/5) {

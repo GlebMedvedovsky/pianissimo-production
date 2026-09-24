@@ -86,7 +86,6 @@ export function initScene(){
    .to(select('.hero-backdrop'),{opacity:0,duration:.65},.12)
    .to(select('.split-backdrop'),{opacity:1,duration:.7},.1)
    .fromTo(logo,{scale:.14},{scale:1,duration:1,ease:'power1.inOut'},0)
-   .to(select('.logo-label'),{opacity:1,duration:.3},.7)
    .to(select('.menu-about'),{autoAlpha:1,duration:.25},.75)
    .to(select('.logo-label,.menu-about'),{autoAlpha:0,duration:.15},revealStart)
    .to(reveal,{progress:1,duration:1.1,ease:'none'},revealStart);
