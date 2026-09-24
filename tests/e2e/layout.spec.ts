@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { ready, shot, noOverflow } from "./helpers";
 test("mobile portfolio header stays pinned without covering content", async ({ page }, info) => {
+  test.skip(info.project.name === "desktop", "mobile-only layout assertion");
+  test.setTimeout(90_000);
   if (info.project.name === "narrow") await page.setViewportSize({ width: 320, height: 568 });
   await ready(page, "/film-music/");
   const header = page.locator(".site-header--portfolio");
@@ -24,6 +26,11 @@ test("mobile portfolio header stays pinned without covering content", async ({ p
   expect(navigationFits).toBe(true);
   await page.locator('header a[href="/directing/"]').click();
   await expect(page).toHaveURL(/\/directing\/$/);
+  await expect(header).toHaveCSS("view-transition-name", "portfolio-header");
+  await expect
+    .poll(() => header.evaluate((element) => element.getBoundingClientRect().top))
+    .toBeCloseTo(0, 0);
+  await expect(page.locator("html")).not.toHaveAttribute("data-portfolio-transition");
   await expect(page.locator("header [aria-current=page]")).toHaveText("Directing");
   await expect(header).toHaveCSS("position", "fixed");
   await page.evaluate(() => scrollTo({ top: 1400, behavior: "instant" }));
@@ -31,10 +38,12 @@ test("mobile portfolio header stays pinned without covering content", async ({ p
   await shot(page, "sticky-directing-scroll", info);
   await page.locator('header a[href="/film-music/"]').click();
   await expect(page).toHaveURL(/\/film-music\/$/);
+  await expect(page.locator("html")).not.toHaveAttribute("data-portfolio-transition");
   await expect(page.locator("header [aria-current=page]")).toHaveText("Film Music");
   await expect(header).toHaveCSS("position", "fixed");
   await page.locator('header a[href="/directing/"]').click();
   await expect(page).toHaveURL(/\/directing\/$/);
+  await expect(page.locator("html")).not.toHaveAttribute("data-portfolio-transition");
   await page.locator("[data-project-card]").first().click();
   await expect(page.locator("#project-dialog")).toBeVisible();
   expect(await page.evaluate(() => document.activeElement?.closest("#project-dialog") !== null)).toBe(true);
@@ -93,7 +102,8 @@ test("hero, reversible logo and viewport layouts", async ({ page }, info) => {
 });
 test("desktop hero reserves a lower safe frame when the shared player is visible", async ({
   page,
-}) => {
+}, info) => {
+  test.skip(info.project.name !== "desktop", "desktop-only player framing");
   await ready(page, "/");
   await page.getByRole("button", { name: "Enable sound", exact: true }).click();
   await expect(page.locator(".player")).toBeVisible();
@@ -148,17 +158,37 @@ test("grids, About and contact fit the viewport", async ({ page }, info) => {
   await page.keyboard.press("Escape");
   await expect(page.locator("#contact-dialog")).not.toBeVisible();
 });
-test("reduced motion retains both real links and avoids a long scene", async ({
+test("reduced motion removes artificial travel and keeps the real About accessible", async ({
   page,
 }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await ready(page, "/");
-  const box = await page.locator(".hero-scene").boundingBox();
-  expect(box!.height).toBeLessThanOrEqual(
-    Math.max(page.viewportSize()!.height, 660) + 5,
-  );
+  const layout = await page.evaluate(() => {
+    const scene = document.querySelector<HTMLElement>(".hero-scene")!;
+    const visuals = document.querySelector<HTMLElement>(".scene-visuals")!;
+    const about = document.querySelector<HTMLElement>("#about")!;
+    const after = getComputedStyle(scene, "::after");
+    return {
+      sceneHeight: scene.getBoundingClientRect().height,
+      naturalContentHeight:
+        visuals.getBoundingClientRect().height + about.getBoundingClientRect().height,
+      artificialTravel: after.content !== "none" && parseFloat(after.height) > 1,
+      stickyPosition: getComputedStyle(
+        document.querySelector<HTMLElement>(".scene-sticky")!,
+      ).position,
+      aboutVisibility: getComputedStyle(about).visibility,
+    };
+  });
+  expect(layout.artificialTravel).toBe(false);
+  expect(layout.sceneHeight).toBeLessThanOrEqual(layout.naturalContentHeight + 5);
+  expect(layout.stickyPosition).toBe("relative");
+  expect(layout.aboutVisibility).toBe("visible");
   await expect(
     page.getByRole("link", { name: "Explore Directing" }),
+  ).toBeVisible();
+  await expect(page.locator("#about")).toBeVisible();
+  await expect(
+    page.locator("#about").getByRole("button", { name: "Get in touch" }),
   ).toBeVisible();
   await shot(page, "reduced-motion", info);
   await page.getByRole("link", { name: "Explore Directing" }).click();

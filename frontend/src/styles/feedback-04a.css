@@ -213,6 +213,12 @@
 }
 
 @media(min-width:801px) {
+   html {
+      --section-switch-width: 70px;
+      --section-switch-rest-offset: 16px;
+      --section-switch-hover-offset: 8px
+   }
+
 
    /* A visible shared player occupies the lower part of the viewport. Keep the
     hero's complete video frame above it, so lower-third captions stay in the
@@ -229,42 +235,155 @@
    }
 
    .section-switch {
-      top: 12svh;
-      height: 78svh;
-      width: 46px;
-      right: 0;
-      padding: 30px 8px;
-      align-items: center;
-      justify-content: center;
-      gap: 25px;
-      border-radius: 90% 0 0 35% / 35% 0 0 65%;
-      transform-origin: right center;
-      transition: transform 350ms ease;
-      box-shadow: 0 0 0 1px var(--border)
+      --section-switch-label-axis: 33px;
+      --section-switch-label-x: calc(100% - var(--section-switch-label-axis));
+      --section-switch-label-rotation: 90deg;
+      --section-switch-caption-y: 37.7778%;
+      --section-switch-title-y: 68.8889%;
+      --section-switch-fill: rgba(237, 232, 220, .48);
+      --section-switch-fill-active: rgba(237, 232, 220, .96);
+      --section-switch-edge: rgba(237, 232, 220, .68);
+      --section-switch-edge-active: rgb(237, 232, 220);
+      --section-switch-label: rgba(24, 24, 24, .88);
+      --section-switch-label-active: rgb(24, 24, 24);
+      top: 8px;
+      bottom: auto;
+      height: calc(100svh - 16px);
+      width: var(--section-switch-width);
+      right: calc(var(--section-switch-rest-offset) * -1);
+      padding: 0;
+      display: block;
+      writing-mode: horizontal-tb;
+      background: transparent;
+      color: var(--section-switch-label);
+      border-radius: 0;
+      box-shadow: none;
+      pointer-events: none;
+      transform: translateX(0);
+      transition: transform 240ms ease;
+      will-change: transform
    }
 
-   .section-switch strong {
-      font-size: 27px
+   .section-switch-shape {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none
    }
 
-   .section-switch span {
+   .section-switch-body {
+      fill: var(--section-switch-fill);
+      stroke: var(--section-switch-edge);
+      stroke-width: 1.25px;
+      vector-effect: non-scaling-stroke;
+      transition: fill 240ms ease, stroke 240ms ease;
+      pointer-events: visiblePainted;
+      cursor: pointer
+   }
+
+   .section-switch-keys {
+      pointer-events: none;
+      opacity: .56;
+      transition: opacity 240ms ease
+   }
+
+   .section-switch-white-key {
+      fill: rgba(248, 244, 236, .82);
+      stroke: rgba(24, 24, 24, .45);
+      stroke-width: .7px;
+      vector-effect: non-scaling-stroke
+   }
+
+   .section-switch-black-key {
+      fill: rgba(17, 17, 17, .86)
+   }
+
+   .section-switch-copy {
+      position: absolute;
+      inset: 0;
+      color: var(--section-switch-label);
+      pointer-events: none;
+      transition: color 240ms ease
+   }
+
+   .section-switch-copy strong,
+   .section-switch-copy>span {
+      position: absolute;
+      left: var(--section-switch-label-x);
+      width: max-content;
+      white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
+      transform-origin: 0 0;
+      transform: rotate(var(--section-switch-label-rotation)) translate(-50%, -50%)
+   }
+
+   .section-switch-copy strong {
+      top: var(--section-switch-title-y);
+      font-size: clamp(20px, 1.7vw, 27px)
+   }
+
+   .section-switch-copy>span {
+      top: var(--section-switch-caption-y);
       font-size: 8px
    }
 
    .switch-left {
-      left: 0;
+      --section-switch-label-x: var(--section-switch-label-axis);
+      --section-switch-label-rotation: -90deg;
+      --section-switch-fill: rgba(17, 17, 17, .48);
+      --section-switch-fill-active: rgba(17, 17, 17, .96);
+      --section-switch-edge: rgba(17, 17, 17, .68);
+      --section-switch-edge-active: rgb(17, 17, 17);
+      --section-switch-label: rgba(248, 244, 236, .88);
+      --section-switch-label-active: rgb(248, 244, 236);
+      left: calc(var(--section-switch-rest-offset) * -1);
       right: auto;
-      border-radius: 0 90% 35% 0 / 0 65% 35% 0;
-      transform-origin: left center
+      color: var(--section-switch-label)
    }
 
-   .section-switch:hover,
+   .section-switch:not(.switch-left):hover,
+   .section-switch:not(.switch-left):focus-visible {
+      transform: translateX(calc(var(--section-switch-hover-offset) - var(--section-switch-rest-offset)))
+   }
+
+   .section-switch.switch-left:hover,
+   .section-switch.switch-left:focus-visible {
+      transform: translateX(calc(var(--section-switch-rest-offset) - var(--section-switch-hover-offset)))
+   }
+
+   .section-switch:hover .section-switch-body,
+   .section-switch:focus-visible .section-switch-body {
+      fill: var(--section-switch-fill-active);
+      stroke: var(--section-switch-edge-active)
+   }
+
+   .section-switch:hover .section-switch-copy,
+   .section-switch:focus-visible .section-switch-copy {
+      color: var(--section-switch-label-active)
+   }
+
+   .section-switch:hover .section-switch-keys,
+   .section-switch:focus-visible .section-switch-keys {
+      opacity: .78
+   }
+
    .section-switch:focus-visible {
-      transform: scaleX(1.12)
+      outline: none
+   }
+
+   .section-switch:focus-visible .section-switch-body {
+      stroke-width: 3px;
    }
 
    .social-rail {
-      right: 58px
+      right: calc(var(--section-switch-width) + 16px)
+   }
+
+   .portfolio {
+      padding-left: max(var(--page-gutter), 78px);
+      padding-right: max(var(--page-gutter), 78px)
    }
 
    html[data-direction=left] {
@@ -273,6 +392,12 @@
 
    html[data-direction=right] {
       --transition-offset: 40%
+   }
+}
+
+@media(min-width:801px) and (max-width:1100px) {
+   .section-switch-copy>span {
+      display: none
    }
 }
 
@@ -471,8 +596,18 @@
 
 @media(prefers-reduced-motion:reduce) {
 
-   .logo-choice:hover,
-   .section-switch:hover {
+   .logo-choice:hover {
+      transform: none
+   }
+
+   .section-switch {
+      transition: none
+   }
+
+   .section-switch:not(.switch-left):hover,
+   .section-switch:not(.switch-left):focus-visible,
+   .section-switch.switch-left:hover,
+   .section-switch.switch-left:focus-visible {
       transform: none
    }
 }

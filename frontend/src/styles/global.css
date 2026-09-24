@@ -688,6 +688,14 @@ p {
     border-radius: 18px 0 0 18px
 }
 
+.section-switch-shape {
+    display: none
+}
+
+.section-switch-copy {
+    display: contents
+}
+
 .section-switch span {
     font-size: 7px;
     letter-spacing: .15em
@@ -1492,6 +1500,40 @@ form .form-status {
 
 ::view-transition-new(root) {
     animation: slide-in var(--transition-duration) ease both
+}
+
+::view-transition-group(portfolio-header),
+::view-transition-group(portfolio-social),
+::view-transition-group(portfolio-player) {
+    animation: none
+}
+
+::view-transition-group(portfolio-header) {
+    z-index: 20
+}
+
+::view-transition-group(portfolio-social) {
+    z-index: 30
+}
+
+::view-transition-group(portfolio-player) {
+    z-index: 50
+}
+
+::view-transition-old(portfolio-header),
+::view-transition-old(portfolio-social),
+::view-transition-old(portfolio-player) {
+    animation: none;
+    opacity: 0;
+    mix-blend-mode: normal
+}
+
+::view-transition-new(portfolio-header),
+::view-transition-new(portfolio-social),
+::view-transition-new(portfolio-player) {
+    animation: none;
+    opacity: 1;
+    mix-blend-mode: normal
 }
 
 html[data-direction=left] {
