@@ -42,6 +42,16 @@ test("manifest validates, IDs and references are checked", () => {
   path.assets[0]!.path = "../private.jpg";
   assert.throws(() => validateManifest(path));
 });
+test("profile links and collective are optional for older manifests", () => {
+  const previous = structuredClone(raw);
+  Reflect.deleteProperty(previous.site, "profileLinks");
+  Reflect.deleteProperty(previous.site, "collective");
+  Reflect.deleteProperty(previous.site.artistLinks, "spotify");
+  assert.equal(validateManifest(previous).site.profileLinks, undefined);
+  const current = validateManifest(raw);
+  assert.equal(current.site.profileLinks?.musicHub, "https://music-hub.bio/sebastiangreim");
+  assert.equal(current.site.collective?.name, "Samples unterm Sofa");
+});
 test("release fails honestly; fixtures are blocked from prototype", () => {
   assert.throws(() => validateManifest(raw, true), /Release blocked/);
   const fixture = structuredClone(raw);

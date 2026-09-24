@@ -197,7 +197,7 @@ class CmsAuthUiTest extends TestCase
             'Directing' => [Pages\Directing::class, 'directing', ['label' => 'Directing QA']],
             'Site-Einstellungen' => [Pages\Site::class, 'site', ['title' => 'CMS QA']],
             'Kontakt' => [Pages\Contact::class, 'contact', ['email' => 'public@example.test']],
-            'Social Links' => [Pages\Social::class, 'social', ['artistLinks' => ['spotify' => null, 'tidal' => null, 'deezer' => null, 'appleMusic' => null]]],
+            'Social Links' => [Pages\Social::class, 'social', ['artistLinks' => ['spotify' => null, 'tidal' => null, 'deezer' => null, 'appleMusic' => null], 'profileLinks' => ['imdb' => null, 'crewUnited' => null, 'musicHub' => null]]],
             'SEO' => [Pages\Seo::class, 'seo', ['titleTemplate' => '%s QA', 'robots' => 'noindex, nofollow']],
             'Website-Farben' => [Pages\Appearance::class, 'appearance', ['dark' => '#111111', 'light' => '#ffffff', 'accent' => '#aa6633']],
             'About' => [Pages\About::class, 'about', ['title' => 'About QA', 'theme' => 'follow-section']],

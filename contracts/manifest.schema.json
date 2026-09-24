@@ -826,6 +826,58 @@
           },
           "additionalProperties": false
         },
+        "profileLinks": {
+          "type": "object",
+          "properties": {
+            "imdb": {
+              "type": "string",
+              "format": "uri"
+            },
+            "crewUnited": {
+              "type": "string",
+              "format": "uri"
+            },
+            "musicHub": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "additionalProperties": false
+        },
+        "collective": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "logoAssetId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "membershipText": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "name",
+            "url",
+            "membershipText"
+          ],
+          "additionalProperties": false
+        },
         "mediaSlots": {
           "type": "object",
           "properties": {

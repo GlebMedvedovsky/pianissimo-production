@@ -15,6 +15,7 @@ class ContentValidator
         }
         foreach ($m['tracks']??[] as $i=>$t) if (isset($t['platformOverrides'])) $m['tracks'][$i]['platformOverrides']=(object)$t['platformOverrides'];
         if (isset($m['site']['artistLinks'])) $m['site']['artistLinks']=(object)$m['site']['artistLinks'];
+        if (isset($m['site']['profileLinks'])) $m['site']['profileLinks']=(object)$m['site']['profileLinks'];
         $schema=json_decode(file_get_contents(config('cms.schema')));
         $result=(new Validator())->validate(json_decode(json_encode($m, JSON_THROW_ON_ERROR)), $schema);
         if (!$result->isValid()) {
@@ -65,7 +66,8 @@ class ContentValidator
         foreach ($m['site']['mediaSlots'] as $slot=>$values) {
             $ref($values['image'],['image'], $slot); $ref($values['poster'],['image'],$slot); $ref($values['video'],['video'],$slot);
         }
-        $urls=[$m['site']['productionDomain'],...array_values((array)($m['site']['artistLinks']??[]))];
+        $ref($m['site']['collective']['logoAssetId']??null,['image'],'Kollektiv-Logo');
+        $urls=[$m['site']['productionDomain'],...array_values((array)($m['site']['artistLinks']??[])),...array_values((array)($m['site']['profileLinks']??[])),$m['site']['collective']['url']??null];
         foreach (['instagram','spotify','samples'] as $key) $urls[]=$m['site']['contacts'][$key];
         foreach ($m['site']['cv'] as $r) $urls[]=$r['link']??null;
         foreach ($m['projects'] as $p) $urls=[...$urls,...array_values((array)$p['platformLinks']),...array_values((array)($p['externalLinks']??[])),$p['externalFilm']['url']??null];

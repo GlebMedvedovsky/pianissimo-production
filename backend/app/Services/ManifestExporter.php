@@ -9,6 +9,7 @@ class ManifestExporter
 {
     private function object(?array $a): object { return (object)($a??[]); }
     private function links(?array $a): object { return (object) array_filter(Arr::only($a??[],['spotify','tidal','deezer','appleMusic']),fn($v)=>$v!==null && $v!==''); }
+    private function profileLinks(?array $a): object { return (object) array_filter(Arr::only($a??[],['imdb','crewUnited','musicHub']),fn($v)=>$v!==null && $v!==''); }
     private function optional(array $a): array { return array_filter($a,fn($v)=>$v!==null && $v!==''); }
     private function media(string $key): array { return Arr::only(Setting::read($key)['media']??['image'=>null,'video'=>null,'poster'=>null],['image','video','poster']); }
     public function package(): array
@@ -59,6 +60,7 @@ class ManifestExporter
         }
         $slots=['hero'=>$this->media('home'),'composerMenu'=>$this->media('music'),'directingMenu'=>$this->media('directing'),'about'=>$this->media('about')];
         foreach ($slots as $values) foreach ($values as $id) $assetIds[]=$id;
+        $assetIds[]=Setting::read('about')['collective']['logoAssetId']??null;
         $assetIds[]=Setting::read('seo')['ogAssetId']??null;
         foreach (Project::where('status','published')->get() as $p) $assetIds[]=$p->seo['ogAssetId']??null;
         $assets=[];
@@ -71,14 +73,18 @@ class ManifestExporter
         foreach (CvEntry::whereIn('status',['published','needs-confirmation'])->orderBy('sort_order')->orderBy('id')->get() as $r) {
             $cv[]=['date'=>$r->date,'text'=>implode(' — ',array_filter([$r->title,$r->institution,$r->description])),'status'=>$r->status,...$this->optional(['link'=>$r->link,'linkText'=>$r->link_text])];
         }
-        $site=Setting::read('site'); $contact=Setting::read('contact'); $about=Setting::read('about');
+        $site=Setting::read('site'); $contact=Setting::read('contact'); $about=Setting::read('about'); $social=Setting::read('social');
         $notice=Setting::read('impressum'); $privacy=Setting::read('privacy');
         $manifest=['schemaVersion'=>'1.0.0','mode'=>'prototype','sources'=>[],'assets'=>$assets,'projects'=>$projects,'tracks'=>$tracks,
             'site'=>['language'=>'en','title'=>$site['title']??'','description'=>$site['description']??'',
                 'biography'=>($about['visible']??true)?($about['biography']??[]):[],'cv'=>$cv,
                 'contacts'=>['email'=>$contact['email']??null,'instagram'=>$contact['instagram']??null,'spotify'=>$contact['spotify']??null,'samples'=>$contact['samples']??null],
                 'legal'=>['notice'=>$notice['text']??'','privacy'=>$privacy['text']??'','approved'=>($notice['status']??'draft')==='published' && ($privacy['status']??'draft')==='published'],
-                'productionDomain'=>$site['productionDomain']??null,'artistLinks'=>$this->links(Setting::read('social')['artistLinks']??[]),'mediaSlots'=>$slots]];
+                'productionDomain'=>$site['productionDomain']??null,'artistLinks'=>$this->links($social['artistLinks']??[]),
+                'profileLinks'=>$this->profileLinks($social['profileLinks']??[]),
+                ...(!empty($about['collective']['name']) && !empty($about['collective']['url']) && !empty($about['collective']['membershipText'])?['collective'=>[
+                    'name'=>$about['collective']['name'],'url'=>$about['collective']['url'],'logoAssetId'=>$about['collective']['logoAssetId']??null,'membershipText'=>$about['collective']['membershipText'],
+                ]]:[]),'mediaSlots'=>$slots]];
         app(ContentValidator::class)->validate($manifest);
         $extension=app(SettingsExporter::class)->export();
         return ['manifest'=>$manifest,'settings'=>$extension];

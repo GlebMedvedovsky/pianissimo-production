@@ -684,6 +684,14 @@ p {
     border-radius: 18px 0 0 18px
 }
 
+.social-rail .profile-link {
+    width: auto;
+    min-width: 33px;
+    padding: 0 5px;
+    font-size: 8px;
+    letter-spacing: .04em
+}
+
 .section-switch-shape {
     display: none
 }
@@ -1157,6 +1165,7 @@ html:has(dialog[open]) {
 
 .platform-links {
     display: flex;
+    flex-wrap: wrap;
     gap: 15px;
     margin-top: 15px;
     font-size: 11px
@@ -1494,6 +1503,24 @@ form .form-status {
     animation: slide-out var(--transition-duration) ease both
 }
 
+.collective-membership {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    line-height: 1.5
+}
+
+.collective-membership img {
+    width: auto;
+    max-width: 72px;
+    height: 28px;
+    object-fit: contain
+}
+
 ::view-transition-new(root) {
     animation: slide-in var(--transition-duration) ease both
 }
@@ -1650,6 +1677,12 @@ html[data-direction=right] {
         border: 1px solid var(--border);
         padding: 3px;
         z-index: 25
+    }
+
+    .social-rail>*,
+    .social-rail .profile-link {
+        min-width: 40px;
+        height: 40px
     }
 
     .portfolio,

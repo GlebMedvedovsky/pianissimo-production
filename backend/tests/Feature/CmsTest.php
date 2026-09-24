@@ -71,6 +71,30 @@ class CmsTest extends TestCase
         $this->assertTrue($a['settings']['home']['loop']); $this->assertFalse($a['settings']['analytics']['enabled']);
         $this->assertSame(hash_file('sha256',config('cms.manifest')),hash('sha256',file_get_contents(config('cms.manifest'))));
     }
+    public function test_profile_links_and_collective_roundtrip_through_settings_and_manifest(): void
+    {
+        $this->admin();
+        Livewire::test(\App\Filament\Pages\Social::class)->fillForm([
+            'artistLinks.spotify'=>'https://open.spotify.com/artist/test',
+            'profileLinks.imdb'=>'https://www.imdb.com/name/test',
+            'profileLinks.crewUnited'=>'https://www.crew-united.com/test',
+            'profileLinks.musicHub'=>'https://music-hub.bio/test',
+        ])->call('save')->assertHasNoFormErrors();
+        Livewire::test(\App\Filament\Pages\About::class)->fillForm([
+            'collective.name'=>'Samples unterm Sofa',
+            'collective.url'=>'https://samples-unterm-sofa.de/',
+            'collective.logoAssetId'=>null,
+            'collective.membershipText'=>'Proud member of Samples unterm Sofa – Filmmusic Collective',
+        ])->call('save')->assertHasNoFormErrors();
+        $social=Setting::read('social');
+        $this->assertSame('https://open.spotify.com/artist/test',$social['artistLinks']['spotify']);
+        $this->assertSame('https://www.imdb.com/name/test',$social['profileLinks']['imdb']);
+        $manifest=app(ManifestExporter::class)->package()['manifest'];
+        $this->assertSame('https://open.spotify.com/artist/test',$manifest['site']['artistLinks']->spotify);
+        $this->assertSame('https://www.imdb.com/name/test',$manifest['site']['profileLinks']->imdb);
+        $this->assertSame('Samples unterm Sofa',$manifest['site']['collective']['name']);
+        app(ContentValidator::class)->validate($manifest);
+    }
     public function test_drafts_hidden_records_and_manual_order_are_respected(): void
     {
         Project::findOrFail('abszission')->update(['status'=>'draft']);
