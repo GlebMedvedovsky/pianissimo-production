@@ -190,7 +190,7 @@ class CmsTest extends TestCase
         $this->assertSame('Changed track',Track::findOrFail('synthetic-track')->title);
         Livewire::test(\App\Filament\Resources\Pages\ListTracks::class)->callTableAction('delete','synthetic-track')->assertHasNoErrors();
         $this->assertNull(Track::find('synthetic-track'));
-        Livewire::test(\App\Filament\Resources\Pages\CreateMediaAsset::class)->fillForm(['id'=>'synthetic-media','path'=>'media/synthetic-test.jpg','type'=>'image','purpose'=>'other','alt'=>'QA','state'=>'temporary','rights_scope'=>'unconfirmed','crop'=>['x'=>50,'y'=>50]])->call('create')->assertHasNoFormErrors();
+        Livewire::test(\App\Filament\Resources\Pages\CreateMediaAsset::class)->fillForm(['_mode'=>'existing','id'=>'synthetic-media','path'=>'media/synthetic-test.jpg','type'=>'image','purpose'=>'other','alt'=>'QA','state'=>'temporary','rights_scope'=>'unconfirmed','crop'=>['x'=>50,'y'=>50]])->call('create')->assertHasNoFormErrors();
         $this->assertNotNull(MediaAsset::find('synthetic-media'));
         Livewire::test(\App\Filament\Resources\Pages\ListMediaAssets::class)->callTableAction('delete','synthetic-media')->assertHasNoErrors();
         $this->assertNull(MediaAsset::find('synthetic-media'));

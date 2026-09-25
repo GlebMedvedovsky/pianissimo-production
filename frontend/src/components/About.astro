@@ -1,6 +1,9 @@
 ---
 import MediaSlot from './MediaSlot.astro';import Icon from './Icon.astro';import {content,asset} from '../lib/content/data';
+import {socialIcon} from '../lib/social';
 const artistLabels:Record<string,string>={spotify:'Spotify',tidal:'Tidal',appleMusic:'Apple Music',deezer:'Deezer'};
+const legacyLinks=Object.entries(content.site.artistLinks||{}).map(([provider,url],sort_order)=>({provider:provider==='appleMusic'?'apple-music':provider,label:artistLabels[provider]||provider,url,visible:true,sort_order}));
+const socialLinks=(content.site.socialLinks?.length?content.site.socialLinks:legacyLinks).filter(link=>link.visible).sort((a,b)=>a.sort_order-b.sort_order);
 const collective=content.site.collective;
 const collectiveLogo=asset(collective?.logoAssetId);
 ---
@@ -8,7 +11,7 @@ const collectiveLogo=asset(collective?.logoAssetId);
  <div class="about-portrait"><MediaSlot name="about"/></div>
  <div class="about-content"><p class="eyebrow">THE PERSON BEHIND THE WORK</p><h2 id="about-title">Sebastian <em>Greim.</em></h2><p class="about-role">Composer. Filmmaker. Storyteller.</p>{content.site.biography.map(p=><p>{p}</p>)}<button class="text-link" data-contact>Get in touch <Icon name="arrow"/></button>
  <details class="cv" open><summary>Selected journey <span>{content.site.cv.length} milestones</span></summary><ol>{content.site.cv.map(item=><li><span class="cv-date">{item.date}</span><div>{item.link&&item.linkText&&item.text.includes(item.linkText)?<>{item.text.slice(0,item.text.indexOf(item.linkText))}<a href={item.link} target="_blank" rel="noreferrer">{item.linkText}</a>{item.text.slice(item.text.indexOf(item.linkText)+item.linkText.length)}</>:item.link?<a href={item.link} target="_blank" rel="noreferrer">{item.text}</a>:item.text}{item.status==='needs-confirmation'&&<small>Details awaiting confirmation</small>}</div></li>)}</ol></details>
- <div class="platform-links">{Object.entries(content.site.artistLinks||{}).map(([name,url])=><a href={url} target="_blank" rel="noreferrer" aria-label={`${artistLabels[name]||name} artist profile`}>{artistLabels[name]||name} artist <span class="streaming-link-icon"><Icon name="arrowUpRight" size={14}/></span></a>)}</div>
+ <div class="platform-links">{socialLinks.map(link=><a href={link.url} target="_blank" rel="noreferrer" aria-label={link.label}>{link.label} <span class="streaming-link-icon"><Icon name={socialIcon[link.provider]||'arrowUpRight'} size={14}/></span></a>)}</div>
  {collective&&<aside class="collective-membership" aria-label="Collective membership">{collectiveLogo&&<img src={'/'+collectiveLogo.path} width={collectiveLogo.width} height={collectiveLogo.height} alt="" loading="lazy"/>}<a href={collective.url} target="_blank" rel="noreferrer">{collective.membershipText} <span class="streaming-link-icon"><Icon name="arrowUpRight" size={14}/></span></a></aside>}
  <a class="text-link back-menu" href="/#main-menu">Back to the main menu ↑</a></div>
 </section>

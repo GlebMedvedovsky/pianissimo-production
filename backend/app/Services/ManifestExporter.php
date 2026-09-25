@@ -82,6 +82,7 @@ class ManifestExporter
                 'legal'=>['notice'=>$notice['text']??'','privacy'=>$privacy['text']??'','approved'=>($notice['status']??'draft')==='published' && ($privacy['status']??'draft')==='published'],
                 'productionDomain'=>$site['productionDomain']??null,'artistLinks'=>$this->links($social['artistLinks']??[]),
                 'profileLinks'=>$this->profileLinks($social['profileLinks']??[]),
+                'socialLinks'=>array_values(array_map(fn($link)=>Arr::only($link,['provider','label','url','visible','sort_order']),$social['links']??[])),
                 ...(!empty($about['collective']['name']) && !empty($about['collective']['url']) && !empty($about['collective']['membershipText'])?['collective'=>[
                     'name'=>$about['collective']['name'],'url'=>$about['collective']['url'],'logoAssetId'=>$about['collective']['logoAssetId']??null,'membershipText'=>$about['collective']['membershipText'],
                 ]]:[]),'mediaSlots'=>$slots]];
@@ -107,12 +108,26 @@ class ManifestExporter
                     if (file_put_contents($directory.'/'.$file.'.pending',$text,LOCK_EX)===false || !rename($directory.'/'.$file.'.pending',$directory.'/'.$file)) throw new DomainException('Export konnte nicht atomar gespeichert werden.');
                 }
             }
+            $media=[];
+            foreach ($package['manifest']['assets'] as $asset) {
+                $record=MediaAsset::find($asset['id']);
+                if (!$record?->storage_path) continue;
+                if (!str_starts_with($record->path,'media/cms/')) throw new DomainException($record->id.': verwaltetes Medium liegt außerhalb des freigegebenen Pfads.');
+                $source=storage_path('app/private/'.$record->storage_path);
+                if (!is_file($source) || hash_file('sha256',$source)!==$record->sha256) throw new DomainException($record->id.': privates Original stimmt nicht mit der Prüfsumme überein.');
+                $mediaRelative=substr($record->path,10); $target=$directory.'/media/'.$mediaRelative;
+                if (!is_dir(dirname($target)) && !mkdir(dirname($target),0750,true) && !is_dir(dirname($target))) throw new DomainException('Kandidaten-Medienverzeichnis konnte nicht erstellt werden.');
+                if (is_file($target)) { if (hash_file('sha256',$target)!==$record->sha256) throw new DomainException('Unveränderliches Medien-Payload stimmt nicht überein.'); }
+                elseif (!copy($source,$target)) throw new DomainException('Medien-Payload konnte nicht gespeichert werden.');
+                $media[]=['path'=>$record->path,'sha256'=>$record->sha256,'size'=>(int)filesize($source),'assetId'=>$record->id];
+            }
+            $managedDeletes=MediaAsset::onlyTrashed()->where('path','like','media/cms/%')->pluck('path')->sort()->values()->all();
             $publication=Publication::firstOrCreate(['hash'=>$hash,'status'=>$publish?'published':'candidate'],['path'=>$relative,'user_id'=>$userId,'summary'=>$summary]);
             // Local apply uses an authenticated export receipt, never admin credentials.
             if ($userId && !$publish) {
                 $receipt=['version'=>1,'candidateHash'=>$hash,'adminUserId'=>$userId,
                     'manifestSha256'=>hash_file('sha256',$directory.'/manifest.json'),
-                    'settingsSha256'=>hash_file('sha256',$directory.'/cms-settings.json')];
+                    'settingsSha256'=>hash_file('sha256',$directory.'/cms-settings.json'),'media'=>$media,'managedDeletes'=>$managedDeletes];
                 $text=json_encode($receipt,JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR)."\n";
                 if (file_put_contents($directory.'/receipt.json.pending',$text,LOCK_EX)===false || !rename($directory.'/receipt.json.pending',$directory.'/receipt.json')) throw new DomainException('Export-Beleg konnte nicht gespeichert werden.');
             }

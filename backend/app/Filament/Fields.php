@@ -1,6 +1,6 @@
 <?php
 namespace App\Filament;
-use Filament\Forms\Components\{TextInput,Textarea,Select,Repeater,Toggle,ColorPicker};
+use Filament\Forms\Components\{TextInput,Textarea,Select,Repeater,Toggle,ColorPicker,FileUpload,Radio};
 use Filament\Schemas\Components\{Section,Tabs};
 use Filament\Schemas\Components\Tabs\Tab;
 use App\Models\{MediaAsset,Track,Project};
@@ -59,12 +59,17 @@ class Fields
     }
     public static function asset(): array
     {
-        return [Section::make('Vorhandene Web-Datei')->columnSpanFull()->description('Nur Metadaten. Kein Upload, Zuschnitt oder erneutes Encoding. Private Originale gehören nicht hierher.')->schema([
-            self::id(),TextInput::make('path')->label('Relativer Web-Pfad')->required()->regex('#^media/[a-zA-Z0-9/_-]+\.(webp|jpg|png|mp3|wav|ogg|mp4|webm)$#')->unique(ignoreRecord:true),Select::make('type')->label('Medientyp')->options(['image'=>'Bild','audio'=>'Audio','video'=>'Video'])->required(),
+        return [Section::make('Datei')->columnSpanFull()->schema([
+            Radio::make('_mode')->label('Quelle')->options(['upload'=>'Neue Datei hochladen','existing'=>'Vorhandene Web-Datei registrieren'])->default('upload')->inline()->live()->dehydrated(false)->visible(fn(string $operation)=>$operation==='create'),
+            self::id(),
+            FileUpload::make('storage_path')->label('Datei auswählen')->disk('local')->directory(fn(\Filament\Schemas\Components\Utilities\Get $get)=>'media/originals/'.($get('id')?:'pending'))->storeFileNamesIn('original_name')->acceptedFileTypes(\App\Services\MediaStorage::acceptedMimeTypes())->maxSize(config('cms.media_max_kb'))->visibility('private')->downloadable()->openable()->helperText('Drag & Drop oder Datei auswählen. Der Dateityp wird zusätzlich anhand des Inhalts geprüft.')->required(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='create' && $get('_mode')==='upload')->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='create' && $get('_mode')==='upload'),
+            TextInput::make('path')->label('Relativer Web-Pfad')->required()->regex('#^media/[a-zA-Z0-9/_-]+\.(webp|jpg|jpeg|png|mp3|wav|ogg|mp4|webm)$#')->unique(ignoreRecord:true)->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='edit' || $get('_mode')==='existing')->disabled(fn(string $operation)=>$operation==='edit')->dehydrated(),
+            Select::make('type')->label('Medientyp')->options(['image'=>'Bild','audio'=>'Audio','video'=>'Video'])->required()->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='edit' || $get('_mode')==='existing')->disabled(fn(string $operation)=>$operation==='edit')->dehydrated(),
+        ])->columns(2),Section::make('Beschreibung und Freigabe')->columnSpanFull()->schema([
             Select::make('purpose')->label('Hauptverwendung')->options(self::options(['hero','menu','about','cover','gallery','hover','trailer','audio','other']))->default('other')->required(),
             Textarea::make('alt')->label('Alternativtext')->default('')->dehydrateStateUsing(fn($state)=>(string)$state),Textarea::make('caption')->label('Bildunterschrift'),TextInput::make('credit')->label('Credit'),Textarea::make('license')->label('Lizenz / Rechtevermerk (intern)'),Textarea::make('source')->label('Quelle / Herkunft (intern)'),
             Select::make('state')->label('Materialstatus')->options(['approved'=>'Bestätigt','temporary'=>'Temporär','test'=>'Test'])->default('temporary')->required(),Select::make('rights_scope')->label('Nutzungsfreigabe')->options(self::options(['unconfirmed','existing_local_draft','next_draft','public']))->default('unconfirmed')->required(),
-            TextInput::make('width')->label('Breite (px)')->integer()->minValue(1),TextInput::make('height')->label('Höhe (px)')->integer()->minValue(1),TextInput::make('duration')->label('Dauer (s)')->numeric()->minValue(0.001),...self::crop(),
+            TextInput::make('width')->label('Breite (px)')->integer()->minValue(1)->disabled()->dehydrated(),TextInput::make('height')->label('Höhe (px)')->integer()->minValue(1)->disabled()->dehydrated(),TextInput::make('duration')->label('Dauer (s)')->numeric()->minValue(0.001)->disabled()->dehydrated(),...self::crop(),
         ])->columns(2)];
     }
     public static function cv(): array { return [self::id(),TextInput::make('date')->label('Zeitraum')->required(),TextInput::make('title')->label('Titel / Eintrag')->required(),TextInput::make('institution')->label('Institution'),Textarea::make('description')->label('Beschreibung'),TextInput::make('link')->label('Link')->url(),TextInput::make('link_text')->label('Nur diesen Namen verlinken')->helperText('Exakter Ausschnitt des angezeigten Texts; leer = kompletter Eintrag.'),TextInput::make('sort_order')->label('Reihenfolge')->integer()->default(0)->required(),self::status()]; }

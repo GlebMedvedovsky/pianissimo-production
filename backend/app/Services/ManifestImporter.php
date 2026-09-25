@@ -86,7 +86,7 @@ class ManifestImporter
                 'directing'=>['media'=>$site['mediaSlots']['directingMenu'],'label'=>'Directing'],
                 'about'=>['title'=>'About','biography'=>$site['biography'],'media'=>$site['mediaSlots']['about'],'visible'=>true,'theme'=>'follow-section','getInTouch'=>'Get in touch','collective'=>$site['collective']??[]],
                 'contact'=>[...$site['contacts'],'recipient'=>null,'footer'=>'','legalIdentity'=>''],
-                'social'=>['artistLinks'=>$site['artistLinks']??[],'profileLinks'=>$site['profileLinks']??[]],
+                'social'=>['artistLinks'=>$site['artistLinks']??[],'profileLinks'=>$site['profileLinks']??[],'links'=>$site['socialLinks']??$this->legacySocialLinks($site)],
                 'impressum'=>['text'=>$site['legal']['notice'],'status'=>$site['legal']['approved']?'published':'draft'],
                 'privacy'=>['text'=>$site['legal']['privacy'],'status'=>$site['legal']['approved']?'published':'draft'],
                 'consent'=>['essential'=>true,'externalMedia'=>true,'analytics'=>false,'marketing'=>false,'bannerText'=>'','privacyLink'=>'/privacy/','status'=>'draft'],
@@ -98,5 +98,12 @@ class ManifestImporter
             foreach ($settings as $key=>$data) $put(Setting::class,$key,['data'=>$data]);
             return $report;
         });
+    }
+    private function legacySocialLinks(array $site): array
+    {
+        $labels=['imdb'=>'IMDb','crewUnited'=>'Crew United','musicHub'=>'Music Hub','spotify'=>'Spotify','tidal'=>'Tidal','appleMusic'=>'Apple Music','deezer'=>'Deezer'];
+        $providers=['crewUnited'=>'crew-united','musicHub'=>'music-hub','appleMusic'=>'apple-music']; $links=[]; $order=0;
+        foreach (['profileLinks','artistLinks'] as $group) foreach (($site[$group]??[]) as $provider=>$url) if ($url) $links[]=['provider'=>$providers[$provider]??$provider,'label'=>$labels[$provider]??$provider,'url'=>$url,'visible'=>true,'sort_order'=>$order++];
+        return $links;
     }
 }

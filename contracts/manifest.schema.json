@@ -57,7 +57,7 @@
           },
           "path": {
             "type": "string",
-            "pattern": "^media\\/[a-zA-Z0-9/_-]+\\.(webp|jpg|png|mp3|wav|ogg|mp4|webm)$"
+            "pattern": "^media\\/[a-zA-Z0-9/_-]+\\.(webp|jpg|jpeg|png|mp3|wav|ogg|mp4|webm)$"
           },
           "width": {
             "type": "number",
@@ -843,6 +843,58 @@
             }
           },
           "additionalProperties": false
+        },
+        "socialLinks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "instagram",
+                  "imdb",
+                  "crew-united",
+                  "music-hub",
+                  "spotify",
+                  "tidal",
+                  "apple-music",
+                  "deezer",
+                  "youtube",
+                  "vimeo",
+                  "soundcloud",
+                  "letterboxd",
+                  "website",
+                  "other"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "visible": {
+                "type": "boolean"
+              },
+              "sort_order": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "provider",
+              "label",
+              "url",
+              "visible",
+              "sort_order"
+            ],
+            "additionalProperties": false
+          }
         },
         "collective": {
           "type": "object",

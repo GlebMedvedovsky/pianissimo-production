@@ -1,8 +1,10 @@
 ---
 import Logo from './Logo.astro';import Icon from './Icon.astro';import {siteConfig} from '../config/site.config';import {content} from '../lib/content/data';
+import {socialIcon} from '../lib/social';
 const {section}=Astro.props;
 const contacts=content.site.contacts;
 const profiles=content.site.profileLinks||{};
+const managedSocial=(content.site.socialLinks||[]).filter(link=>link.visible).sort((a,b)=>a.sort_order-b.sort_order);
 ---
 <a class="skip-link" href="#content">Skip to content</a>
 <header class:list={['site-header',{'site-header--portfolio':section==='music'||section==='directing'}]}>
@@ -11,9 +13,11 @@ const profiles=content.site.profileLinks||{};
 </header>
 <aside class="social-rail" aria-label="Contact and social links">
  <button data-contact aria-label="Contact by email" title="Contact"><Icon name="mail"/></button>
- {contacts.instagram&&<a href={contacts.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram"><Icon name="instagram"/></a>}
- {profiles.musicHub&&<a href={profiles.musicHub} target="_blank" rel="noreferrer" aria-label="Music Hub" title="Music Hub"><Icon name="music"/></a>}
- {profiles.imdb&&<a class="profile-link" href={profiles.imdb} target="_blank" rel="noreferrer" aria-label="IMDb profile">IMDb</a>}
- {profiles.crewUnited&&<a class="profile-link profile-link--crew" href={profiles.crewUnited} target="_blank" rel="noreferrer" aria-label="Crew United profile">Crew</a>}
+ {managedSocial.length>0?managedSocial.map(link=><a href={link.url} target="_blank" rel="noreferrer" aria-label={link.label} title={link.label}><Icon name={socialIcon[link.provider]||'arrowUpRight'}/></a>):<>
+  {contacts.instagram&&<a href={contacts.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram"><Icon name="instagram"/></a>}
+  {profiles.musicHub&&<a href={profiles.musicHub} target="_blank" rel="noreferrer" aria-label="Music Hub" title="Music Hub"><Icon name="music"/></a>}
+  {profiles.imdb&&<a class="profile-link" href={profiles.imdb} target="_blank" rel="noreferrer" aria-label="IMDb profile">IMDb</a>}
+  {profiles.crewUnited&&<a class="profile-link profile-link--crew" href={profiles.crewUnited} target="_blank" rel="noreferrer" aria-label="Crew United profile">Crew</a>}
+ </>}
  {contacts.samples&&<a href={contacts.samples} target="_blank" rel="noreferrer" aria-label="Samples unterm Sofa" title="Samples unterm Sofa"><Icon name="sofa"/></a>}
 </aside>

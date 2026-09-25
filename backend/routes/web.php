@@ -7,6 +7,11 @@ Route::post('/admin-theme', function (\Illuminate\Http\Request $request) {
     return response()->json(['saved'=>true]);
 })->middleware(['auth','throttle:60,1']);
 Route::get('/admin-media/{asset}', function (\App\Models\MediaAsset $asset) {
+    if ($asset->storage_path) {
+        $root=realpath(config('cms.media_originals_root'));
+        $file=realpath(storage_path('app/private/'.$asset->storage_path));
+        if($root && $file && str_starts_with($file,$root.DIRECTORY_SEPARATOR) && is_file($file)) return response()->file($file,['Cache-Control'=>'no-store'])->setPrivate();
+    }
     foreach ([config('cms.media_root'), config('cms.private_media_root')] as $directory) {
         $root=realpath($directory);
         $file=realpath($directory.'/'.preg_replace('#^media/#','',$asset->path));

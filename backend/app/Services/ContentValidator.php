@@ -2,6 +2,7 @@
 namespace App\Services;
 
 use DomainException;
+use App\Models\MediaAsset;
 use Opis\JsonSchema\Validator;
 use Opis\JsonSchema\Errors\ErrorFormatter;
 
@@ -67,7 +68,7 @@ class ContentValidator
             $ref($values['image'],['image'], $slot); $ref($values['poster'],['image'],$slot); $ref($values['video'],['video'],$slot);
         }
         $ref($m['site']['collective']['logoAssetId']??null,['image'],'Kollektiv-Logo');
-        $urls=[$m['site']['productionDomain'],...array_values((array)($m['site']['artistLinks']??[])),...array_values((array)($m['site']['profileLinks']??[])),$m['site']['collective']['url']??null];
+        $urls=[$m['site']['productionDomain'],...array_values((array)($m['site']['artistLinks']??[])),...array_values((array)($m['site']['profileLinks']??[])),...array_column($m['site']['socialLinks']??[],'url'),$m['site']['collective']['url']??null];
         foreach (['instagram','spotify','samples'] as $key) $urls[]=$m['site']['contacts'][$key];
         foreach ($m['site']['cv'] as $r) $urls[]=$r['link']??null;
         foreach ($m['projects'] as $p) $urls=[...$urls,...array_values((array)$p['platformLinks']),...array_values((array)($p['externalLinks']??[])),$p['externalFilm']['url']??null];
@@ -80,6 +81,17 @@ class ContentValidator
         if ($checkFiles) foreach ($m['assets'] as $a) {
             $root=realpath(config('cms.media_root'));
             $file=realpath(config('cms.media_root').'/'.substr($a['path'],6));
+            if (!$file && str_starts_with($a['path'],'media/cms/')) {
+                $managedRoot=realpath(config('cms.managed_media_root'));
+                $managedFile=realpath(config('cms.managed_media_root').'/'.substr($a['path'],10));
+                if ($managedRoot && $managedFile && str_starts_with($managedFile,$managedRoot.DIRECTORY_SEPARATOR)) { $root=$managedRoot; $file=$managedFile; }
+            }
+            if (!$file && str_starts_with($a['path'],'media/cms/')) {
+                $managed=MediaAsset::where('path',$a['path'])->whereNotNull('storage_path')->first();
+                $privateRoot=realpath(config('cms.media_originals_root'));
+                $private=$managed?realpath(storage_path('app/private/'.$managed->storage_path)):false;
+                if ($privateRoot && $private && str_starts_with($private,$privateRoot.DIRECTORY_SEPARATOR)) { $root=$privateRoot; $file=$private; }
+            }
             if (!$file || !$root || !str_starts_with($file,$root.DIRECTORY_SEPARATOR) || !is_file($file)) $fail("{$a['id']}: Web-Datei fehlt.");
             if (isset($a['sha256']) && hash_file('sha256',$file)!==$a['sha256']) $fail("{$a['id']}: Prüfsumme stimmt nicht.");
         }
