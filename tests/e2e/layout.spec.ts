@@ -1,5 +1,24 @@
 import { test, expect } from "@playwright/test";
 import { ready, shot, noOverflow } from "./helpers";
+test("compact player transport icons are exact mirrored peers", async ({ page }, info) => {
+  test.skip(!["desktop", "mobile"].includes(info.project.name), "desktop/mobile player control check");
+  await ready(page, "/film-music/");
+  await page.locator("[data-play-track]").first().click();
+  await expect(page.locator(".player")).toBeVisible();
+  if (info.project.name === "mobile") await page.getByRole("button", { name: "More player controls" }).click();
+  const controls = info.project.name === "mobile" ? ".player-secondary" : ".player-buttons";
+  const previous = page.locator(`${controls} [data-player="previous"]`);
+  const next = page.locator(`${controls} [data-player="next"]`);
+  await expect(previous).toHaveAttribute("aria-label", "Previous track");
+  await expect(next).toHaveAttribute("aria-label", "Next track");
+  await expect(previous.locator("path")).toHaveAttribute("d", "M5 5v14m13-14L7 12l11 7Z");
+  await expect(next.locator("path")).toHaveAttribute("d", "M19 5v14M6 5L17 12 6 19Z");
+  for (const button of [previous, next]) await expect(button.locator("svg")).toHaveAttribute("stroke", "currentColor");
+  const [previousBox, nextBox, previousSvg, nextSvg] = await Promise.all([previous.boundingBox(), next.boundingBox(), previous.locator("svg").boundingBox(), next.locator("svg").boundingBox()]);
+  expect(previousBox).not.toBeNull();expect(nextBox).not.toBeNull();expect(previousSvg).not.toBeNull();expect(nextSvg).not.toBeNull();
+  expect(nextBox!.width).toBe(previousBox!.width);expect(nextBox!.height).toBe(previousBox!.height);
+  expect(nextSvg!.width).toBe(previousSvg!.width);expect(nextSvg!.height).toBe(previousSvg!.height);
+});
 test("mobile portfolio header stays pinned without covering content", async ({ page }, info) => {
   test.skip(info.project.name === "desktop", "mobile-only layout assertion");
   test.setTimeout(90_000);

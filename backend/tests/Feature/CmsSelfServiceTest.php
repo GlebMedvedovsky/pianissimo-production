@@ -1,8 +1,8 @@
 <?php
 namespace Tests\Feature;
 
-use App\Models\{AuditEvent,MediaAsset,Membership,Setting,User};
-use App\Services\{FrontendPublication,ManifestExporter,ManifestImporter,MediaStorage,MediaUsageResolver};
+use App\Models\{AuditEvent,MediaAsset,Membership,Project,Publication,Setting,User};
+use App\Services\{DraftStateSnapshot,FrontendPublication,ManifestExporter,ManifestImporter,MediaStorage,MediaUsageResolver};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -144,5 +144,42 @@ class CmsSelfServiceTest extends TestCase
         file_put_contents($active,substr(file_get_contents($active),0,-1));
         if(!is_dir($this->fixtureRoot.'/state'))mkdir($this->fixtureRoot.'/state',0750,true); file_put_contents($this->fixtureRoot.'/state/operation.lock','999');
         try{$flow->apply($review['planHash'],$admin->id);$this->fail('Concurrent apply must fail');}catch(\DomainException){} finally {unlink($this->fixtureRoot.'/state/operation.lock');}
+    }
+
+    public function test_unpublished_draft_can_be_discarded_without_changing_frontend_and_stales_candidate(): void
+    {
+        $admin=$this->admin();$active=$this->fixtureRoot.'/manifest.json';copy(config('cms.manifest'),$active);
+        config(['cms.manifest'=>$active,'cms.managed_media_root'=>$this->fixtureRoot.'/managed','cms.frontend_apply_state'=>$this->fixtureRoot.'/state']);
+        $project=Project::where('status','published')->firstOrFail();$appliedSynopsis=$project->synopsis.' Applied baseline';$project->update(['synopsis'=>$appliedSynopsis]);
+        $flow=app(FrontendPublication::class);$first=app(ManifestExporter::class)->export(false,false,$admin->id);$firstReview=$flow->review($first['hash'],$admin->id);$flow->apply($firstReview['planHash'],$admin->id);
+        $this->assertFileExists($this->fixtureRoot.'/state/applied-cms.json');$frontend=file_get_contents($active);
+
+        $project->update(['synopsis'=>'Dieser nicht veröffentlichte Text soll verworfen werden.']);
+        $second=app(ManifestExporter::class)->export(false,false,$admin->id);$secondReview=$flow->review($second['hash'],$admin->id);
+        $draft=app(DraftStateSnapshot::class);$this->assertTrue($draft->hasChanges());$this->assertStringContainsString('Projekte',implode(' ',$draft->preview()['descriptions']));
+        Livewire::test(\App\Filament\Pages\Publication::class)->assertSee('Nicht veröffentlichte Änderungen verwerfen');
+
+        $result=$draft->discard($admin->id);
+        $this->assertSame($appliedSynopsis,Project::findOrFail($project->id)->synopsis);
+        $this->assertSame($frontend,file_get_contents($active),'Draft discard must never change the frontend manifest.');
+        $this->assertGreaterThanOrEqual(1,$result['staleCandidates']);
+        $this->assertSame('stale',Publication::where('hash',$second['hash'])->firstOrFail()->status);
+        $this->assertTrue(AuditEvent::where('object_type','publication')->where('action','draft-discard')->exists());
+        $this->assertFalse($draft->hasChanges());
+        Project::findOrFail($project->id)->update(['synopsis'=>'Dieser nicht veröffentlichte Text soll verworfen werden.']);
+        $fresh=app(ManifestExporter::class)->export(false,false,$admin->id);$this->assertSame($second['hash'],$fresh['hash']);$freshReview=$flow->review($fresh['hash'],$admin->id);$this->assertNotSame($secondReview['planHash'],$freshReview['planHash']);
+        try{$flow->apply($secondReview['planHash'],$admin->id);$this->fail('A discarded candidate must not apply.');}catch(\DomainException $e){$this->assertStringContainsString('veraltet',$e->getMessage());}
+    }
+
+    public function test_existing_installation_without_apply_audit_detects_and_discards_about_draft_from_active_frontend(): void
+    {
+        $admin=$this->admin();$active=$this->fixtureRoot.'/manifest.json';copy(config('cms.manifest'),$active);
+        config(['cms.manifest'=>$active,'cms.frontend_apply_state'=>$this->fixtureRoot.'/state']);
+        $applied=json_decode(file_get_contents($active),true)['site']['biography'];$about=Setting::read('about');Setting::put('about',[...$about,'biography'=>[...$applied,'Nicht veröffentlichter Browser-Entwurf']]);
+        $frontend=file_get_contents($active);$draft=app(DraftStateSnapshot::class);
+        $this->assertTrue($draft->hasChanges());$this->assertStringContainsString('Website-Einstellungen',implode(' ',$draft->preview()['descriptions']));
+        Livewire::test(\App\Filament\Pages\Publication::class)->assertSee('Nicht veröffentlichte Änderungen verwerfen')->assertSee('Noch keine aktuelle Vorschau vorhanden');
+        $draft->discard($admin->id);
+        $this->assertSame($applied,Setting::read('about')['biography']);$this->assertSame($frontend,file_get_contents($active));$this->assertFalse($draft->hasChanges());
     }
 }

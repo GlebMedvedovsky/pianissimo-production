@@ -12,9 +12,10 @@ class SettingsExporter
     {
         $take=fn($key,$fields)=>Arr::only(Setting::read($key),$fields);
         $seo=$take('seo',['titleTemplate','description','canonicalBase','ogAssetId','robots','sitemap','index']);
-        $consent=$take('consent',['essential','externalMedia','analytics','marketing','bannerText','privacyLink','status']);
+        $consent=$take('consent',['essential','externalMedia','analytics','marketing','bannerText','privacyLink','version','status']);
         $home=$take('home',['loop','autoplayMuted']);
-        $analytics=$take('analytics',['enabled','provider','measurementId']);
+        $analytics=$take('analytics',['enabled','provider','measurementId','siteDomain']);
+        $consent['version']=(int)($consent['version']??1); $analytics['siteDomain']=$analytics['siteDomain']??null;
         Validator::make(['seo'=>$seo,'consent'=>$consent,'home'=>$home,'analytics'=>$analytics],[
             'seo.titleTemplate'=>'required|string|max:255','seo.description'=>'nullable|string|max:2000',
             'seo.canonicalBase'=>'nullable|url:http,https','seo.robots'=>['required',\Illuminate\Validation\Rule::in(['noindex, nofollow','index, follow','noindex, follow'])],
@@ -22,13 +23,16 @@ class SettingsExporter
             'consent.essential'=>'required|accepted','consent.externalMedia'=>'required|accepted',
             'consent.analytics'=>'required|boolean','consent.marketing'=>'required|boolean',
             'consent.bannerText'=>'nullable|string','consent.privacyLink'=>'required|regex:#^/[a-z0-9/-]+$#',
+            'consent.version'=>'required|integer|min:1',
             'consent.status'=>'required|in:draft,reviewed,published',
             'home.loop'=>'required|accepted','home.autoplayMuted'=>'required|accepted',
             'analytics.enabled'=>'required|boolean','analytics.provider'=>'required|in:none,ga4,plausible',
-            'analytics.measurementId'=>'nullable|regex:/^[A-Za-z0-9.-]{1,100}$/',
+            'analytics.measurementId'=>'nullable|regex:/^G-[A-Z0-9]{4,20}$/','analytics.siteDomain'=>'nullable|regex:/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/',
         ])->validate();
         if (!empty($seo['ogAssetId']) && !MediaAsset::whereKey($seo['ogAssetId'])->where('type','image')->exists()) throw new DomainException('SEO: OG-Bild fehlt oder ist kein Bild.');
-        if ($analytics['enabled'] && (!$consent['analytics'] || $analytics['provider']==='none' || empty($analytics['measurementId']))) throw new DomainException('Analytics benötigt expliziten Consent und eine konfigurierte Kennung.');
+        if ($analytics['enabled'] && (!$consent['analytics'] || $analytics['provider']==='none')) throw new DomainException('Analytics benötigt expliziten Consent und einen konfigurierten Anbieter.');
+        if ($analytics['enabled'] && $analytics['provider']==='ga4' && empty($analytics['measurementId'])) throw new DomainException('Google Analytics benötigt eine gültige Measurement-ID.');
+        if ($analytics['enabled'] && $analytics['provider']==='plausible' && empty($analytics['siteDomain'])) throw new DomainException('Plausible benötigt eine gültige Website-Domain.');
         $services=[];
         foreach (ExternalService::orderBy('sort_order')->orderBy('id')->get() as $s) {
             $v=$s->only(['name','provider','category','purpose','description','privacy_url','storage_description','requires_consent','enabled','provider_id','sort_order']);

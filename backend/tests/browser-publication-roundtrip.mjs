@@ -34,8 +34,8 @@ try {
   await page.goto('http://127.0.0.1:8080/admin/login'); await page.locator('input[type=email]').fill(credentials.email); await page.locator('input[type=password]').fill(credentials.password); await page.getByRole('button',{name:'Anmelden',exact:true}).click(); await page.waitForURL('**/admin/dashboard');
   assert.equal(hashFile(path.join(root,'content/manifest.json')),baseline.manifestSha256); checks.push('Upload and draft assignment left active frontend unchanged');
   await page.getByRole('link',{name:'Veröffentlichung',exact:true}).click();
-  if(process.env.SKIP_DRY_RUN!=='1')await clickAndWaitForNotification('Paket prüfen (Dry Run)','Validierung erfolgreich');
-  await page.getByRole('button',{name:'Export-Vorschau erstellen',exact:true}).click();
+  if(process.env.SKIP_DRY_RUN!=='1')await clickAndWaitForNotification('Paket prüfen','Validierung erfolgreich');
+  await page.getByRole('button',{name:'Vorschau erstellen',exact:true}).click();
   await page.getByRole('button',{name:'Änderungen prüfen',exact:true}).waitFor();
   await page.getByRole('button',{name:'Änderungen prüfen',exact:true}).click(); await page.getByText(/Änderungen geprüft/).waitFor();
   const descriptions=await page.locator('.fi-section').first().locator('li').allTextContents(); assert(descriptions.some(text=>/Neues Medium: synthetic-self-service/.test(text))); assert(descriptions.some(text=>/Website-Medium geändert: mediaSlots → about → image/.test(text)));

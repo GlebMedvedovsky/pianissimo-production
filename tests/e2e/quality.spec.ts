@@ -47,7 +47,7 @@ test("keyboard can choose both logo halves; modal focus stays contained", async 
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await page.getByRole("button", { name: "Keep off" }).click();
+  await page.getByRole("button", { name: "Necessary only" }).click();
   const music = page.getByRole("link", { name: "Explore Film Music" }),
     directing = page.getByRole("link", { name: "Explore Directing" });
   await music.focus();

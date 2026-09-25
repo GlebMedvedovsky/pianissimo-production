@@ -12,7 +12,7 @@ abstract class SettingsPage extends Page implements HasForms
     protected string $view='cms.settings';
     protected static string $settingsKey;
     public ?array $data=[];
-    public function mount(): void { $this->form->fill(Setting::read(static::$settingsKey)); }
+    public function mount(): void { $data=Setting::read(static::$settingsKey);if(static::$settingsKey==='consent'&&!array_key_exists('version',$data))$data['version']=1;$this->form->fill($data); }
     public function form(Schema $schema): Schema { return $schema->components(SettingsForm::fields(static::$settingsKey))->statePath('data'); }
     protected function getHeaderActions(): array
     {

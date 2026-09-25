@@ -73,7 +73,7 @@ class ManifestExporter
         foreach (CvEntry::whereIn('status',['published','needs-confirmation'])->orderBy('sort_order')->orderBy('id')->get() as $r) {
             $cv[]=['date'=>$r->date,'text'=>implode(' — ',array_filter([$r->title,$r->institution,$r->description])),'status'=>$r->status,...$this->optional(['link'=>$r->link,'linkText'=>$r->link_text])];
         }
-        $site=Setting::read('site'); $contact=Setting::read('contact'); $about=Setting::read('about'); $social=Setting::read('social');
+        $site=Setting::read('site'); $contact=Setting::read('contact'); $about=Setting::read('about'); $social=Setting::read('social'); $consent=Setting::read('consent'); $analytics=Setting::read('analytics');
         $notice=Setting::read('impressum'); $privacy=Setting::read('privacy');
         $manifest=['schemaVersion'=>'1.0.0','mode'=>'prototype','sources'=>[],'assets'=>$assets,'projects'=>$projects,'tracks'=>$tracks,
             'site'=>['language'=>'en','title'=>$site['title']??'','description'=>$site['description']??'',
@@ -83,6 +83,8 @@ class ManifestExporter
                 'productionDomain'=>$site['productionDomain']??null,'artistLinks'=>$this->links($social['artistLinks']??[]),
                 'profileLinks'=>$this->profileLinks($social['profileLinks']??[]),
                 'socialLinks'=>array_values(array_map(fn($link)=>Arr::only($link,['provider','label','url','visible','sort_order']),$social['links']??[])),
+                'consent'=>['version'=>(int)($consent['version']??1),'necessary'=>true,'externalMedia'=>(bool)($consent['externalMedia']??true),'analytics'=>(bool)($consent['analytics']??false),'marketing'=>(bool)($consent['marketing']??false),'bannerText'=>(string)($consent['bannerText']??''),'privacyLink'=>(string)($consent['privacyLink']??'/privacy/')],
+                'analytics'=>['enabled'=>(bool)($analytics['enabled']??false),'provider'=>(string)($analytics['provider']??'none'),'measurementId'=>($analytics['provider']??null)==='ga4'?($analytics['measurementId']??null):null,'siteDomain'=>($analytics['provider']??null)==='plausible'?($analytics['siteDomain']??null):null],
                 ...(!empty($about['collective']['name']) && !empty($about['collective']['url']) && !empty($about['collective']['membershipText'])?['collective'=>[
                     'name'=>$about['collective']['name'],'url'=>$about['collective']['url'],'logoAssetId'=>$about['collective']['logoAssetId']??null,'membershipText'=>$about['collective']['membershipText'],
                 ]]:[]),'mediaSlots'=>$slots]];
@@ -108,6 +110,10 @@ class ManifestExporter
                     if (file_put_contents($directory.'/'.$file.'.pending',$text,LOCK_EX)===false || !rename($directory.'/'.$file.'.pending',$directory.'/'.$file)) throw new DomainException('Export konnte nicht atomar gespeichert werden.');
                 }
             }
+            $snapshotFile=$directory.'/cms-draft-snapshot.json';
+            $snapshot=json_encode(app(DraftStateSnapshot::class)->capture($hash),JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n";
+            if(is_file($snapshotFile)){if(file_get_contents($snapshotFile)!==$snapshot){if(\App\Models\Publication::where('hash',$hash)->latest('id')->value('status')!=='stale')throw new DomainException('Unveränderlicher CMS-Stand stimmt nicht überein.');$pending=$snapshotFile.'.pending';if(file_put_contents($pending,$snapshot,LOCK_EX)===false||!rename($pending,$snapshotFile))throw new DomainException('CMS-Stand konnte nicht erneuert werden.');}}
+            elseif(file_put_contents($snapshotFile.'.pending',$snapshot,LOCK_EX)===false||!rename($snapshotFile.'.pending',$snapshotFile))throw new DomainException('CMS-Stand konnte nicht gespeichert werden.');
             $media=[];
             foreach ($package['manifest']['assets'] as $asset) {
                 $record=MediaAsset::find($asset['id']);
@@ -127,7 +133,7 @@ class ManifestExporter
             if ($userId && !$publish) {
                 $receipt=['version'=>1,'candidateHash'=>$hash,'adminUserId'=>$userId,
                     'manifestSha256'=>hash_file('sha256',$directory.'/manifest.json'),
-                    'settingsSha256'=>hash_file('sha256',$directory.'/cms-settings.json'),'media'=>$media,'managedDeletes'=>$managedDeletes];
+                    'settingsSha256'=>hash_file('sha256',$directory.'/cms-settings.json'),'snapshotSha256'=>hash_file('sha256',$snapshotFile),'media'=>$media,'managedDeletes'=>$managedDeletes];
                 $text=json_encode($receipt,JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR)."\n";
                 if (file_put_contents($directory.'/receipt.json.pending',$text,LOCK_EX)===false || !rename($directory.'/receipt.json.pending',$directory.'/receipt.json')) throw new DomainException('Export-Beleg konnte nicht gespeichert werden.');
             }

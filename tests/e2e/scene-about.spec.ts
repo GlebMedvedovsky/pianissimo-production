@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 async function ready(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Keep off", exact: true }).click();
+  await page.getByRole("button", { name: "Necessary only", exact: true }).click();
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator(".hero-scene")).toHaveAttribute(
     "data-phase",
@@ -205,7 +205,7 @@ test("reduced motion exposes the same About and footer without pinning", async (
 }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Keep off", exact: true }).click();
+  await page.getByRole("button", { name: "Necessary only", exact: true }).click();
   await expect(page.locator("#about")).toHaveCount(1);
   expect(
     await page
@@ -238,7 +238,7 @@ test("header outline follows Film Music and Directing themes on client navigatio
   page,
 }, info) => {
   await page.goto("/film-music/", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Keep off", exact: true }).click();
+  await page.getByRole("button", { name: "Necessary only", exact: true }).click();
   for (const section of ["music", "directing", "music"]) {
     if (section === "directing")
       await page.locator('header a[href="/directing/"]').click();

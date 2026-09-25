@@ -38,7 +38,7 @@ async function logout(){await menu();await admin.getByRole('button',{name:'Abmel
 const isDark=()=>admin.locator('html').evaluate(e=>e.classList.contains('dark'));
 async function saveSynopsis(value){await admin.goto('http://127.0.0.1:8080/admin/projects/abszission/edit');await admin.getByRole('textbox',{name:/^Synopsis/}).fill(value);await admin.getByRole('button',{name:'Entwurf speichern',exact:true}).click();await admin.getByText('Gespeichert',{exact:true}).waitFor();}
 async function publicData(page){return page.locator('#site-content').textContent();}
-async function exportCandidate(){await admin.goto('http://127.0.0.1:8080/admin/publication');await admin.getByRole('button',{name:'Export-Vorschau erstellen',exact:true}).click();await admin.getByText('Lokales Paket erstellt',{exact:true}).waitFor();return await admin.locator('code[title]').getAttribute('title');}
+async function exportCandidate(){await admin.goto('http://127.0.0.1:8080/admin/publication');await admin.getByRole('button',{name:'Vorschau erstellen',exact:true}).click();await admin.getByText('Lokales Paket erstellt',{exact:true}).waitFor();return await admin.locator('code[title]').getAttribute('title');}
 async function cli(command,id,token,label){
   return new Promise((resolve,reject)=>{let output='',sent=false;const args=['scripts/cms-frontend.mjs',command,...(id?[id]:[])];
     const child=spawn(process.execPath,args,{cwd:root,stdio:['pipe','pipe','pipe'],windowsHide:true});

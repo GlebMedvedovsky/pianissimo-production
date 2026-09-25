@@ -29,10 +29,12 @@ class FrontendPublication
     private function candidate(string $id): array
     {
         $id=$this->hex($id); $dir=storage_path('app/private/'.config('cms.export_prefix').'/candidates/'.$id);
+        if(\App\Models\Publication::where('hash',$id)->latest('id')->value('status')==='stale')throw new DomainException('Diese Vorschau ist veraltet. Bitte erstellen und prüfen Sie eine neue Vorschau.');
         $manifestFile=$dir.'/manifest.json'; $settingsFile=$dir.'/cms-settings.json';
         $manifest=$this->readJson($manifestFile); $receipt=$this->readJson($dir.'/receipt.json');
         if (($receipt['candidateHash']??null)!==$id || ($receipt['manifestSha256']??null)!==hash_file('sha256',$manifestFile) || ($receipt['settingsSha256']??null)!==hash_file('sha256',$settingsFile) || !is_int($receipt['adminUserId']??null) || $receipt['adminUserId']<1) throw new DomainException('Kandidaten-Beleg ist ungültig.');
         $settings=$this->readJson($settingsFile);
+        if(isset($receipt['snapshotSha256'])&&(!is_file($dir.'/cms-draft-snapshot.json')||$receipt['snapshotSha256']!==hash_file('sha256',$dir.'/cms-draft-snapshot.json')))throw new DomainException('Der CMS-Stand des Kandidaten ist ungültig.');
         if (($settings['scope']??null)!=='next_draft' || ($settings['deploymentAuthorized']??null)!==false) throw new DomainException('Der Kandidat ist kein freigegebener nächster Entwurf.');
         app(ContentValidator::class)->validate($manifest,false,false);
         if (($manifest['sources']??[])!==[]) throw new DomainException('Private Quellen dürfen nicht in den Kandidaten gelangen.');
@@ -173,11 +175,13 @@ class FrontendPublication
     }
     public function apply(string $planHash,int $userId): array
     {
-        $planHash=$this->hex($planHash); $recorded=$this->readJson(config('cms.frontend_apply_state').'/plans/'.$planHash.'.json');
+        $planHash=$this->hex($planHash);if(is_file(config('cms.frontend_apply_state').'/plans/'.$planHash.'.stale'))throw new DomainException('Diese geprüfte Vorschau ist veraltet. Bitte erstellen und prüfen Sie eine neue Vorschau.');$recorded=$this->readJson(config('cms.frontend_apply_state').'/plans/'.$planHash.'.json');
         if($this->hashValue($recorded)!==$planHash)throw new DomainException('Geprüfter Plan wurde verändert.');
         return $this->withLock(function() use($recorded,$planHash,$userId) {
-            $this->candidate($recorded['candidateHash']); $currentHash=hash_file('sha256',config('cms.manifest'));
-            if($currentHash===$recorded['resultingManifestHash'])return ['status'=>'already-current','planHash'=>$planHash];
+            $candidate=$this->candidate($recorded['candidateHash']); $currentHash=hash_file('sha256',config('cms.manifest'));
+            try{$draftHash=ManifestImporter::hash(app(ManifestExporter::class)->package());}catch(\Throwable){$draftHash=null;}
+            if($draftHash!==$recorded['candidateHash']){app(DraftStateSnapshot::class)->markCandidatesStale([$recorded['candidateHash']]);throw new DomainException('Diese Vorschau ist nicht mehr aktuell. Bitte erstellen und prüfen Sie eine neue Vorschau.');}
+            if($currentHash===$recorded['resultingManifestHash']){$this->promoteSnapshot($candidate,$recorded);return ['status'=>'already-current','planHash'=>$planHash];}
             $prepared=$this->prepare($recorded['candidateHash']);
             foreach(['candidateHash','previousManifestHash','resultingManifestHash','changes','mediaChanges'] as $key)if(!$this->equal($prepared['plan'][$key],$recorded[$key]))throw new DomainException('Kandidat oder aktiver Stand hat sich seit der Prüfung geändert. Bitte erneut prüfen.');
             $state=config('cms.frontend_apply_state'); $revisionId=now()->format('YmdHisv').'-'.$planHash; $revisionDir=$state.'/revisions/'.$revisionId;
@@ -197,6 +201,7 @@ class FrontendPublication
                 if(hash_file('sha256',config('cms.manifest'))!==$recorded['previousManifestHash'])throw new DomainException('Aktives Manifest wurde seit der Prüfung verändert.');
                 $this->replaceFile(config('cms.manifest'),$prepared['bytes']);
                 foreach($recorded['mediaChanges'] as $change)if(!$change['afterSha256'])@unlink(config('cms.managed_media_root').'/'.substr($this->safeManagedPath($change['path']),10));
+                $this->promoteSnapshot($prepared['candidate'],$recorded);
             } catch(\Throwable $e) {
                 foreach($recorded['mediaChanges'] as $change){$target=config('cms.managed_media_root').'/'.substr($this->safeManagedPath($change['path']),10);if($change['beforeSha256']){$backup=$revisionDir.'/media/'.substr($change['path'],10);if(is_file($backup))$this->replaceFile($target,file_get_contents($backup));}else @unlink($target);}
                 if(hash_file('sha256',config('cms.manifest'))!==$recorded['previousManifestHash'])$this->replaceFile(config('cms.manifest'),$prepared['active']['bytes']); throw $e;
@@ -204,6 +209,10 @@ class FrontendPublication
             app(AuditLogger::class)->record('publication',$recorded['candidateHash'],'apply',$planHash,['revision'=>$revisionId]);
             return ['status'=>'success','planHash'=>$planHash,'revision'=>$revisionId,'resultingManifestHash'=>$recorded['resultingManifestHash']];
         });
+    }
+    private function promoteSnapshot(array $candidate,array $plan): void
+    {
+        if(isset($candidate['receipt']['snapshotSha256']))app(DraftStateSnapshot::class)->promote($candidate['dir'].'/cms-draft-snapshot.json',$candidate['receipt']['snapshotSha256'],$plan['resultingManifestHash']);
     }
     public function rollbackReview(int $userId): array
     {

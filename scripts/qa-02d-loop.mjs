@@ -20,7 +20,7 @@ async function run(name,mobile){
  });
  await page.goto('http://127.0.0.1:4321/');await page.waitForFunction(()=>window.__loopQA?.firstFrame!==null&&document.querySelector('[data-slot-video=hero]').currentTime>.1);
  assert.ok(await page.locator('[data-slot-video=hero]').evaluate(v=>v.muted&&v.loop&&!v.paused));
- await page.getByRole('button',{name:'Keep off',exact:true}).click();await page.locator('[data-showreel-sound]').click();await page.waitForFunction(()=>!document.querySelector('[data-slot-video=hero]').muted);await page.screenshot({path:`${out}/${name}-loop-start-ui.png`});
+ await page.getByRole('button',{name:'Necessary only',exact:true}).click();await page.locator('[data-showreel-sound]').click();await page.waitForFunction(()=>!document.querySelector('[data-slot-video=hero]').muted);await page.screenshot({path:`${out}/${name}-loop-start-ui.png`});
  console.log(name,'natural loop observation started');
  await page.waitForFunction(()=>window.__loopQA.wraps.length>=3,undefined,{timeout:285000,polling:1000});
  await page.screenshot({path:`${out}/${name}-loop-finish-ui.png`});const result=await page.evaluate(()=>window.__loopQA);const frames=result.frames;delete result.frames;

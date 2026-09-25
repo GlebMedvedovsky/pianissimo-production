@@ -8,6 +8,7 @@ import { initFilters } from "./navigation/filters";
 import { initProjectModal } from "./navigation/modals";
 import { coordinator, playable, renderPlayer } from "./media/player";
 import { initConsent } from "./media/consent";
+import { initAnalytics } from "./analytics";
 import { initLocalVideo } from "./media/local-video";
 let cleanup = () => {};
 let navigationDirection = "right";
@@ -89,7 +90,8 @@ function init() {
   const removeVideo = initLocalVideo(signal);
   initFilters(signal);
   initProjectModal();
-  initConsent();
+  initConsent(signal);
+  initAnalytics(signal);
   coordinator.section(location.hash === "#about" ? "about" : currentSection());
   renderPlayer();
   const root = document.documentElement;

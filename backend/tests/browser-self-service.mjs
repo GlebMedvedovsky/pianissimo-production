@@ -30,8 +30,8 @@ try {
   assert.equal(hashFile(path.join(root,'content/manifest.json')),baseline.manifestSha256); checks.push('Save Draft leaves active frontend unchanged');
 
   await page.getByRole('link',{name:'Veröffentlichung',exact:true}).click();
-  await page.getByRole('button',{name:'Paket prüfen (Dry Run)',exact:true}).click(); await page.getByText('Validierung erfolgreich',{exact:true}).waitFor();
-  await page.getByRole('button',{name:'Export-Vorschau erstellen',exact:true}).click(); await page.getByText('Lokales Paket erstellt',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Paket prüfen',exact:true}).click(); await page.getByText('Validierung erfolgreich',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Vorschau erstellen',exact:true}).click(); await page.getByText('Lokales Paket erstellt',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Änderungen prüfen',exact:true}).click(); await page.getByText(/Änderungen geprüft/).waitFor();
   const descriptions=await page.locator('.fi-section').first().locator('li').allTextContents();
   assert(descriptions.some(text=>/Neues Medium: synthetic-self-service/.test(text))); assert(descriptions.some(text=>/Website-Medium geändert: mediaSlots → about → image/.test(text)));

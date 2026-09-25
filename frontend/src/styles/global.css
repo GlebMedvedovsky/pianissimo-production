@@ -1291,9 +1291,41 @@ form .form-status {
 }
 
 .consent-actions {
-    display: grid;
-    gap: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     margin: 25px 0
+}
+
+.consent-preferences {
+    display: grid;
+    gap: 10px;
+    margin-top: 22px
+}
+
+.consent-preferences label {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: start;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--border)
+}
+
+.consent-preferences input {
+    margin-top: 3px
+}
+
+.consent-preferences span,
+.consent-preferences small {
+    display: block
+}
+
+.consent-preferences small {
+    margin-top: 4px;
+    color: var(--muted);
+    line-height: 1.45
 }
 
 .small-dialog>a {
@@ -1302,35 +1334,61 @@ form .form-status {
 
 .cookie-notice {
     position: fixed;
-    bottom: 20px;
-    left: 24px;
-    z-index: 40;
-    max-width: calc(100vw - 48px);
-    display: flex;
-    align-items: center;
-    gap: 20px;
+    right: 24px;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    z-index: 60;
+    width: min(540px, calc(100vw - 48px));
+    display: grid;
+    gap: 14px;
     background: var(--background);
     color: var(--text);
     border: 1px solid var(--border);
-    padding: 17px 20px
+    padding: 18px 20px;
+    box-shadow: 0 14px 45px rgba(0,0,0,.18)
+}
+
+.player[hidden]~* .cookie-notice,
+body:has(.player[hidden]) .cookie-notice {
+    bottom: calc(20px + env(safe-area-inset-bottom))
+}
+
+.cookie-notice strong {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 500
 }
 
 .cookie-notice p {
     font-size: 11px;
     color: var(--text);
     line-height: 1.6;
-    margin: 0
+    margin: 5px 0 0
 }
 
-.cookie-notice p>span {
-    color: var(--muted);
-    font-size: 10px
+.cookie-notice-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px
 }
 
-.cookie-notice button {
+.cookie-notice button,
+.cookie-notice a {
     font-size: 10px;
     padding: 9px;
     border-bottom: 1px solid var(--border)
+}
+
+@media (max-width: 600px) {
+    .cookie-notice { right: 12px; bottom: calc(112px + env(safe-area-inset-bottom)); width: calc(100vw - 24px); padding: 15px }
+    body:has(.player[hidden]) .cookie-notice { bottom: calc(12px + env(safe-area-inset-bottom)) }
+    .cookie-notice-actions { display: grid; grid-template-columns: 1fr 1fr }
+    .cookie-notice button,.cookie-notice a { text-align: center }
+    .consent-actions { display: grid }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cookie-notice,.consent-dialog { scroll-behavior: auto }
 }
 
 .direct-project {

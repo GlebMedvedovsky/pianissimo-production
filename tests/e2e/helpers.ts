@@ -3,7 +3,7 @@ export async function ready(page: Page, path: string) {
   await page.goto(path);
   await page.locator("html.js").waitFor();
   await expect(page.locator(".cookie-notice")).toBeVisible();
-  await page.getByRole("button", { name: "Keep off", exact: true }).click();
+  await page.getByRole("button", { name: "Necessary only", exact: true }).click();
   await page.evaluate(() => document.fonts.ready);
 }
 export async function shot(page: Page, name: string, info: TestInfo) {

@@ -52,6 +52,17 @@ test("profile links and collective are optional for older manifests", () => {
   assert.equal(current.site.profileLinks?.musicHub, "https://music-hub.bio/sebastiangreim");
   assert.equal(current.site.collective?.name, "Samples unterm Sofa");
 });
+test("public consent and analytics configuration is strict and backwards compatible", () => {
+  const configured = structuredClone(raw) as typeof raw & {site: typeof raw.site & Record<string,unknown>};
+  configured.site.consent = {version:2,necessary:true,externalMedia:true,analytics:true,marketing:false,bannerText:"Your choice.",privacyLink:"/privacy/"};
+  configured.site.analytics = {enabled:true,provider:"ga4",measurementId:"G-TEST1234",siteDomain:null};
+  assert.equal(validateManifest(configured).site.consent?.version,2);
+  const invalid = structuredClone(configured);
+  invalid.site.analytics = {enabled:true,provider:"ga4",measurementId:"not-an-id"};
+  assert.throws(()=>validateManifest(invalid));
+  const old = structuredClone(raw);
+  assert.equal(validateManifest(old).site.consent,undefined);
+});
 test("release fails honestly; fixtures are blocked from prototype", () => {
   assert.throws(() => validateManifest(raw, true), /Release blocked/);
   const fixture = structuredClone(raw);
