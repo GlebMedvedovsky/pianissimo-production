@@ -87,6 +87,9 @@ test("reduced motion removes the split-menu colour transition", async ({
 
   const composer = page.locator(composerImage);
   const directing = page.locator(directingImage);
+  expect(await page.locator('.scene-logo .logo-label').evaluateAll(elements =>
+    elements.map(element => getComputedStyle(element).opacity),
+  )).toEqual(['1', '1']);
   await expect(composer).toHaveCSS("filter", "grayscale(1)");
   await expect(directing).toHaveCSS("filter", "grayscale(1)");
   const transitionMs = await composer.evaluate((image) => {
@@ -111,7 +114,7 @@ test("split-logo labels scale continuously with both logo halves", async ({
     const sticky = scene.querySelector<HTMLElement>(".scene-sticky")!;
     return scene.clientHeight - sticky.clientHeight;
   });
-  const checkpoints = [0, 0.25, 0.5, 0.75, 1];
+  const checkpoints = [0, 0.5, 0.62, 0.7, 0.9, 1];
   const widths: number[] = [];
   const ratios: number[][] = [];
 
@@ -154,7 +157,12 @@ test("split-logo labels scale continuously with both logo halves", async ({
     ratios.push(state.halves.map(({ label }) => label.width / state.logoWidth));
 
     for (const { path, label, opacity } of state.halves) {
-      expect(opacity).toBe("1");
+      const alpha = Number(opacity);
+      if (progress <= .62) expect(alpha).toBeLessThan(.05);
+      else if (progress < .9) {
+        expect(alpha).toBeGreaterThan(0);
+        expect(alpha).toBeLessThan(1);
+      } else expect(alpha).toBeCloseTo(1, 2);
       expect(label.left).toBeGreaterThanOrEqual(path.left - 1);
       expect(label.top).toBeGreaterThanOrEqual(path.top - 1);
       expect(label.right).toBeLessThanOrEqual(path.right + 1);
@@ -162,7 +170,7 @@ test("split-logo labels scale continuously with both logo halves", async ({
     }
 
     await page.screenshot({
-      path: `docs/qa/split-logo-scale-${index * 25}.png`,
+      path: `docs/qa/split-logo-scale-${index}.png`,
     });
   }
 
@@ -178,8 +186,13 @@ test("split-logo labels scale continuously with both logo halves", async ({
       ({ scrollTop }) => scrollTo({ top: scrollTop, behavior: "instant" }),
       { scrollTop: travel * (progress / 2.25) },
     );
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(220);
     const state = await readState();
-    for (const { opacity } of state.halves) expect(opacity).toBe("1");
+    for (const { opacity } of state.halves) {
+      const alpha = Number(opacity);
+      if (progress <= .62) expect(alpha).toBeLessThan(.05);
+      else if (progress < .9) expect(alpha).toBeLessThan(1);
+      else expect(alpha).toBeCloseTo(1, 2);
+    }
   }
 });

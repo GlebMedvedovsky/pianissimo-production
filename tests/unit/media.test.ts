@@ -59,13 +59,31 @@ class FakeFadeClock implements FadeClock {
 }
 class FakeShowreelGain implements ShowreelGainController {
   fadeDurations: number[] = [];
+  fadeStarts: number[] = [];
+  states: Array<{ muted: boolean; volume: number }> = [];
+  holds = 0;
   restores = 0;
   resumes = 0;
+  muted = true;
+  volume = 1;
+  effective = 0;
+  setUserState(muted: boolean, volume: number) {
+    this.muted = muted;
+    this.volume = volume;
+    this.effective = muted ? 0 : volume;
+    this.states.push({ muted, volume });
+  }
   fadeOut(duration: number) {
+    this.fadeStarts.push(this.effective);
     this.fadeDurations.push(duration);
+    this.effective = 0;
+  }
+  hold() {
+    this.holds++;
   }
   restore() {
     this.restores++;
+    this.effective = this.muted ? 0 : this.volume;
   }
   async resume() {
     this.resumes++;
@@ -262,13 +280,14 @@ test("hero navigation fade schedules GainNode silence before it pauses", async (
   c.setShowreelGain(video, gain);
   assert.equal(c.fadeShowreelForNavigation(video), true);
   assert.deepEqual(gain.fadeDurations, [1000]);
+  assert.deepEqual(gain.fadeStarts, [0.7]);
   clock.tick(500);
   assert.equal(video.volume, 0.7);
   assert.equal(video.paused, false);
   clock.tick(1000);
   assert.equal(video.paused, true);
   assert.equal(c.showreelPauseReason, "navigation");
-  assert.equal(gain.restores, 1);
+  assert.equal(gain.restores, 0);
 });
 test("About hides a sounding showreel and uses the existing GainNode fade", async () => {
   const audio = new FakeMedia(),
@@ -343,7 +362,8 @@ test("a newer source selection cancels a hero fade before it can pause that sour
   clock.tick(1000);
   assert.equal(audio.paused, false);
   assert.equal(c.currentMedia, audio);
-  assert.equal(gain.restores, 1);
+  assert.equal(gain.restores, 0);
+  assert.equal(gain.holds, 1);
 });
 test("header restart seeks the persisted showreel once and keeps its sound choice", async () => {
   const audio = new FakeMedia(),
@@ -358,6 +378,80 @@ test("header restart seeks the persisted showreel once and keeps its sound choic
   assert.equal(video.paused, false);
   assert.equal(c.state.kind, "showreel");
 });
+test("muted showreel stays silent through loop, seek, replay and header restart events", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio);
+  video.muted = true;
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  assert.equal(gain.effective, 0);
+  for (const type of ["seeking", "seeked", "timeupdate", "play", "playing"]) {
+    video.dispatchEvent(new Event(type));
+    assert.equal(gain.effective, 0, `${type} must preserve silence`);
+  }
+  c.pause();
+  await c.toggle();
+  assert.equal(gain.effective, 0);
+  c.restartShowreel(video);
+  await Promise.resolve();
+  assert.equal(gain.effective, 0);
+  assert.equal(c.muted, true);
+});
+test("showreel volume is authoritative across mute, touch-style change and loop events", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio);
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  c.volume(0.35);
+  assert.equal(c.volumeLevel, 0.35);
+  assert.equal(gain.effective, 0.35);
+  video.volume = 1;
+  for (const type of ["seeking", "seeked", "play", "playing", "timeupdate"]) {
+    video.dispatchEvent(new Event(type));
+  }
+  assert.equal(c.volumeLevel, 0.35);
+  assert.equal(gain.effective, 0.35);
+  c.mute();
+  assert.equal(c.muted, true);
+  assert.equal(c.volumeLevel, 0.35);
+  assert.equal(gain.effective, 0);
+  c.mute();
+  assert.equal(c.muted, false);
+  assert.equal(c.volumeLevel, 0.35);
+  assert.equal(gain.effective, 0.35);
+});
+test("rapid showreel mute toggles finish in a deterministic silent state", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio);
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  c.volume(0.35);
+  c.mute();
+  c.mute();
+  c.mute();
+  assert.equal(c.muted, true);
+  assert.equal(c.volumeLevel, 0.35);
+  assert.equal(gain.effective, 0);
+  assert.equal(video.muted, true);
+});
+test("muted showreel never starts a navigation fade", async () => {
+  const audio = new FakeMedia(),
+    video = new FakeMedia(),
+    gain = new FakeShowreelGain(),
+    c = new MediaCoordinator(audio);
+  video.muted = true;
+  await c.useShowreel(video, false);
+  c.setShowreelGain(video, gain);
+  assert.equal(c.fadeShowreelForNavigation(video), false);
+  assert.deepEqual(gain.fadeDurations, []);
+  assert.equal(gain.effective, 0);
+});
 test("Web Audio showreel graph ramps a single GainNode and resumes in a gesture", async () => {
   const context = new FakeAudioContext();
   const graph = createShowreelGain(
@@ -365,6 +459,7 @@ test("Web Audio showreel graph ramps a single GainNode and resumes in a gesture"
     () => context,
   );
   assert.ok(graph);
+  graph.setUserState(false, 0.35);
   graph.fadeOut(1000);
   graph.restore();
   await graph.resume();
@@ -372,10 +467,44 @@ test("Web Audio showreel graph ramps a single GainNode and resumes in a gesture"
   assert.equal(context.gainConnections.length, 1);
   assert.deepEqual(context.gainCalls.slice(-5), [
     ["cancel", 4, 0],
-    ["set", 1, 4],
+    ["set", 0.35, 4],
     ["ramp", 0, 5],
     ["cancel", 4, 0],
-    ["set", 1, 4],
+    ["set", 0.35, 4],
   ]);
   assert.equal(context.resumes, 1);
+});
+test("an interrupted Web Audio fade continues monotonically from its current gain", () => {
+  const context = new FakeAudioContext();
+  const graph = createShowreelGain(
+    new FakeMedia() as unknown as HTMLMediaElement,
+    () => context,
+  )!;
+  graph.setUserState(false, 1);
+  graph.fadeOut(1000);
+  context.currentTime = 4.5;
+  graph.hold();
+  graph.fadeOut(1000);
+  assert.deepEqual(context.gainCalls.slice(-5), [
+    ["cancel", 4.5, 0],
+    ["set", 0.5, 4.5],
+    ["cancel", 4.5, 0],
+    ["set", 0.5, 4.5],
+    ["ramp", 0, 5.5],
+  ]);
+});
+test("Web Audio restore cannot unmute an authoritatively muted showreel", () => {
+  const context = new FakeAudioContext();
+  const graph = createShowreelGain(
+    new FakeMedia() as unknown as HTMLMediaElement,
+    () => context,
+  )!;
+  graph.setUserState(false, 0.35);
+  graph.setUserState(true, 0.35);
+  graph.fadeOut(1000);
+  graph.restore();
+  assert.deepEqual(context.gainCalls.slice(-2), [
+    ["cancel", 4, 0],
+    ["set", 0, 4],
+  ]);
 });

@@ -98,6 +98,9 @@ export class MediaCoordinator {
   private applyingFade = false;
   private showreelGains = new WeakMap<MediaPort, ShowreelGainController>();
   private showreelPanelAllowed = true;
+  private userMuted = false;
+  private userVolume = 1;
+  private showreelUserStateReady = false;
 
   constructor(
     private audio: MediaPort,
@@ -122,7 +125,9 @@ export class MediaCoordinator {
     ++this.generation;
     if (this.fading) {
       this.fadeClock.cancelFrame(this.fading.frame);
-      this.restoreFadeOutput(this.fading.video, this.fading.volume);
+      const gain = this.showreelGains.get(this.fading.video);
+      if (gain) gain.hold();
+      else this.restoreFadeOutput(this.fading.video, this.fading.volume);
       this.fading = undefined;
     }
     if (this.pendingShowreelSeek) {
@@ -150,13 +155,40 @@ export class MediaCoordinator {
     else this.setFadedVolume(video, volume);
   }
 
+  private clampVolume(value: number) {
+    return Math.max(0, Math.min(1, value));
+  }
+
+  private ensureShowreelUserState(video: MediaPort) {
+    if (this.showreelUserStateReady) return;
+    this.userMuted = video.muted;
+    this.userVolume = this.clampVolume(video.volume);
+    this.showreelUserStateReady = true;
+  }
+
+  private syncShowreelUserState(video: MediaPort, preserveFade = false) {
+    this.ensureShowreelUserState(video);
+    video.muted = this.userMuted;
+    const gain = this.showreelGains.get(video);
+    const fadeInProgress = preserveFade && this.fading?.video === video;
+    if (gain) {
+      if (this.userMuted || !fadeInProgress) {
+        gain.setUserState(this.userMuted, this.userVolume);
+      }
+    } else if (!fadeInProgress && !this.userMuted) {
+      this.setFadedVolume(video, this.userVolume);
+    }
+  }
+
   setShowreelGain(video: MediaPort, gain: ShowreelGainController) {
     this.showreelGains.set(video, gain);
+    this.syncShowreelUserState(video);
   }
 
   resumeShowreelAudio(video: MediaPort) {
     const gain = this.showreelGains.get(video);
     if (!gain) return;
+    this.syncShowreelUserState(video);
     void gain.resume().catch(error => {
       console.warn('Showreel audio context could not resume.', error);
     });
@@ -168,6 +200,9 @@ export class MediaCoordinator {
     for (const type of ['timeupdate', 'durationchange', 'loadedmetadata']) {
       media.addEventListener(type, () => {
         if (media !== this.active) return;
+        if (this.state.kind === 'showreel' && this.userMuted) {
+          this.syncShowreelUserState(media, true);
+        }
         this.state.time = Number.isFinite(media.currentTime) ? media.currentTime : 0;
         this.state.duration =
           Number.isFinite(media.duration) && media.duration > 0
@@ -178,11 +213,21 @@ export class MediaCoordinator {
     }
     media.addEventListener('play', () => {
       if (media === this.active) {
+        if (this.state.kind === 'showreel') {
+          this.syncShowreelUserState(media, true);
+        }
         this.state.playing = true;
         if (this.state.kind === 'showreel') this.showreelPauseReason = null;
         this.emit();
       }
     });
+    for (const type of ['playing', 'seeking', 'seeked']) {
+      media.addEventListener(type, () => {
+        if (media === this.active && this.state.kind === 'showreel') {
+          this.syncShowreelUserState(media, true);
+        }
+      });
+    }
     media.addEventListener('volumechange', () => {
       if (media === this.active && !this.applyingFade) this.emit();
     });
@@ -270,6 +315,10 @@ export class MediaCoordinator {
     else {
       this.cancelPendingOperation();
       this.stopOthers();
+      if (this.state.kind === 'showreel') {
+        this.syncShowreelUserState(this.active);
+        if (!this.userMuted) this.resumeShowreelAudio(this.active);
+      }
       this.state.visible = true;
       await this.start();
     }
@@ -335,8 +384,15 @@ export class MediaCoordinator {
 
   volume(value: number) {
     this.cancelPendingOperation();
-    this.active.volume = Math.max(0, Math.min(1, value));
-    this.active.muted = value === 0;
+    const volume = this.clampVolume(value);
+    if (this.state.kind === 'showreel') {
+      this.ensureShowreelUserState(this.active);
+      this.userVolume = volume;
+      this.syncShowreelUserState(this.active);
+    } else {
+      this.active.volume = volume;
+      this.active.muted = volume === 0;
+    }
     this.emit();
   }
 
@@ -362,7 +418,7 @@ export class MediaCoordinator {
     } else if (
       this.state.track &&
       !this.dismissed &&
-      (this.state.kind === 'track' || !this.active.muted)
+      (this.state.kind === 'track' || !this.userMuted)
     ) {
       this.state.visible = true;
     }
@@ -396,14 +452,14 @@ export class MediaCoordinator {
       this.active !== video ||
       this.state.kind !== 'showreel' ||
       video.paused ||
-      video.muted ||
-      video.volume <= 0
+      this.userMuted ||
+      this.userVolume <= 0
     ) {
       return false;
     }
     this.cancelPendingOperation();
     const generation = this.generation;
-    const startVolume = video.volume;
+    const startVolume = this.userVolume;
     const startedAt = this.fadeClock.now();
     const gain = this.showreelGains.get(video);
     if (gain) gain.fadeOut(siteConfig.media.showreelFadeDuration);
@@ -421,7 +477,7 @@ export class MediaCoordinator {
       this.fading = undefined;
       this.showreelPauseReason = 'navigation';
       video.pause();
-      this.restoreFadeOutput(video, startVolume);
+      if (!gain) this.restoreFadeOutput(video, startVolume);
       this.state.playing = false;
       this.emit();
     };
@@ -447,14 +503,21 @@ export class MediaCoordinator {
       video.paused &&
       this.showreelPanelAllowed
     ) {
-      return this.useShowreel(video, false, !video.muted);
+      return this.useShowreel(video, false, !this.userMuted);
     }
     return Promise.resolve();
   }
 
   mute() {
     this.cancelPendingOperation();
-    this.active.muted = !this.active.muted;
+    if (this.state.kind === 'showreel') {
+      this.ensureShowreelUserState(this.active);
+      this.userMuted = !this.userMuted;
+      this.syncShowreelUserState(this.active);
+      if (!this.userMuted) this.resumeShowreelAudio(this.active);
+    } else {
+      this.active.muted = !this.active.muted;
+    }
     this.emit();
   }
 
@@ -467,8 +530,10 @@ export class MediaCoordinator {
       this.cancelPendingOperation();
     }
     this.observe(video);
-    if (unmute) video.muted = false;
-    if (!video.muted) this.resumeShowreelAudio(video);
+    this.ensureShowreelUserState(video);
+    if (unmute) this.userMuted = false;
+    this.syncShowreelUserState(video);
+    if (!this.userMuted) this.resumeShowreelAudio(video);
     this.state.kind = 'showreel';
     this.state.track = { id: 'showreel', title: 'Showreel', url: video.src };
     this.state.visible = showPanel && this.showreelPanelAllowed;
@@ -484,12 +549,14 @@ export class MediaCoordinator {
     this.observe(video);
     this.state.kind = 'showreel';
     this.state.track = { id: 'showreel', title: 'Showreel', url: video.src };
-    this.state.visible = !video.muted && this.showreelPanelAllowed;
+    this.ensureShowreelUserState(video);
+    this.syncShowreelUserState(video);
+    this.state.visible = !this.userMuted && this.showreelPanelAllowed;
     this.state.time = 0;
     this.state.duration = Number.isFinite(video.duration) ? video.duration : null;
     this.state.playing = false;
     this.state.error = null;
-    if (!video.muted) this.resumeShowreelAudio(video);
+    if (!this.userMuted) this.resumeShowreelAudio(video);
     const generation = this.generation;
     const seekAndStart = () => {
       if (generation !== this.generation) return;
@@ -531,5 +598,13 @@ export class MediaCoordinator {
 
   get currentMedia() {
     return this.active;
+  }
+
+  get muted() {
+    return this.state.kind === 'showreel' ? this.userMuted : this.active.muted;
+  }
+
+  get volumeLevel() {
+    return this.state.kind === 'showreel' ? this.userVolume : this.active.volume;
   }
 }

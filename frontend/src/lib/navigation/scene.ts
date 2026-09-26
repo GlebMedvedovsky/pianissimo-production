@@ -29,6 +29,9 @@ export function initScene(){
   if(!context.conditions?.motion)return;
   const select=gsap.utils.selector(scene);
   const revealStart=1.15;
+  const logoTextRevealStart=.65;
+  const logoTextRevealDuration=.25;
+  const depthBlur=matchMedia('(max-width:600px)').matches?5:7;
   const reveal={progress:0};
   // A conservative inscribed circle guarantees the entire viewport (not just
   // its centre or sampled corners) fits inside this curved aperture at the end.
@@ -42,8 +45,11 @@ export function initScene(){
   const renderReveal=()=>{
    const progress=reveal.progress;
    const complete=progress>=1;
+   const edgeAlpha=Math.sin(Math.PI*progress)*.72;
    about.style.visibility=progress>0?'visible':'hidden';
    about.style.clipPath=complete?'none':'url(#scene-about-aperture)';
+   about.style.setProperty('--about-reveal-progress',progress.toFixed(4));
+   about.style.setProperty('--about-edge-alpha',edgeAlpha.toFixed(4));
    about.inert=!complete;
    visuals.style.visibility=complete?'hidden':'visible';
    // This CTM includes the responsive SVG viewBox and the menu's placement.
@@ -82,12 +88,19 @@ export function initScene(){
   }});
   // Native scroll: the spacer is exactly the animation's travel. Once revealed,
   // this same About continues in normal document flow, directly to the footer.
-  timeline.to(select('.hero-heading,.hero-note,.scroll-cue,.hero-controls'),{autoAlpha:0,duration:.22},0)
+  timeline.fromTo(select('.hero-heading'),{autoAlpha:0},{autoAlpha:1,duration:.25,ease:'power1.out'},.58)
+   .to(select('.hero-heading'),{autoAlpha:0,duration:.16,ease:'power1.in'},.88)
+   .to(select('.hero-note,.scroll-cue,.hero-controls'),{autoAlpha:0,duration:.22},0)
    .to(select('.hero-backdrop'),{opacity:0,duration:.65},.12)
    .to(select('.split-backdrop'),{opacity:1,duration:.7},.1)
    .fromTo(logo,{scale:.14},{scale:1,duration:1,ease:'power1.inOut'},0)
+   .fromTo(select('.logo-label'),{autoAlpha:0},{autoAlpha:1,duration:logoTextRevealDuration,ease:'power1.out'},logoTextRevealStart)
    .to(select('.menu-about'),{autoAlpha:1,duration:.25},.75)
    .to(select('.logo-label,.menu-about'),{autoAlpha:0,duration:.15},revealStart)
+   .fromTo(about,{opacity:.08},{opacity:1,duration:.88,ease:'none'},revealStart)
+   .fromTo(select('.about-portrait'),{autoAlpha:.12,scale:1.025},{autoAlpha:1,scale:1,duration:.92,ease:'power1.out'},revealStart+.04)
+   .fromTo(select('.about-content'),{autoAlpha:0,y:24},{autoAlpha:1,y:0,duration:.86,ease:'power1.out'},revealStart+.18)
+   .to(logo,{filter:`blur(${depthBlur}px)`,duration:1.1,ease:'power1.in'},revealStart)
    .to(reveal,{progress:1,duration:1.1,ease:'none'},revealStart);
   syncPhase();
   return()=>{
@@ -98,7 +111,11 @@ export function initScene(){
    about.inert=false;
    about.style.removeProperty('visibility');
    about.style.removeProperty('clip-path');
+   about.style.removeProperty('--about-reveal-progress');
+   about.style.removeProperty('--about-edge-alpha');
    visuals.style.removeProperty('visibility');
+   gsap.set([about,...select('.about-portrait,.about-content')],{clearProps:'opacity,visibility,transform'});
+   gsap.set(logo,{clearProps:'filter'});
    composition.removeAttribute('transform');
    aperture.removeAttribute('transform');
    choices.forEach(link=>link.removeAttribute('tabindex'));

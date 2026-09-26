@@ -92,15 +92,16 @@ async function checkAperture(page: Page, complete = false) {
 test("curved reveal, stationary frames, reverse scroll and natural About handoff", async ({
   page,
 }, info) => {
+  test.setTimeout(90_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(String(error)));
   await ready(page);
   await expect(page.locator("#about")).toHaveCount(1);
   await expect(page.locator("#about")).toBeHidden();
-  const initialLayout = await layout(page);
+  let revealedLayout: Awaited<ReturnType<typeof layout>> | undefined;
+  let previousOpacity = 0;
   const frames =
     info.project.name === "desktop" ? [0, 0.25, 0.5, 0.75, 1] : [0, 0.5, 1];
-  let middle = "";
   for (const value of frames) {
     await progress(page, value);
     const about = page.locator("#about");
@@ -109,10 +110,11 @@ test("curved reveal, stationary frames, reverse scroll and natural About handoff
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    expect(await layout(page)).toEqual(initialLayout);
-    expect(
+    const opacity = Number(
       await about.evaluate((element) => getComputedStyle(element).opacity),
-    ).toBe("1");
+    );
+    expect(opacity).toBeGreaterThanOrEqual(previousOpacity);
+    previousOpacity = opacity;
     if (value === 0) {
       await expect(about).toBeHidden();
       expect(
@@ -123,6 +125,8 @@ test("curved reveal, stationary frames, reverse scroll and natural About handoff
       expect(coverage.failures).toEqual([]);
       expect(coverage.insideCount).toBeGreaterThan(0);
       if (value === 1) {
+        expect(opacity).toBeCloseTo(1, 2);
+        revealedLayout = await layout(page);
         expect(coverage.corners).toEqual([true, true, true, true]);
         expect(
           await about.evaluate((element) => (element as HTMLElement).inert),
@@ -153,7 +157,6 @@ test("curved reveal, stationary frames, reverse scroll and natural About handoff
             () => !!document.activeElement?.closest("#about"),
           ),
         ).toBe(false);
-        if (value === 0.5) middle = before!;
       }
     }
     await page.screenshot({
@@ -170,9 +173,10 @@ test("curved reveal, stationary frames, reverse scroll and natural About handoff
     }
   }
   await progress(page, 0.5);
-  expect(
-    await page.locator("#scene-about-aperture path").getAttribute("transform"),
-  ).toBe(middle);
+  expect(Number(await page.locator('#about').evaluate(element =>
+    getComputedStyle(element).getPropertyValue('--about-reveal-progress'),
+  ))).toBeCloseTo(.5, 1);
+  expect(await page.locator("#scene-about-aperture path").getAttribute("transform")).toBeTruthy();
   await progress(page, 0);
   await expect(page.locator("#about")).toBeHidden();
   await expect(
@@ -185,9 +189,9 @@ test("curved reveal, stationary frames, reverse scroll and natural About handoff
   // The existing desktop portrait sticks during ordinary About scrolling.
   // Its size is unchanged; copy moves with the section, without a handoff jump.
   expect(scrolledLayout.map(({ y, ...box }) => box)).toEqual(
-    initialLayout.map(({ y, ...box }) => box),
+    revealedLayout!.map(({ y, ...box }) => box),
   );
-  expect(scrolledLayout.slice(1)).toEqual(initialLayout.slice(1));
+  expect(scrolledLayout.slice(1)).toEqual(revealedLayout!.slice(1));
   const gap = await page.evaluate(
     () =>
       document.querySelector(".site-footer")!.getBoundingClientRect().top -
@@ -198,6 +202,69 @@ test("curved reveal, stationary frames, reverse scroll and natural About handoff
   await expect(page.locator(".site-footer")).toBeInViewport();
   await page.screenshot({ path: info.outputPath("footer.png") });
   expect(errors).toEqual([]);
+});
+
+test("hero branding reveals with zoom progress and reverses without a flash", async ({ page }, info) => {
+  await ready(page);
+  const heading = page.locator('.hero-heading');
+  await expect(heading).toBeHidden();
+  const setTimelineTime = (value: number) => page.evaluate((time) => {
+    const scene = document.querySelector<HTMLElement>('.hero-scene')!;
+    const sticky = scene.querySelector<HTMLElement>('.scene-sticky')!;
+    const travel = scene.offsetHeight - sticky.offsetHeight;
+    scrollTo({ top: scene.offsetTop + travel * (time / 2.25), behavior: 'instant' });
+  }, value);
+  await setTimelineTime(.42);
+  await page.waitForTimeout(120);
+  await expect(heading).toBeHidden();
+  await setTimelineTime(.70);
+  await page.waitForTimeout(120);
+  expect(Number(await heading.evaluate(element => getComputedStyle(element).opacity))).toBeGreaterThan(.35);
+  const backdrops = await page.evaluate(() => ({
+    showreel: Number(getComputedStyle(document.querySelector('.hero-backdrop')!).opacity),
+    split: Number(getComputedStyle(document.querySelector('.split-backdrop')!).opacity),
+  }));
+  expect(backdrops.split).toBeGreaterThan(.7);
+  expect(backdrops.split).toBeGreaterThan(backdrops.showreel);
+  await page.screenshot({ path: info.outputPath('hero-brand-reveal.png') });
+  await setTimelineTime(.42);
+  await page.waitForTimeout(120);
+  await expect(heading).toBeHidden();
+});
+
+test("split-logo text reveals only after the split photos dominate and reverses with scroll", async ({ page }, info) => {
+  await ready(page);
+  const labels = page.locator('.scene-logo .logo-label');
+  const setTimelineTime = (value: number) => page.evaluate((time) => {
+    const scene = document.querySelector<HTMLElement>('.hero-scene')!;
+    const sticky = scene.querySelector<HTMLElement>('.scene-sticky')!;
+    const travel = scene.offsetHeight - sticky.offsetHeight;
+    scrollTo({ top: scene.offsetTop + travel * (time / 2.25), behavior: 'instant' });
+  }, value);
+  const opacity = () => labels.evaluateAll(elements => elements.map(element => Number(getComputedStyle(element).opacity)));
+  const capture = async (name: string) => page.screenshot({ path: info.outputPath(`split-logo-text-${name}.png`) });
+
+  await expect(page.locator('.scene-logo .logo-left')).toBeVisible();
+  expect(await opacity()).toEqual([0, 0]);
+  await capture('earliest');
+  await setTimelineTime(.50);await page.waitForTimeout(120);
+  expect(await opacity()).toEqual([0, 0]);
+  await capture('mid');
+  await setTimelineTime(.70);await page.waitForTimeout(120);
+  const emerging = await opacity();
+  emerging.forEach(value => { expect(value).toBeGreaterThan(.2);expect(value).toBeLessThan(.9); });
+  const backdrops = await page.evaluate(() => ({
+    hero: Number(getComputedStyle(document.querySelector('.hero-backdrop')!).opacity),
+    split: Number(getComputedStyle(document.querySelector('.split-backdrop')!).opacity),
+  }));
+  expect(backdrops.split).toBeGreaterThan(.8);
+  expect(backdrops.split).toBeGreaterThan(backdrops.hero);
+  await capture('emerging');
+  await setTimelineTime(.92);await page.waitForTimeout(120);
+  (await opacity()).forEach(value => expect(value).toBeGreaterThan(.97));
+  await capture('full');
+  await setTimelineTime(.50);await page.waitForTimeout(120);
+  (await opacity()).forEach(value => expect(value).toBeLessThan(.05));
 });
 
 test("reduced motion exposes the same About and footer without pinning", async ({

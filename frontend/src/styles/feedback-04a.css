@@ -86,6 +86,7 @@
 .player-buttons {
    grid-area: buttons;
    justify-self: center;
+   align-items: center;
    gap: 2px
 }
 
@@ -133,8 +134,30 @@
 .player-more {
    grid-area: actions;
    justify-self: end;
+   align-items: center;
    gap: 7px;
    white-space: nowrap
+}
+
+@media(min-width:801px) {
+   .player-buttons>[data-player=previous],
+   .player-buttons>[data-player=next],
+   .player-buttons>[data-player=shuffle],
+   .player-more>[data-player=mute] {
+      transform: translateY(2px)
+   }
+}
+
+.player [data-player=shuffle][aria-pressed=true] {
+   color: var(--color-accent);
+   background: transparent;
+   outline: 0
+}
+
+.player [data-player=shuffle]:focus-visible {
+   border-radius: 5px;
+   outline: 2px solid var(--focus);
+   outline-offset: -2px
 }
 
 .player-more .volume-label {
@@ -214,9 +237,8 @@
 
 @media(min-width:801px) {
    html {
-      --section-switch-width: 70px;
-      --section-switch-rest-offset: 16px;
-      --section-switch-hover-offset: 8px
+      --section-switch-width: 58px;
+      --section-switch-rest-width: 46px
    }
 
 
@@ -235,146 +257,95 @@
    }
 
    .section-switch {
-      --section-switch-label-axis: 33px;
-      --section-switch-label-x: calc(100% - var(--section-switch-label-axis));
       --section-switch-label-rotation: 90deg;
-      --section-switch-caption-y: 37.7778%;
-      --section-switch-title-y: 68.8889%;
-      --section-switch-fill: rgba(237, 232, 220, .48);
-      --section-switch-fill-active: rgba(237, 232, 220, .96);
-      --section-switch-edge: rgba(237, 232, 220, .68);
-      --section-switch-edge-active: rgb(237, 232, 220);
-      --section-switch-label: rgba(24, 24, 24, .88);
-      --section-switch-label-active: rgb(24, 24, 24);
-      top: 8px;
-      bottom: auto;
-      height: calc(100svh - 16px);
-      width: var(--section-switch-width);
-      right: calc(var(--section-switch-rest-offset) * -1);
+      --section-switch-rest: rgb(181, 176, 167);
+      --section-switch-rest-text: rgb(20, 20, 20);
+      --section-switch-hover: rgb(243, 240, 234);
+      --section-switch-hover-text: rgb(20, 20, 20);
+      top: 0;
+      bottom: 0;
+      height: 100svh;
+      width: var(--section-switch-rest-width);
+      right: 0;
       padding: 0;
       display: block;
       writing-mode: horizontal-tb;
-      background: transparent;
-      color: var(--section-switch-label);
+      background: var(--section-switch-rest);
+      color: var(--section-switch-rest-text);
+      border: 1px solid color-mix(in srgb, var(--section-switch-rest-text) 24%, transparent);
+      border-right: 0;
       border-radius: 0;
       box-shadow: none;
-      pointer-events: none;
-      transform: translateX(0);
-      transition: transform 240ms ease;
-      will-change: transform
-   }
-
-   .section-switch-shape {
-      display: block;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-      pointer-events: none
-   }
-
-   .section-switch-body {
-      fill: var(--section-switch-fill);
-      stroke: var(--section-switch-edge);
-      stroke-width: 1.25px;
-      vector-effect: non-scaling-stroke;
-      transition: fill 240ms ease, stroke 240ms ease;
-      pointer-events: visiblePainted;
-      cursor: pointer
-   }
-
-   .section-switch-keys {
-      pointer-events: none;
-      opacity: .56;
-      transition: opacity 240ms ease
-   }
-
-   .section-switch-white-key {
-      fill: rgba(248, 244, 236, .82);
-      stroke: rgba(24, 24, 24, .45);
-      stroke-width: .7px;
-      vector-effect: non-scaling-stroke
-   }
-
-   .section-switch-black-key {
-      fill: rgba(17, 17, 17, .86)
+      transform: none;
+      transition: width 220ms ease, background-color 220ms ease, color 220ms ease
    }
 
    .section-switch-copy {
       position: absolute;
-      inset: 0;
-      color: var(--section-switch-label);
-      pointer-events: none;
-      transition: color 240ms ease
-   }
-
-   .section-switch-copy strong,
-   .section-switch-copy>span {
-      position: absolute;
-      left: var(--section-switch-label-x);
+      top: 50%;
+      left: 50%;
       width: max-content;
+      display: flex;
+      align-items: center;
+      gap: clamp(24px, 5svh, 48px);
+      color: inherit;
+      pointer-events: none;
       white-space: nowrap;
-      pointer-events: auto;
-      cursor: pointer;
-      transform-origin: 0 0;
-      transform: rotate(var(--section-switch-label-rotation)) translate(-50%, -50%)
+      transform: translate(-50%, -50%) rotate(var(--section-switch-label-rotation));
+      transform-origin: center;
+      transition: color 220ms ease
    }
 
-   .section-switch-copy strong {
-      top: var(--section-switch-title-y);
-      font-size: clamp(20px, 1.7vw, 27px)
+   .section-switch .section-switch-title {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 10px;
+      font-family: var(--font-serif);
+      font-size: clamp(28px, 2.4vw, 36px);
+      font-style: italic;
+      line-height: 1
    }
 
-   .section-switch-copy>span {
-      top: var(--section-switch-caption-y);
-      font-size: 8px
+   .section-switch .section-switch-caption {
+      font-family: var(--font-sans);
+      font-size: 8px;
+      line-height: 1.2;
+      letter-spacing: .15em
+   }
+
+   .section-switch .section-switch-title>span {
+      font-size: inherit;
+      letter-spacing: 0
+   }
+
+   .section-switch-arrow {
+      display: inline-block;
+      line-height: 1
    }
 
    .switch-left {
-      --section-switch-label-x: var(--section-switch-label-axis);
-      --section-switch-label-rotation: -90deg;
-      --section-switch-fill: rgba(17, 17, 17, .48);
-      --section-switch-fill-active: rgba(17, 17, 17, .96);
-      --section-switch-edge: rgba(17, 17, 17, .68);
-      --section-switch-edge-active: rgb(17, 17, 17);
-      --section-switch-label: rgba(248, 244, 236, .88);
-      --section-switch-label-active: rgb(248, 244, 236);
-      left: calc(var(--section-switch-rest-offset) * -1);
+      --section-switch-hover: rgb(20, 20, 20);
+      --section-switch-hover-text: rgb(243, 240, 234);
+      left: 0;
       right: auto;
-      color: var(--section-switch-label)
+      border-right: 1px solid color-mix(in srgb, var(--section-switch-rest-text) 24%, transparent);
+      border-left: 0
    }
 
-   .section-switch:not(.switch-left):hover,
-   .section-switch:not(.switch-left):focus-visible {
-      transform: translateX(calc(var(--section-switch-hover-offset) - var(--section-switch-rest-offset)))
+   .switch-left .section-switch-copy {
+      transform: translate(-50%, -50%) rotate(90deg)
    }
 
-   .section-switch.switch-left:hover,
-   .section-switch.switch-left:focus-visible {
-      transform: translateX(calc(var(--section-switch-rest-offset) - var(--section-switch-hover-offset)))
-   }
-
-   .section-switch:hover .section-switch-body,
-   .section-switch:focus-visible .section-switch-body {
-      fill: var(--section-switch-fill-active);
-      stroke: var(--section-switch-edge-active)
-   }
-
-   .section-switch:hover .section-switch-copy,
-   .section-switch:focus-visible .section-switch-copy {
-      color: var(--section-switch-label-active)
-   }
-
-   .section-switch:hover .section-switch-keys,
-   .section-switch:focus-visible .section-switch-keys {
-      opacity: .78
+   .section-switch:hover,
+   .section-switch:focus-visible {
+      width: var(--section-switch-width);
+      background: var(--section-switch-hover);
+      color: var(--section-switch-hover-text)
    }
 
    .section-switch:focus-visible {
-      outline: none
-   }
-
-   .section-switch:focus-visible .section-switch-body {
-      stroke-width: 3px;
+      outline: 3px solid var(--focus);
+      outline-offset: -5px
    }
 
    .social-rail {
@@ -392,12 +363,6 @@
 
    html[data-direction=right] {
       --transition-offset: 40%
-   }
-}
-
-@media(min-width:801px) and (max-width:1100px) {
-   .section-switch-copy>span {
-      display: none
    }
 }
 
@@ -420,8 +385,8 @@
       bottom: calc(52px + env(safe-area-inset-bottom));
       transform: none;
       width: auto;
-      grid-template-columns: minmax(0, 1fr) auto auto auto;
-      grid-template-areas: 'track buttons more close' 'progress progress progress progress';
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas: 'track buttons close' 'progress progress progress' 'secondary secondary secondary';
       gap: 6px 7px;
       padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
       min-height: 88px
@@ -483,38 +448,22 @@
       padding: 9px
    }
 
-   .player-more-trigger {
-      grid-area: more;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      min-width: 44px;
-      height: 42px;
-      padding: 0 4px;
-      font-size: 9px
-   }
-
    .player-secondary {
-      position: absolute;
-      right: 10px;
-      bottom: calc(100% + 8px);
+      position: static;
+      grid-area: secondary;
       box-sizing: border-box;
-      width: min(288px, calc(100vw - 24px));
+      width: 100%;
+      min-width: 0;
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
-      gap: 7px;
-      padding: 10px;
-      background: var(--player-bg);
+      gap: 5px;
+      padding: 0;
+      background: transparent;
       color: var(--player-text);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: 0 8px 28px #0004
-   }
-
-   .player-secondary[hidden] {
-      display: none
+      border: 0;
+      border-radius: 0;
+      box-shadow: none
    }
 
    .player-secondary-transport {
@@ -530,25 +479,44 @@
 
    .player-secondary .volume-label {
       display: flex;
+      flex: 1 1 60px;
+      min-width: 0;
       align-items: center;
-      gap: 7px;
-      font-size: 9px
+      gap: 0;
+      font-size: 0
    }
 
    .player-secondary .volume-label input {
-      width: 82px
+      width: 100%;
+      min-width: 48px
    }
 
+   .player-secondary [data-player-project],
    .player-secondary .player-platforms {
-      flex-basis: 100%;
-      max-width: 100%;
-      flex-wrap: wrap;
-      white-space: normal;
-      overflow: visible
+      display: none
+   }
+
+   .player[data-source=showreel] {
+      grid-template-columns: max-content minmax(112px, 1fr) auto auto;
+      grid-template-areas: 'track secondary buttons close' 'progress progress progress progress';
+      column-gap: 4px;
+      min-height: 0
+   }
+
+   .player[data-source=showreel] .player-track {
+      width: max-content
+   }
+
+   .player[data-source=showreel] .player-secondary {
+      width: auto
    }
 
    .player:has(.player-error:not([hidden])) {
-      grid-template-areas: 'track buttons more close' 'progress progress progress progress' 'error error error error'
+      grid-template-areas: 'track buttons close' 'progress progress progress' 'secondary secondary secondary' 'error error error'
+   }
+
+   .player[data-source=showreel]:has(.player-error:not([hidden])) {
+      grid-template-areas: 'track secondary buttons close' 'progress progress progress progress' 'error error error error'
    }
 
    .project-dialog[open] {
@@ -574,12 +542,7 @@
    }
 
    .player {
-      grid-template-columns: minmax(0, 1fr) auto auto auto
-   }
-
-   .player-more-trigger {
-      min-width: 40px;
-      font-size: 8px
+      grid-template-columns: minmax(0, 1fr) auto auto
    }
 
    .player-progress span {
@@ -604,10 +567,4 @@
       transition: none
    }
 
-   .section-switch:not(.switch-left):hover,
-   .section-switch:not(.switch-left):focus-visible,
-   .section-switch.switch-left:hover,
-   .section-switch.switch-left:focus-visible {
-      transform: none
-   }
 }

@@ -140,6 +140,7 @@ function init() {
         if (!wasActive) coordinator.section("about");
       } else if (currentSection() === "home") {
         root.dataset.theme = "dark";
+        if (wasActive) coordinator.section("home");
       }
       wasActive = active;
     };

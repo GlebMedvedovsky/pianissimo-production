@@ -17,24 +17,6 @@ const filters = isMusic
   : ['Director', 'Assistant Director'];
 const defaultFilter = isMusic ? 'All' : siteConfig.directing.defaultFilter;
 
-const SVG_W = 70;
-const SVG_H = 900;
-const MASTER_PATH = `  M 0,900
-  L 0,38
-  C 0,13 11,0 28,0
-  C 42,0 48,15 48,38
-  C 48,150 46,255 44,370
-  C 43,445 49,490 59,540
-  C 67,575 68,650 68,800
-  L 68,900
-  Z`.replace(/\s+/g, ' ').trim();
-
-const sectionSwitchTransform = isMusic
-  ? `translate(${SVG_W} 0) scale(-1 1)`
-  : undefined;
-const keyboardClipId = `section-switch-keyboard-clip-${section}`;
-const whiteKeys = [-12, -2, 8, 18, 28, 38, 48, 58];
-const blackKeyBoundaries = [-2, 8, 28, 38, 48, 68];
 ---
 
 <section
@@ -156,58 +138,12 @@ const blackKeyBoundaries = [-2, 8, 28, 38, 48, 68];
     data-direction={isMusic ? 'right' : 'left'}
     aria-label={isMusic ? 'Open Directing' : 'Open Film Music'}
   >
-    <svg
-      class="section-switch-shape"
-      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <clipPath id={keyboardClipId} clipPathUnits="userSpaceOnUse">
-          <rect x="-20" y="848" width="88" height="40"></rect>
-        </clipPath>
-      </defs>
-      <path
-        class="section-switch-body"
-        d={MASTER_PATH}
-        transform={sectionSwitchTransform}
-      ></path>
-      <g
-        class="section-switch-keys"
-        transform={sectionSwitchTransform}
-      >
-        <g clip-path={`url(#${keyboardClipId})`}>
-          {
-            whiteKeys.map((x) => (
-              <rect
-                class="section-switch-white-key"
-                x={x}
-                y="848"
-                width="10"
-                height="40"
-              ></rect>
-            ))
-          }
-          {
-            blackKeyBoundaries.map((boundary) => (
-              <rect
-                class="section-switch-black-key"
-                x={boundary - 2.75}
-                y="848"
-                width="5.5"
-                height="24"
-              ></rect>
-            ))
-          }
-        </g>
-      </g>
-    </svg>
     <span class="section-switch-copy">
-      <span>
-        {isMusic ? 'DISCOVER THE OTHER SIDE' : 'THE OTHER SIDE OF THE STORY'}
-      </span>
-      <strong>{isMusic ? 'Directing →' : '← Film Music'}</strong>
+      <span class="section-switch-caption">THE OTHER SIDE OF THE STORY</span>
+      <strong class="section-switch-title">
+        <span>{isMusic ? 'Directing' : 'Film Music'}</span>
+        <span class="section-switch-arrow" aria-hidden="true">→</span>
+      </strong>
     </span>
   </a>
 </section>

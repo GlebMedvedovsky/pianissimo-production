@@ -43,6 +43,11 @@
 }
 
 @media(prefers-reduced-motion:no-preference) {
+   .js .hero-heading {
+      visibility: hidden;
+      opacity: 0
+   }
+
    .js .hero-scene {
       --scene-travel: 155svh
    }
@@ -70,6 +75,8 @@
    .js .hero-scene .about-section {
       visibility: hidden;
       clip-path: url(#scene-about-aperture);
+      filter: drop-shadow(0 0 16px rgb(18 18 18 / var(--about-edge-alpha, 0)));
+      will-change: opacity, filter;
       z-index: 2
    }
 
@@ -91,6 +98,10 @@
       stroke: none
    }
 
+   .is-about-revealing .scene-logo {
+      will-change: filter
+   }
+
    .is-about-revealing .split-backdrop .media-slot {
       transform: none !important;
       transition: none
@@ -105,6 +116,10 @@
 }
 
 @media(max-width:600px) {
+   .js .hero-scene .about-section {
+      filter: drop-shadow(0 0 11px rgb(18 18 18 / var(--about-edge-alpha, 0)))
+   }
+
    .hero-scene .about-portrait {
       height: 34svh;
       min-height: 220px;
