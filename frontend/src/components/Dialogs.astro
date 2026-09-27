@@ -1,5 +1,7 @@
 ---
-import Icon from './Icon.astro';import {content} from '../lib/content/data';import {siteConfig} from '../config/site.config';
+import Icon from './Icon.astro';import {content as activeContent} from '../lib/content/data';import type {Manifest} from '../../../contracts/content';import {siteConfig} from '../config/site.config';
+interface Props {content?:Manifest}
+const {content=activeContent}=Astro.props;
 const email=siteConfig.contacts.email||content.site.contacts.email;
 const consent=content.site.consent??{version:1,necessary:true,externalMedia:true,analytics:false,marketing:false,bannerText:'',privacyLink:'/privacy/'};
 const analytics=content.site.analytics??{enabled:false,provider:'none',measurementId:null,siteDomain:null};

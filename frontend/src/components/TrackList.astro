@@ -1,10 +1,10 @@
 ---
-import {content,asset} from '../lib/content/data';import {projectForTrack,platformLinks} from '../lib/content/selectors';import Icon from './Icon.astro';import type {Track} from '../../../contracts/content';
-interface Props {tracks:Track[]; compact?:boolean}
-const {tracks,compact=false}=Astro.props;
+import {content as activeContent,assetFrom} from '../lib/content/data';import {projectForTrack,platformLinks} from '../lib/content/selectors';import Icon from './Icon.astro';import type {Track,Manifest} from '../../../contracts/content';
+interface Props {tracks:Track[]; compact?:boolean;content?:Manifest}
+const {tracks,compact=false,content=activeContent}=Astro.props;
 ---
 <div class:list={['track-list',{compact}]}>
- {tracks.map((track,i)=>{const project=projectForTrack(content,track.id);const cover=asset(project?.memberships.music?.coverAssetId);const platforms=project?platformLinks(track,project):{};return <div class="track-row" data-track-row={track.id} data-genres={track.genres.join('|')} data-emotions={track.emotions.join('|')}>
+ {tracks.map((track,i)=>{const project=projectForTrack(content,track.id);const cover=assetFrom(content,project?.memberships.music?.coverAssetId);const platforms=project?platformLinks(track,project):{};return <div class="track-row" data-track-row={track.id} data-genres={track.genres.join('|')} data-emotions={track.emotions.join('|')}>
   <span class="track-number">{String(i+1).padStart(2,'0')}</span>
   {cover&&<img src={'/'+cover.path.replace('.webp','-480.webp')} width="48" height="48" loading="lazy" alt=""/>}
   <div class="track-description"><span class="track-title">{track.title}</span>{project&&<a data-project={project.id} href={`/projects/${project.slug}/`}>{project.title}</a>}<span class="track-tags">{[...track.genres,...track.emotions].join(' · ')}</span></div>

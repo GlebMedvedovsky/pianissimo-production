@@ -27,6 +27,7 @@ class OwnerExperienceTest extends TestCase
         MediaAsset::where('type','image')->firstOrFail()->update(['alt'=>'']);
         Livewire::test(Dashboard::class)
             ->assertSee('Website-Status')->assertSee('Inhalte')->assertSee('SEO-Status')->assertSee('Analytics')
+            ->assertSee('Website-Vorschau öffnen')->assertSee('Änderungen prüfen')
             ->assertSeeHtml('<strong>'.MediaAsset::count().'</strong><br>Medien in der Bibliothek')->assertSeeHtml('<strong>'.count(app(ManifestExporter::class)->package()['manifest']['assets']).'</strong> Medien im aktuellen Website-Paket')
             ->assertSee('Alternativtexte ergänzen')->assertSee('Suchmaschinen sind noch ausgeschlossen')->assertSee('Canonical')
             ->assertSeeHtml(ProjectResource::getUrl('create'))->assertSeeHtml(MediaAssetResource::getUrl('create'))
@@ -42,9 +43,9 @@ class OwnerExperienceTest extends TestCase
         $this->get(ExternalServiceResource::getUrl('index'))->assertOk()->assertSee('Hilfe')->assertSee('search=Externe%20Medien',false);
     }
 
-    public function test_publication_explains_when_no_current_candidate_exists(): void
+    public function test_publication_explains_owner_flow_without_requiring_candidate_steps(): void
     {
-        Livewire::test(Publication::class)->assertSee('Noch keine aktuelle Vorschau vorhanden')->assertDontSee('Vorschau-ID');
+        Livewire::test(Publication::class)->assertSee('Website-Vorschau öffnen')->assertSee('Änderungen prüfen')->assertSee('Die Änderungen wurden noch nicht geprüft')->assertSee('Technische Details')->assertDontSee('Vorschau-ID');
     }
 
     public function test_help_search_categories_empty_state_and_cms_links(): void
@@ -53,6 +54,7 @@ class OwnerExperienceTest extends TestCase
             ->set('search','')->set('category','Medien')->assertSee('Ein neues Bild hochladen')->assertDontSee('SEO einfach erklärt')
             ->set('search','unauffindbarer-begriff')->assertSee('Keine passenden Artikel');
         $this->get(Help::getUrl())->assertOk()->assertSee('Im Handbuch suchen')->assertSee('Analytics mit einem KI-Assistenten auswerten');
+        Livewire::test(Help::class)->set('category','Veröffentlichung')->assertSee('Entwurf speichern')->assertSee('Website-Vorschau öffnen')->assertSee('Unterschied Vorschau / Veröffentlichung')->assertSee('Was bedeutet „nicht mehr aktuell“?');
     }
 
     public function test_seo_page_explains_fields_and_warns_about_noindex(): void

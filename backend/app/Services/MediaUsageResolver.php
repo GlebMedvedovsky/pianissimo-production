@@ -29,12 +29,16 @@ class MediaUsageResolver
             ['about','media.image','About','Bild','image',About::getUrl()],['about','media.video','About','Video','video',About::getUrl()],['about','media.poster','About','Poster','image',About::getUrl()],
             ['about','collective.logoAssetId','About','Kollektiv-Logo','image',About::getUrl()],['seo','ogAssetId','SEO','Standard-OG-Bild','image',Seo::getUrl()],
         ];
-        foreach ($settings as [$setting,$path,$location,$slot,$type,$url]) if (data_get(Setting::read($setting),$path)===$asset->id) $rows[]=$this->row('setting:'.$setting.':'.$path,$location,$slot,false,$type,$url);
+        foreach ($settings as [$setting,$path,$location,$slot,$type,$url]) if (data_get(Setting::read($setting),$path)===$asset->id) {
+            $field=str_starts_with($path,'media.')?substr($path,6):null;
+            $active=$field?MediaSlotPolicy::isActive($setting,$field,Setting::read($setting)['media']??[]):true;
+            $rows[]=$this->row('setting:'.$setting.':'.$path,$location,$slot,false,$type,$url,$active);
+        }
         return $rows;
     }
 
-    private function row(string $key,string $location,string $slot,bool $required,string $type,string $url): array
-    { return compact('key','location','slot','required','type','url'); }
+    private function row(string $key,string $location,string $slot,bool $required,string $type,string $url,bool $active=true): array
+    { return compact('key','location','slot','required','type','url','active'); }
 
     public function detach(MediaAsset $asset,array $keys): void
     {
@@ -56,7 +60,7 @@ class MediaUsageResolver
             if ($deleteAfter && count($keys)!==count($all)) throw new DomainException('Zum Löschen müssen alle Verwendungen ausgewählt und ersetzt werden.');
             foreach ($keys as $key) {
                 $usage=$index->get($key); if (!$usage) throw new DomainException('Eine ausgewählte Verwendung ist nicht mehr aktuell.');
-                if ($replacement->type!==$usage['type']) throw new DomainException($usage['location'].' → '.$usage['slot'].': inkompatibler Medientyp.');
+                if (!MediaTypePolicy::isCompatible($replacement,$usage['type'])) throw new DomainException($usage['location'].' → '.$usage['slot'].': inkompatibler Medientyp.');
             }
             foreach ($keys as $key) $this->write($key,$replacement->id,false);
             if ($deleteAfter) $this->deleteUnused($asset);

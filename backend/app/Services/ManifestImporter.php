@@ -81,10 +81,10 @@ class ManifestImporter
             ]);
             $settings=[
                 'site'=>['title'=>$site['title'],'description'=>$site['description'],'productionDomain'=>$site['productionDomain'],'language'=>$site['language']],
-                'home'=>['media'=>$site['mediaSlots']['hero'],'loop'=>true,'autoplayMuted'=>true],
-                'music'=>['media'=>$site['mediaSlots']['composerMenu'],'label'=>'Film Music'],
-                'directing'=>['media'=>$site['mediaSlots']['directingMenu'],'label'=>'Directing'],
-                'about'=>['title'=>'About','biography'=>$site['biography'],'media'=>$site['mediaSlots']['about'],'visible'=>true,'theme'=>'follow-section','getInTouch'=>'Get in touch','collective'=>$site['collective']??[]],
+                'home'=>['media'=>MediaSlotPolicy::hydrate('home',['media'=>$site['mediaSlots']['hero']])['media'],'loop'=>true,'autoplayMuted'=>true],
+                'music'=>['media'=>MediaSlotPolicy::hydrate('music',['media'=>$site['mediaSlots']['composerMenu']])['media'],'label'=>'Film Music'],
+                'directing'=>['media'=>MediaSlotPolicy::hydrate('directing',['media'=>$site['mediaSlots']['directingMenu']])['media'],'label'=>'Directing'],
+                'about'=>['title'=>'About','biography'=>$site['biography'],'media'=>MediaSlotPolicy::hydrate('about',['media'=>$site['mediaSlots']['about']])['media'],'visible'=>true,'theme'=>'follow-section','getInTouch'=>'Get in touch','collective'=>$site['collective']??[]],
                 'contact'=>[...$site['contacts'],'recipient'=>null,'footer'=>'','legalIdentity'=>''],
                 'social'=>['artistLinks'=>$site['artistLinks']??[],'profileLinks'=>$site['profileLinks']??[],'links'=>$site['socialLinks']??$this->legacySocialLinks($site)],
                 'impressum'=>['text'=>$site['legal']['notice'],'status'=>$site['legal']['approved']?'published':'draft'],

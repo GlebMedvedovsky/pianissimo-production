@@ -1,7 +1,8 @@
 ---
-import Logo from './Logo.astro';import Icon from './Icon.astro';import {siteConfig} from '../config/site.config';import {content} from '../lib/content/data';
+import Logo from './Logo.astro';import Icon from './Icon.astro';import {siteConfig} from '../config/site.config';import {content as activeContent} from '../lib/content/data';import type {Manifest} from '../../../contracts/content';
 import {socialIcon} from '../lib/social';
-const {section}=Astro.props;
+interface Props {section?:string;content?:Manifest}
+const {section,content=activeContent}=Astro.props;
 const contacts=content.site.contacts;
 const profiles=content.site.profileLinks||{};
 const managedSocial=(content.site.socialLinks||[]).filter(link=>link.visible).sort((a,b)=>a.sort_order-b.sort_order);

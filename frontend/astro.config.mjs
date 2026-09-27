@@ -7,6 +7,17 @@ import { audioFixtures } from "../scripts/fixture-middleware.mjs";
 const localPath = (relative) =>
   fileURLToPath(new URL(relative, import.meta.url)).replaceAll("\\", "/");
 
+const localDraftPreviewRoute = {
+  name: "local-draft-preview-route",
+  hooks: {
+    "astro:route:setup": ({ route }) => {
+      if (route.component.replaceAll("\\", "/").endsWith("/pages/draft-preview.astro")) {
+        route.prerender = !process.argv.includes("dev");
+      }
+    },
+  },
+};
+
 // Astro's Markdown/asset import handlers can run before Vite's static-file guard.
 // Apply the same native Vite policy before those handlers, including ?import.
 const privateLocalMaterials = {
@@ -65,10 +76,12 @@ export default defineConfig({
   output: "static",
   trailingSlash: "always",
   devToolbar: { enabled: false },
+  integrations: [localDraftPreviewRoute],
   server: { host: "127.0.0.1", port: 4321 },
   vite: {
     plugins: [privateLocalMaterials, audioFixtures],
     server: {
+      allowedHosts: ["host.docker.internal"],
       // A shared viewing session must never silently move to another port.
       strictPort: true,
       fs: {

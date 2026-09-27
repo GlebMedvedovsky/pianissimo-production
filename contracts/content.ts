@@ -23,7 +23,8 @@ export type Manifest=z.infer<typeof manifestSchema>;
 export type Project=z.infer<typeof projectSchema>;
 export type Track=z.infer<typeof trackSchema>;
 export type MediaAsset=z.infer<typeof assetSchema>;
-export function validateManifest(input:unknown,release=false):Manifest {
+export type ContentValidationPolicy='publication'|'draft-preview';
+export function validateManifest(input:unknown,release=false,policy:ContentValidationPolicy='publication'):Manifest {
  const data=manifestSchema.parse(input);
  const unique=(values:string[],label:string)=>{if(new Set(values).size!==values.length)throw Error(`Duplicate ${label}`);};
  for(const name of ['assets','projects','tracks','sources'] as const)unique(data[name].map(x=>x.id),name);
@@ -34,7 +35,7 @@ export function validateManifest(input:unknown,release=false):Manifest {
  data.tracks.forEach(t=>{ref(t.audioAssetId,'audio');if(t.peaks&&!t.duration)throw Error(`Peaks need duration: ${t.id}`)});
  Object.values(data.site.mediaSlots).forEach(s=>{ref(s.image,'image');ref(s.poster,'image');ref(s.video,'video')});
  ref(data.site.collective?.logoAssetId||null,'image');
- if(data.mode!=='test'&&(data.assets.some(a=>a.state==='test')||data.projects.some(p=>p.status==='test')||data.tracks.some(t=>t.status==='test')))throw Error('Test fixtures cannot enter ordinary content');
+ if(policy==='publication'&&data.mode!=='test'&&(data.assets.some(a=>a.state==='test')||data.projects.some(p=>p.status==='test')||data.tracks.some(t=>t.status==='test')))throw Error('Test fixtures cannot enter ordinary content');
  if(data.projects.find(p=>p.id==='kinnhakenhank')?.externalFilm)throw Error('Kinnhakenhank permits only the selected local trailer');
  const letterboxd=data.projects.find(p=>p.id==='letterboxd-everything-everywhere-all-at-once');
  if(letterboxd&&(letterboxd.externalFilm||letterboxd.localTrailerAssetId||Object.values(letterboxd.memberships).some(m=>m.hoverAssetId)))throw Error('Letterboxd permits only confirmed screenshots, no video');

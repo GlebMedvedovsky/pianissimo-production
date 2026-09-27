@@ -2,6 +2,11 @@
 namespace App\Models;
 class Project extends StableModel
 {
+    protected static function booted(): void
+    {
+        parent::booted();
+        static::saving(fn($project)=>\App\Services\MediaTypePolicy::assert($project->seo['ogAssetId']??null,'image','Projekt-SEO-Bild'));
+    }
     public function setExternalFilmAttribute($value): void { $this->attributes['external_film']=is_array($value) && count(array_filter($value))===0?null:($value===null?null:json_encode($value)); }
     protected $casts = ['credits'=>'array','categories'=>'array','awards'=>'array','platform_links'=>'array','genres'=>'array','emotions'=>'array','seo'=>'array','external_links'=>'array','external_film'=>'array'];
     public function memberships() { return $this->hasMany(Membership::class)->orderBy('direction'); }

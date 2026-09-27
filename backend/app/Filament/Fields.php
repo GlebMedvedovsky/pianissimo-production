@@ -3,7 +3,9 @@ namespace App\Filament;
 use Filament\Forms\Components\{TextInput,Textarea,Select,Repeater,Toggle,ColorPicker,FileUpload,Radio};
 use Filament\Schemas\Components\{Section,Tabs};
 use Filament\Schemas\Components\Tabs\Tab;
-use App\Models\{MediaAsset,Track,Project};
+use App\Models\{Track,Project};
+use App\Services\MediaTypePolicy;
+use Filament\Schemas\Components\Utilities\{Get,Set};
 
 class Fields
 {
@@ -19,7 +21,16 @@ class Fields
     public static function options(array $values): array { return array_combine($values,$values); }
     public static function id() { return TextInput::make('id')->label('Stabile ID')->required()->maxLength(100)->unique(ignoreRecord:true)->regex('/^[a-z0-9]+(?:-[a-z0-9]+)*$/')->disabledOn('edit')->dehydrated()->helperText('Einmalig vergeben, z. B. mein-projekt. Nach dem Anlegen unveränderlich.'); }
     public static function status() { return Select::make('status')->label('Auswahl für das nächste Paket')->options(['draft'=>'Entwurf','published'=>'Im nächsten Paket zeigen','hidden'=>'Ausgeblendet','needs-confirmation'=>'Bestätigung offen'])->default('draft')->required()->helperText('Speichern ändert nur den CMS-Entwurf. Die Website bleibt unverändert.'); }
-    public static function media(string $name,string $label,?string $type=null) { return Select::make($name)->label($label)->options(fn()=>MediaAsset::query()->when($type,fn($q)=>$q->where('type',$type))->orderBy('id')->get()->mapWithKeys(fn($a)=>[$a->id=>($a->alt?:$a->id).' · '.$a->type])->all())->searchable()->preload(); }
+    public static function mediaOptions(?string $type=null,?string $excludeId=null): array
+    {
+        $labels=['image'=>'Bild','video'=>'Video','audio'=>'Audio'];
+        return MediaTypePolicy::query($type)->when($excludeId,fn($query)=>$query->whereKeyNot($excludeId))->orderBy('id')->get()->mapWithKeys(function($asset)use($labels){
+            $mime=$asset->mime_type?:'geprüfter Bestandsimport';
+            return [$asset->id=>($asset->alt?:$asset->id).' · '.($labels[$asset->type]??$asset->type).' · '.$mime];
+        })->all();
+    }
+    public static function media(string $name,string $label,?string $type=null) { return Select::make($name)->label($label)->options(fn()=>self::mediaOptions($type))->searchable()->preload()->optionsLimit(500); }
+    public static function projectMedia(string $name,string $label) { return Select::make($name)->label($label)->options(fn(Get $get)=>self::mediaOptions(MediaTypePolicy::projectSlotType($get('slot'))))->searchable()->preload()->optionsLimit(500)->helperText(fn(Get $get)=>match(MediaTypePolicy::projectSlotType($get('slot'))){'image'=>'Nur Bilddateien: JPEG, PNG oder WebP.','video'=>'Nur Videodateien: MP4 oder WebM.',default=>'Zusätzliche Zuordnung ohne sichtbare Standardrolle.'}); }
     public static function crop(): array { return [TextInput::make('crop.x')->label('Fokus horizontal (%)')->numeric()->minValue(0)->maxValue(100)->default(50)->required(),TextInput::make('crop.y')->label('Fokus vertikal (%)')->numeric()->minValue(0)->maxValue(100)->default(50)->required()]; }
     public static function links(string $prefix): array { return array_map(fn($name)=>TextInput::make($prefix.'.'.$name)->label($name)->url()->maxLength(2000),['spotify','tidal','deezer','appleMusic']); }
     public static function tags(): array { return [Select::make('genres')->label('Genres')->multiple()->options(self::taxonomy('genres'))->default([]),Select::make('emotions')->label('Emotionen')->multiple()->options(self::taxonomy('emotions'))->default([])]; }
@@ -32,11 +43,11 @@ class Fields
                 Repeater::make('memberships')->label('Richtungen – eine gemeinsame Projektidentität')->relationship()->schema([
                     Select::make('direction')->label('Richtung')->options(['music'=>'Film Music','directing'=>'Directing'])->required()->distinct()->disableOptionsWhenSelectedInSiblingRepeaterItems(),
                     Select::make('role')->label('Rolle')->options(self::options(['Composer','Co-composer','Songwriter','Director','Assistant Director']))->required(),
-                    TextInput::make('sort_order')->label('Reihenfolge in dieser Richtung')->integer()->default(0)->required(),self::media('cover_asset_id','Cover','image')->required(),self::media('hover_asset_id','Hover-Medium','video'),...self::crop(),Select::make('fit')->label('Bildanpassung')->options(['cover'=>'Füllen','contain'=>'Vollständig']),
+                    TextInput::make('sort_order')->label('Reihenfolge in dieser Richtung')->integer()->default(0)->required(),self::media('cover_asset_id','Projekt-Cover','image')->required()->helperText('Eigenständiges Bild für die Projektkarte in dieser Richtung.'),self::media('hover_asset_id','Hover-Video','video')->helperText('Optionale, vom Cover unabhängige Video-Erweiterung der Projektkarte.'),...self::crop(),Select::make('fit')->label('Bildanpassung')->options(['cover'=>'Füllen','contain'=>'Vollständig']),
                 ])->columns(2)->defaultItems(0)->maxItems(2),
                 Repeater::make('mediaAssignments')->label('Galerie, Trailer & weitere Medien')->relationship()->orderColumn('sort_order')->schema([
-                    Select::make('slot')->label('Verwendung')->options(['gallery'=>'Galerie','trailer'=>'Lokaler Trailer','trailer_poster'=>'Trailer-Poster','soundtrack_cover'=>'Soundtrack-Cover','other'=>'Weitere Zuordnung'])->required(),self::media('media_asset_id','Medium')->required(),
-                ])->columns(2)->defaultItems(0)->collapsible()->helperText('Reihenfolge durch Verschieben. Kinnhakenhank: ausschließlich ausgewählten V2-Trailer verwenden.'),
+                    Select::make('slot')->label('Eigenständige Medienrolle')->options(['gallery'=>'Galeriebild','trailer'=>'Lokaler Trailer (Video)','trailer_poster'=>'Trailer-Poster (Bild)','soundtrack_cover'=>'Soundtrack-Cover (Bild)','other'=>'Weitere Zuordnung'])->required()->live()->afterStateUpdated(fn(Set $set)=>$set('media_asset_id',null)),self::projectMedia('media_asset_id','Datei für diese Rolle')->required(),
+                ])->columns(2)->defaultItems(0)->collapsible()->helperText('Galeriebilder werden durch Verschieben sortiert. Cover, Trailer und Trailer-Poster haben unabhängige Rollen; keines überschreibt das andere. Kinnhakenhank: ausschließlich ausgewählten V2-Trailer verwenden.'),
             ]),
             Tab::make('Soundtrack')->schema([Toggle::make('soundtrack_order_pending')->label('Track-Reihenfolge noch unbestätigt')->helperText('Sperrt den Export eines sichtbaren Projekts; interne Sortierung ist keine Freigabe.'),Repeater::make('soundtrack')->label('Tracks in manueller Reihenfolge')->relationship()->orderColumn('sort_order')->schema([Select::make('track_id')->label('Track')->options(fn()=>Track::orderBy('title')->pluck('title','id'))->searchable()->required()->distinct()->disableOptionsWhenSelectedInSiblingRepeaterItems()])->defaultItems(0)]),
             Tab::make('Credits & Links')->schema([
@@ -66,7 +77,7 @@ class Fields
             TextInput::make('path')->label('Relativer Web-Pfad')->required()->regex('#^media/[a-zA-Z0-9/_-]+\.(webp|jpg|jpeg|png|mp3|wav|ogg|mp4|webm)$#')->unique(ignoreRecord:true)->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='edit' || $get('_mode')==='existing')->disabled(fn(string $operation)=>$operation==='edit')->dehydrated(),
             Select::make('type')->label('Medientyp')->options(['image'=>'Bild','audio'=>'Audio','video'=>'Video'])->required()->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='edit' || $get('_mode')==='existing')->disabled(fn(string $operation)=>$operation==='edit')->dehydrated(),
         ])->columns(2),Section::make('Beschreibung und Freigabe')->columnSpanFull()->schema([
-            Select::make('purpose')->label('Hauptverwendung')->options(self::options(['hero','menu','about','cover','gallery','hover','trailer','audio','other']))->default('other')->required(),
+            Select::make('purpose')->label('Hauptverwendung')->options(self::options(['hero','menu','about','cover','gallery','hover','trailer','audio','other']))->default('other')->required()->helperText('Nur interne Metadaten zur Einordnung. Diese Auswahl weist die Datei keinem Bereich, Projekt oder Track zu.'),
             Textarea::make('alt')->label('Alternativtext')->default('')->dehydrateStateUsing(fn($state)=>(string)$state),Textarea::make('caption')->label('Bildunterschrift'),TextInput::make('credit')->label('Credit'),Textarea::make('license')->label('Lizenz / Rechtevermerk (intern)'),Textarea::make('source')->label('Quelle / Herkunft (intern)'),
             Select::make('state')->label('Materialstatus')->options(['approved'=>'Bestätigt','temporary'=>'Temporär','test'=>'Test'])->default('temporary')->required(),Select::make('rights_scope')->label('Nutzungsfreigabe')->options(self::options(['unconfirmed','existing_local_draft','next_draft','public']))->default('unconfirmed')->required(),
             TextInput::make('width')->label('Breite (px)')->integer()->minValue(1)->disabled()->dehydrated(),TextInput::make('height')->label('Höhe (px)')->integer()->minValue(1)->disabled()->dehydrated(),TextInput::make('duration')->label('Dauer (s)')->numeric()->minValue(0.001)->disabled()->dehydrated(),...self::crop(),

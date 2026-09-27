@@ -11,8 +11,8 @@ class ManifestExporter
     private function links(?array $a): object { return (object) array_filter(Arr::only($a??[],['spotify','tidal','deezer','appleMusic']),fn($v)=>$v!==null && $v!==''); }
     private function profileLinks(?array $a): object { return (object) array_filter(Arr::only($a??[],['imdb','crewUnited','musicHub']),fn($v)=>$v!==null && $v!==''); }
     private function optional(array $a): array { return array_filter($a,fn($v)=>$v!==null && $v!==''); }
-    private function media(string $key): array { return Arr::only(Setting::read($key)['media']??['image'=>null,'video'=>null,'poster'=>null],['image','video','poster']); }
-    public function package(): array
+    private function media(string $key): array { return MediaSlotPolicy::project($key,Setting::read($key)['media']??[]); }
+    public function package(string $validationPolicy=ContentValidator::POLICY_PUBLICATION): array
     {
         $trackIds=Track::where('status','published')->where('library_visible',true)->pluck('id')->all(); $assetIds=[]; $projects=[];
         foreach (Project::where('status','published')->orderBy('sort_order')->orderBy('id')->with(['memberships','mediaAssignments','soundtrack'])->get() as $p) {
@@ -51,7 +51,7 @@ class ManifestExporter
         }
         $tracks=[];
         foreach (Track::whereIn('id',array_unique($trackIds))->orderBy('id')->get() as $t) {
-            if ($t->audio_asset_id && !in_array($t->rights_scope,['existing_local_draft','next_draft','public'])) throw new DomainException("{$t->id}: Playback-Nutzung für den nächsten Entwurf ist unbestätigt.");
+            if ($validationPolicy===ContentValidator::POLICY_PUBLICATION && $t->audio_asset_id && !in_array($t->rights_scope,['existing_local_draft','next_draft','public'])) throw new DomainException("{$t->id}: Playback-Nutzung für den nächsten Entwurf ist unbestätigt.");
             $assetIds[]=$t->audio_asset_id;
             $tracks[]=['id'=>$t->id,'title'=>$t->title,'audioAssetId'=>$t->audio_asset_id,'duration'=>$t->duration,'peaks'=>$t->peaks,
                 'genres'=>$t->genres,'emotions'=>$t->emotions,'platformOverrides'=>$this->links($t->platform_overrides),'status'=>'published',
@@ -88,7 +88,7 @@ class ManifestExporter
                 ...(!empty($about['collective']['name']) && !empty($about['collective']['url']) && !empty($about['collective']['membershipText'])?['collective'=>[
                     'name'=>$about['collective']['name'],'url'=>$about['collective']['url'],'logoAssetId'=>$about['collective']['logoAssetId']??null,'membershipText'=>$about['collective']['membershipText'],
                 ]]:[]),'mediaSlots'=>$slots]];
-        app(ContentValidator::class)->validate($manifest);
+        app(ContentValidator::class)->validate($manifest,false,true,$validationPolicy);
         $extension=app(SettingsExporter::class)->export();
         return ['manifest'=>$manifest,'settings'=>$extension];
     }

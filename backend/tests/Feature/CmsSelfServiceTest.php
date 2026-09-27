@@ -156,6 +156,7 @@ class CmsSelfServiceTest extends TestCase
 
         $project->update(['synopsis'=>'Dieser nicht veröffentlichte Text soll verworfen werden.']);
         $second=app(ManifestExporter::class)->export(false,false,$admin->id);$secondReview=$flow->review($second['hash'],$admin->id);
+        $draftPreview=app(\App\Services\DraftPreviewService::class)->create($admin->id);
         $draft=app(DraftStateSnapshot::class);$this->assertTrue($draft->hasChanges());$this->assertStringContainsString('Projekte',implode(' ',$draft->preview()['descriptions']));
         Livewire::test(\App\Filament\Pages\Publication::class)->assertSee('Nicht veröffentlichte Änderungen verwerfen');
 
@@ -165,6 +166,7 @@ class CmsSelfServiceTest extends TestCase
         $this->assertGreaterThanOrEqual(1,$result['staleCandidates']);
         $this->assertSame('stale',Publication::where('hash',$second['hash'])->firstOrFail()->status);
         $this->assertTrue(AuditEvent::where('object_type','publication')->where('action','draft-discard')->exists());
+        try{app(\App\Services\DraftPreviewService::class)->resolve($draftPreview['token']);$this->fail('Draft discard must invalidate website preview snapshots.');}catch(\DomainException){}
         $this->assertFalse($draft->hasChanges());
         Project::findOrFail($project->id)->update(['synopsis'=>'Dieser nicht veröffentlichte Text soll verworfen werden.']);
         $fresh=app(ManifestExporter::class)->export(false,false,$admin->id);$this->assertSame($second['hash'],$fresh['hash']);$freshReview=$flow->review($fresh['hash'],$admin->id);$this->assertNotSame($secondReview['planHash'],$freshReview['planHash']);

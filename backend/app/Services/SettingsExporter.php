@@ -1,6 +1,6 @@
 <?php
 namespace App\Services;
-use App\Models\{Setting,Project,MediaAsset,ExternalService};
+use App\Models\{Setting,Project,ExternalService};
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Validator;
 use DomainException;
@@ -29,7 +29,7 @@ class SettingsExporter
             'analytics.enabled'=>'required|boolean','analytics.provider'=>'required|in:none,ga4,plausible',
             'analytics.measurementId'=>'nullable|regex:/^G-[A-Z0-9]{4,20}$/','analytics.siteDomain'=>'nullable|regex:/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/',
         ])->validate();
-        if (!empty($seo['ogAssetId']) && !MediaAsset::whereKey($seo['ogAssetId'])->where('type','image')->exists()) throw new DomainException('SEO: OG-Bild fehlt oder ist kein Bild.');
+        MediaTypePolicy::assert($seo['ogAssetId']??null,'image','SEO');
         if ($analytics['enabled'] && (!$consent['analytics'] || $analytics['provider']==='none')) throw new DomainException('Analytics benötigt expliziten Consent und einen konfigurierten Anbieter.');
         if ($analytics['enabled'] && $analytics['provider']==='ga4' && empty($analytics['measurementId'])) throw new DomainException('Google Analytics benötigt eine gültige Measurement-ID.');
         if ($analytics['enabled'] && $analytics['provider']==='plausible' && empty($analytics['siteDomain'])) throw new DomainException('Plausible benötigt eine gültige Website-Domain.');
@@ -48,7 +48,7 @@ class SettingsExporter
         foreach (Project::where('status','published')->orderBy('id')->with('mediaAssignments')->get() as $p) {
             $value=Arr::only($p->seo??[],['title','description','canonical','ogAssetId','noindex']);
             Validator::make($value,['title'=>'nullable|string|max:255','description'=>'nullable|string|max:2000','canonical'=>'nullable|url:http,https','noindex'=>'nullable|boolean','ogAssetId'=>'nullable|string'])->validate();
-            if (!empty($value['ogAssetId']) && !MediaAsset::whereKey($value['ogAssetId'])->where('type','image')->exists()) throw new DomainException("{$p->id}: SEO-Bild fehlt.");
+            MediaTypePolicy::assert($value['ogAssetId']??null,'image',$p->id.' SEO-Bild');
             $projectSeo[$p->id]=(object)$value;
             $additionalMedia[$p->id]=$p->mediaAssignments->whereIn('slot',['soundtrack_cover','other'])->map->only(['media_asset_id','slot','sort_order'])->values()->all();
         }

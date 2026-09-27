@@ -8,8 +8,12 @@ use Opis\JsonSchema\Errors\ErrorFormatter;
 
 class ContentValidator
 {
-    public function validate(array $m, bool $release = false, bool $checkFiles = true): void
+    public const POLICY_PUBLICATION='publication';
+    public const POLICY_DRAFT_PREVIEW='draft-preview';
+
+    public function validate(array $m, bool $release = false, bool $checkFiles = true, string $policy = self::POLICY_PUBLICATION): void
     {
+        if (!in_array($policy,[self::POLICY_PUBLICATION,self::POLICY_DRAFT_PREVIEW],true)) throw new DomainException('Unbekannte Validierungsrichtlinie.');
         // json_decode(..., true) cannot distinguish {} from []; restore known object slots.
         foreach ($m['projects']??[] as $i=>$p) {
             foreach (['memberships','platformLinks','externalLinks'] as $key) if (isset($p[$key])) $m['projects'][$i][$key]=(object)$p[$key];
@@ -74,7 +78,7 @@ class ContentValidator
         foreach ($m['projects'] as $p) $urls=[...$urls,...array_values((array)$p['platformLinks']),...array_values((array)($p['externalLinks']??[])),$p['externalFilm']['url']??null];
         foreach ($m['tracks'] as $t) $urls=[...$urls,...array_values((array)$t['platformOverrides'])];
         foreach (array_filter($urls) as $url) if (!in_array(strtolower(parse_url($url,PHP_URL_SCHEME)??''),['http','https'],true)) $fail('Öffentliche Links müssen HTTP(S) verwenden.');
-        if ($m['mode']!=='test') {
+        if ($policy===self::POLICY_PUBLICATION && $m['mode']!=='test') {
             foreach ($m['assets'] as $a) if ($a['state']==='test') $fail('Test-Medium im regulären Paket.');
             foreach (array_merge($m['projects'],$m['tracks']) as $r) if ($r['status']==='test') $fail('Test-Datensatz im regulären Paket.');
         }

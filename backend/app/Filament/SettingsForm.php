@@ -1,17 +1,27 @@
 <?php
 namespace App\Filament;
-use Filament\Forms\Components\{TextInput,Textarea,Toggle,Select,Repeater,ColorPicker,Hidden};
+use Filament\Forms\Components\{TextInput,Textarea,Toggle,Select,Repeater,ColorPicker,Hidden,Radio};
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Section;
 class SettingsForm
 {
-    public static function media(): array { return [Fields::media('media.image','Bild','image'),Fields::media('media.video','Video','video'),Fields::media('media.poster','Poster','image')]; }
+    public static function media(string $key): array
+    {
+        return [
+            Radio::make('media.mode')->label('Darstellung')->options(['image'=>'Bild','video'=>'Video'])->inline()->live()->required()
+                ->helperText(fn(Get $get)=>'Aktive Darstellung: '.($get('media.mode')==='video'?'Video':'Bild').'. Nur diese Auswahl wird in Vorschau und Paket verwendet.'),
+            Fields::media('media.image','Bild','image')->required(fn(Get $get)=>$get('media.mode')==='image')->visible(fn(Get $get)=>$get('media.mode')==='image')->helperText('Statisches Bild für diesen Bereich.'),
+            Fields::media('media.video','Video','video')->required(fn(Get $get)=>$get('media.mode')==='video')->visible(fn(Get $get)=>$get('media.mode')==='video')->helperText('Aktives Video für diesen Bereich.'),
+            Fields::media('media.poster','Video-Poster','image')->visible(fn(Get $get)=>$get('media.mode')==='video')->helperText('Optionales Vorschaubild für das ausgewählte Video.'),
+        ];
+    }
     public static function fields(string $key): array
     {
         return match($key) {
             'site'=>[TextInput::make('title')->label('Website-Titel')->required(),Textarea::make('description')->label('Beschreibung'),TextInput::make('productionDomain')->label('Künftige Production-Domain')->url()->helperText('Kein Deployment durch Speichern.')],
-            'home'=>[...self::media(),Toggle::make('loop')->label('Hero unbegrenzt wiederholen')->default(true)->accepted()->helperText('Glebs bestätigte Loop-Vorgabe bleibt bestehen.'),Toggle::make('autoplayMuted')->label('Automatisch, zunächst ohne Ton')->default(true)->accepted()],
-            'music','directing'=>[TextInput::make('label')->label('Menübezeichnung')->required(),...self::media()],
-            'about'=>[TextInput::make('title')->label('Überschrift')->required(),Repeater::make('biography')->label('Biografie – Absätze in Reihenfolge')->simple(Textarea::make('paragraph')->required())->defaultItems(0),...self::media(),TextInput::make('getInTouch')->label('Get-in-touch-Text'),Toggle::make('visible')->label('Im Paket sichtbar')->default(true),Select::make('theme')->label('Öffentliche About-Farbwelt')->options(['follow-section'=>'Bereich folgen','dark'=>'Dunkel','light'=>'Hell'])->required()->helperText('Unabhängig von Ihrem Admin-Design; Frontend-Anbindung bleibt ein späterer Schritt.'),Section::make('Kollektiv / Mitgliedschaft')->schema([TextInput::make('collective.name')->label('Kollektiv')->maxLength(255),TextInput::make('collective.membershipText')->label('Mitgliedschaft')->maxLength(500),TextInput::make('collective.url')->label('Kollektiv-Link')->url()->maxLength(2000),Fields::media('collective.logoAssetId','Kollektiv-Logo','image')])->columns(2)],
+            'home'=>[...self::media('home'),Toggle::make('loop')->label('Hero unbegrenzt wiederholen')->default(true)->accepted()->helperText('Glebs bestätigte Loop-Vorgabe bleibt bestehen.'),Toggle::make('autoplayMuted')->label('Automatisch, zunächst ohne Ton')->default(true)->accepted()],
+            'music','directing'=>[TextInput::make('label')->label('Menübezeichnung')->required(),...self::media($key)],
+            'about'=>[TextInput::make('title')->label('Überschrift')->required(),Repeater::make('biography')->label('Biografie – Absätze in Reihenfolge')->simple(Textarea::make('paragraph')->required())->defaultItems(0),...self::media('about'),TextInput::make('getInTouch')->label('Get-in-touch-Text'),Toggle::make('visible')->label('Im Paket sichtbar')->default(true),Select::make('theme')->label('Öffentliche About-Farbwelt')->options(['follow-section'=>'Bereich folgen','dark'=>'Dunkel','light'=>'Hell'])->required()->helperText('Unabhängig von Ihrem Admin-Design; Frontend-Anbindung bleibt ein späterer Schritt.'),Section::make('Kollektiv / Mitgliedschaft')->schema([TextInput::make('collective.name')->label('Kollektiv')->maxLength(255),TextInput::make('collective.membershipText')->label('Mitgliedschaft')->maxLength(500),TextInput::make('collective.url')->label('Kollektiv-Link')->url()->maxLength(2000),Fields::media('collective.logoAssetId','Kollektiv-Logo','image')->helperText('Eigenständiges Logo der Kollektiv-Mitgliedschaft.')])->columns(2)],
             'contact'=>[TextInput::make('email')->label('Öffentliche E-Mail')->email(),TextInput::make('recipient')->label('Interner Formular-Empfänger')->email()->helperText('Wird niemals exportiert. Kein Mailversand in 03A.'),TextInput::make('instagram')->label('Instagram')->url(),TextInput::make('spotify')->label('Spotify')->url(),TextInput::make('samples')->label('Samples-Kollektiv')->url(),Textarea::make('footer')->label('Footer-Text'),Textarea::make('legalIdentity')->label('Öffentliche Anbieteridentität')],
             'social'=>[Repeater::make('links')->label('Social Links')->addActionLabel('Social Link hinzufügen')->orderColumn('sort_order')->reorderable()->collapsible()->itemLabel(fn(array $state)=>$state['label']??$state['provider']??'Social Link')->schema([
                 Select::make('provider')->label('Anbieter / Dienst')->options(Fields::options(['instagram','imdb','crew-united','music-hub','spotify','tidal','apple-music','deezer','youtube','vimeo','soundcloud','letterboxd','website','other']))->required(),

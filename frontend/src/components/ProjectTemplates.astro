@@ -1,6 +1,6 @@
 ---
-import {content} from '../lib/content/data';import ProjectDetail from './ProjectDetail.astro';
-interface Props {context?:'music'|'directing'}
-const {context='music'}=Astro.props;
+import {content as activeContent} from '../lib/content/data';import type {Manifest} from '../../../contracts/content';import ProjectDetail from './ProjectDetail.astro';
+interface Props {context?:'music'|'directing';content?:Manifest}
+const {context='music',content=activeContent}=Astro.props;
 ---
-{content.projects.map(project=><template data-project-template={project.id}><ProjectDetail project={project} context={context}/></template>)}
+{content.projects.map(project=><template data-project-template={project.id}><ProjectDetail project={project} context={context} content={content}/></template>)}

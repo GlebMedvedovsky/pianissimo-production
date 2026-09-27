@@ -21,6 +21,11 @@ class MediaStorage
 
     public static function acceptedMimeTypes(): array { return array_keys(self::MIME_EXTENSIONS); }
 
+    public static function mimeTypesFor(string $type): array
+    {
+        return array_keys(array_filter(self::MIME_TYPES, fn (string $value): bool => $value === $type));
+    }
+
     public function inspectStored(string $relative, string $id, ?string $originalName=null): array
     {
         if (!preg_match('/^media\/originals\/(?:pending|[a-z0-9]+(?:-[a-z0-9]+)*)\/[A-Za-z0-9-]+\.[A-Za-z0-9]+$/',$relative)) throw new DomainException('Ungültiger privater Medienpfad.');

@@ -25,7 +25,7 @@ try {
   await page.getByRole('button',{name:'Datei ersetzen',exact:true}).waitFor(); checks.push('Desktop upload UI and create');
 
   await page.getByRole('link',{name:'About',exact:true}).click();
-  const image=page.getByLabel('Bild'); await image.click(); await page.getByRole('option',{name:/Synthetic self-service QA/}).click();
+  const image=page.getByRole('combobox',{name:/^Bild/}); await image.click(); await page.getByRole('option',{name:/Synthetic self-service QA/}).click();
   await page.getByRole('button',{name:'Entwurf speichern',exact:true}).click(); await page.getByText('Entwurf gespeichert',{exact:true}).waitFor(); checks.push('Assign optional About image and Save Draft');
   assert.equal(hashFile(path.join(root,'content/manifest.json')),baseline.manifestSha256); checks.push('Save Draft leaves active frontend unchanged');
 
@@ -34,8 +34,8 @@ try {
   await page.getByRole('button',{name:'Vorschau erstellen',exact:true}).click(); await page.getByText('Lokales Paket erstellt',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Änderungen prüfen',exact:true}).click(); await page.getByText(/Änderungen geprüft/).waitFor();
   const descriptions=await page.locator('.fi-section').first().locator('li').allTextContents();
-  assert(descriptions.some(text=>/Neues Medium: synthetic-self-service/.test(text))); assert(descriptions.some(text=>/Website-Medium geändert: mediaSlots → about → image/.test(text)));
-  for(const text of descriptions)assert.match(text,/^(?:\+ Social Link:|− Social Link:|.+ (?:URL geändert|eingeblendet|ausgeblendet|Reihenfolge geändert)|\+ Neues Medium: synthetic-self-service|Website-Medium geändert: mediaSlots → about → image)$/);
+  assert(descriptions.some(text=>/Neues Medium: synthetic-self-service/.test(text))); assert(descriptions.some(text=>/About: Bild geändert/.test(text)));
+  for(const text of descriptions)assert.match(text,/^(?:\+ Social Link:|− Social Link:|.+ (?:URL geändert|eingeblendet|ausgeblendet|Reihenfolge geändert)|\+ Neues Medium: synthetic-self-service|About: Bild geändert)$/);
   checks.push('Candidate and guarded semantic review in CMS UI');
   await page.getByRole('button',{name:'Für Website übernehmen',exact:true}).click(); await page.getByRole('button',{name:/Bestätigen|Für Website übernehmen/}).last().click();
   await page.getByText('Für Website übernommen',{exact:true}).waitFor();

@@ -4,9 +4,13 @@
             <p><strong>{{ $owner['status']['hasDraftChanges'] ? 'Änderungen noch nicht übernommen' : 'Website und CMS sind auf demselben Stand' }}</strong></p>
             <p>Speichern allein ändert die Website nicht. Änderungen werden erst nach Ihrer Prüfung übernommen.</p>
             <p>Letzte Übernahme: {{ $owner['status']['lastApply'] ? $owner['status']['lastApply']->format('d.m.Y H:i') : 'Noch keine Übernahme protokolliert' }}</p>
-            @if($owner['status']['candidatePending'])<p>Eine Vorschau wartet auf Ihre Prüfung.</p>@endif
-            <p>Öffentliche Website: noch nicht verbunden.</p>
-            <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem"><x-filament::button tag="a" :href="$owner['links']['publication']">Änderungen veröffentlichen</x-filament::button><x-filament::link :href="$owner['links']['publication']">Zur Veröffentlichung</x-filament::link></div>
+            @if($owner['status']['review']==='stale')<p><strong>Die geprüften Änderungen sind nicht mehr aktuell.</strong></p>@elseif($owner['status']['review']==='current')<p>Die Änderungen wurden geprüft und können übernommen werden.</p>@elseif($owner['status']['hasDraftChanges'])<p>Die Änderungen wurden noch nicht geprüft.</p>@endif
+            <p>Die öffentliche Production-Website ist noch nicht verbunden.</p>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem">
+                @if($owner['status']['hasDraftChanges'])<x-filament::button tag="a" :href="$owner['links']['preview']" target="_blank" rel="noopener">Website-Vorschau öffnen</x-filament::button>@endif
+                @if($owner['status']['review']==='current')<x-filament::button tag="a" :href="$owner['links']['publication']" color="success">Für Website übernehmen</x-filament::button>@elseif($owner['status']['hasDraftChanges'])<x-filament::button tag="a" :href="$owner['links']['publication']">{{ $owner['status']['review']==='stale' ? 'Änderungen erneut prüfen' : 'Änderungen prüfen' }}</x-filament::button>@endif
+                <x-filament::link :href="$owner['links']['publication']">Zur Veröffentlichung</x-filament::link>
+            </div>
         </x-filament::section>
         <x-filament::section heading="Inhalte">
             <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem">

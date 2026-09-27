@@ -1,15 +1,16 @@
 ---
-import { musicCategories } from '../../../contracts/content';
-import { content, asset } from '../lib/content/data';
+import { musicCategories, type Manifest } from '../../../contracts/content';
+import { content as activeContent, assetFrom } from '../lib/content/data';
 import { selectProjects } from '../lib/content/selectors';
 import { siteConfig } from '../config/site.config';
 import Icon from './Icon.astro';
 
 interface Props {
   section: 'music' | 'directing';
+  content?: Manifest;
 }
 
-const { section } = Astro.props;
+const { section, content=activeContent } = Astro.props;
 const isMusic = section === 'music';
 const projects = selectProjects(content, section, 'All');
 const filters = isMusic
@@ -59,7 +60,7 @@ const defaultFilter = isMusic ? 'All' : siteConfig.directing.defaultFilter;
     {
       projects.map((project, index) => {
         const member = project.memberships[section]!;
-        const cover = asset(member.coverAssetId)!;
+        const cover = assetFrom(content, member.coverAssetId)!;
 
         return (
           <a
@@ -90,7 +91,7 @@ const defaultFilter = isMusic ? 'All' : siteConfig.directing.defaultFilter;
                 member.hoverAssetId && (
                   <video
                     data-hover-video
-                    data-src={'/' + asset(member.hoverAssetId)!.path}
+                    data-src={'/' + assetFrom(content, member.hoverAssetId)!.path}
                     muted
                     playsinline
                     loop

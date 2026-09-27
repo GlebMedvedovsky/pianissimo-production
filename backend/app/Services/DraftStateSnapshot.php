@@ -77,6 +77,7 @@ class DraftStateSnapshot
             return [$count,$hashes];
         });
         $this->invalidatePlans($hashes);
+        app(DraftPreviewService::class)->invalidateForUser($userId);
         if(hash_file('sha256',config('cms.manifest'))!==$frontendHash)throw new DomainException('Der Frontend-Stand wurde unerwartet verändert.');
         return [...$review,'staleCandidates'=>$stale];
     }

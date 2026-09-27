@@ -142,8 +142,17 @@ class FrontendPublication
                 foreach ($old as $provider=>$link) if(!$new->has($provider))$out[]='− Social Link: '.$link['label'];
             } elseif (preg_match('#^/assets/([^/]+)/(path|sha256)$#',$path,$m)) $out[]='Media „'.$m[1].'“: Datei ersetzt';
             elseif (preg_match('#^/assets/([^/]+)$#',$path,$m)) $out[]=($change['before']===null?'+ Neues Medium: ':'− Medium entfernt: ').$m[1];
-            elseif (preg_match('#^/projects/([^/]+)(.*)$#',$path,$m)) $out[]='Projekt „'.$m[1].'“ geändert: '.trim($m[2],'/');
-            elseif (str_starts_with($path,'/site/mediaSlots/')) $out[]='Website-Medium geändert: '.str_replace('/',' → ',trim(substr($path,5),'/'));
+            elseif (preg_match('#^/projects/([^/]+)(.*)$#',$path,$m)) {
+                $part=trim($m[2],'/');
+                $roles=['gallery'=>'Galerie/Reihenfolge','localTrailerAssetId'=>'Trailer-Video','localTrailerPosterId'=>'Trailer-Poster','memberships'=>'Richtungs-Cover/Hover','tracks'=>'Soundtrack/Reihenfolge'];
+                $role=collect($roles)->first(fn($label,$prefix)=>str_starts_with($part,$prefix),$part);
+                $out[]='Projekt „'.$m[1].'“: '.$role.' geändert';
+            }
+            elseif (preg_match('#^/site/mediaSlots/([^/]+)/([^/]+)$#',$path,$m)) {
+                $locations=['hero'=>'Startseite','composerMenu'=>'Film Music','directingMenu'=>'Directing','about'=>'About'];
+                $fields=['image'=>'Bild','video'=>'Video','poster'=>'Video-Poster'];
+                $out[]=($locations[$m[1]]??$m[1]).': '.($fields[$m[2]]??$m[2]).' geändert';
+            }
             else $out[]='Geändert: '.str_replace('/',' → ',trim($path,'/'));
         }
         return array_values(array_unique($out));
@@ -160,6 +169,27 @@ class FrontendPublication
         $this->writeImmutable(config('cms.frontend_apply_state').'/plans/'.$planHash.'.json',$this->json($plan));
         app(AuditLogger::class)->record('publication',$candidateHash,'review',$planHash,['changes'=>count($plan['changes'])]);
         return ['kind'=>'review','candidateHash'=>$candidateHash,'planHash'=>$planHash,'timestamp'=>$plan['reviewedAt'],'exportingAdminId'=>$plan['exportingAdminId'],'validation'=>'gültig','changeCount'=>count($plan['changes']),'descriptions'=>$this->describe($plan['changes']),'affectedPaths'=>array_column($plan['mediaChanges'],'path')];
+    }
+    public function currentReview(): array
+    {
+        $event=\App\Models\AuditEvent::where('object_type','publication')->where('action','review')->latest('id')->first();
+        if(!$event||!is_string($event->result_hash)||!preg_match('/^[a-f0-9]{64}$/',$event->result_hash))return ['kind'=>'empty'];
+        $planHash=$event->result_hash;$file=config('cms.frontend_apply_state').'/plans/'.$planHash.'.json';
+        if(is_file(config('cms.frontend_apply_state').'/plans/'.$planHash.'.stale')||!is_file($file))return ['kind'=>'stale'];
+        try{$plan=$this->readJson($file);if($this->hashValue($plan)!==$planHash)return ['kind'=>'stale'];}
+        catch(\Throwable){return ['kind'=>'stale'];}
+        $candidateHash=$plan['candidateHash']??'';
+        if(!preg_match('/^[a-f0-9]{64}$/',$candidateHash))return ['kind'=>'stale'];
+        $candidate=\App\Models\Publication::where('hash',$candidateHash)->latest('id')->first();
+        if(!$candidate||$candidate->status==='stale')return ['kind'=>'stale'];
+        try{$draftHash=ManifestImporter::hash(app(ManifestExporter::class)->package());$activeHash=hash_file('sha256',config('cms.manifest'));}
+        catch(\Throwable){return ['kind'=>'stale'];}
+        if($activeHash===($plan['resultingManifestHash']??null))return ['kind'=>'applied'];
+        if($draftHash!==$candidateHash||$activeHash!==($plan['previousManifestHash']??null)){
+            app(DraftStateSnapshot::class)->markCandidatesStale([$candidateHash]);
+            return ['kind'=>'stale'];
+        }
+        return ['kind'=>'current','candidateHash'=>$candidateHash,'planHash'=>$planHash,'timestamp'=>$plan['reviewedAt']??$event->created_at?->toIso8601String(),'validation'=>'gültig','changeCount'=>count($plan['changes']??[]),'descriptions'=>$this->describe($plan['changes']??[]),'affectedPaths'=>array_column($plan['mediaChanges']??[],'path')];
     }
     private function withLock(callable $callback): mixed
     {
