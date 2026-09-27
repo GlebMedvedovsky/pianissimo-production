@@ -11,6 +11,7 @@ class Help extends \Filament\Pages\Page
     protected string $view='cms.help';
     #[Url] public string $search='';
     #[Url] public string $category='Alle';
+    #[Url] public string $article='';
     public function categories(): array { return app(\App\Services\HelpCenter::class)->categories(); }
-    public function articles(): array { return app(\App\Services\HelpCenter::class)->search($this->search,$this->category); }
+    public function articles(): array { return app(\App\Services\HelpCenter::class)->search($this->search,$this->category,$this->article); }
 }

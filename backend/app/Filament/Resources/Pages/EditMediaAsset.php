@@ -7,7 +7,7 @@ class EditMediaAsset extends \Filament\Resources\Pages\EditRecord
     protected function getSaveFormAction(): \Filament\Actions\Action { return parent::getSaveFormAction()->label('Entwurf speichern'); }
     protected function getHeaderActions(): array
     {
-        return [\Filament\Actions\Action::make('replace')->label('Datei ersetzen')->icon('heroicon-o-arrow-path')->schema([
+        return [\Filament\Actions\Action::make('help')->label('Medien-Hilfe')->url(fn()=>\App\Filament\Pages\Help::getUrl(['article'=>'hauptverwendung']).'#hauptverwendung'),\Filament\Actions\Action::make('replace')->label('Datei ersetzen')->icon('heroicon-o-arrow-path')->schema([
             \Filament\Forms\Components\FileUpload::make('replacement')->label('Neue Datei')->disk('local')->directory('media/originals/'.$this->record->id)->storeFileNamesIn('original_name')->acceptedFileTypes(\App\Services\MediaStorage::acceptedMimeTypes())->maxSize(config('cms.media_max_kb'))->visibility('private')->required(),
         ])->requiresConfirmation()->modalHeading('Datei unter derselben stabilen ID ersetzen?')->modalDescription('Alle Verwendungen behalten diese ID. Die Website ändert sich erst nach geprüftem Apply.')->action(function(array $data): void {
             app(\App\Services\MediaStorage::class)->replace($this->record,$data['replacement'],$data['original_name']??null);

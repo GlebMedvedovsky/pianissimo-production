@@ -28,4 +28,13 @@ class EditProject extends \Filament\Resources\Pages\EditRecord
     }
 
     protected function getSaveFormAction(): \Filament\Actions\Action { return parent::getSaveFormAction()->label('Entwurf speichern'); }
+
+    protected function getHeaderActions(): array
+    {
+        return [\Filament\Actions\ActionGroup::make([
+            \Filament\Actions\Action::make('creditsHelp')->label('Credits verstehen')->url(fn()=>\App\Filament\Pages\Help::getUrl(['article'=>'credits-bearbeiten']).'#credits-bearbeiten'),
+            \Filament\Actions\Action::make('galleryHelp')->label('Galerie sortieren')->url(fn()=>\App\Filament\Pages\Help::getUrl(['article'=>'galerie-sortieren']).'#galerie-sortieren'),
+            \Filament\Actions\Action::make('seoHelp')->label('Projekt-SEO verstehen')->url(fn()=>\App\Filament\Pages\Help::getUrl(['article'=>'seo-titel']).'#seo-titel'),
+        ])->label('Hilfe')];
+    }
 }

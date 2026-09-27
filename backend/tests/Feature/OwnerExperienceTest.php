@@ -53,14 +53,14 @@ class OwnerExperienceTest extends TestCase
         Livewire::test(Help::class)->set('search','Canonical')->assertSee('Canonical URL')->assertDontSee('Ein neues Bild hochladen')
             ->set('search','')->set('category','Medien')->assertSee('Ein neues Bild hochladen')->assertDontSee('SEO einfach erklärt')
             ->set('search','unauffindbarer-begriff')->assertSee('Keine passenden Artikel');
-        $this->get(Help::getUrl())->assertOk()->assertSee('Im Handbuch suchen')->assertSee('Analytics mit einem KI-Assistenten auswerten');
-        Livewire::test(Help::class)->set('category','Veröffentlichung')->assertSee('Entwurf speichern')->assertSee('Website-Vorschau öffnen')->assertSee('Unterschied Vorschau / Veröffentlichung')->assertSee('Was bedeutet „nicht mehr aktuell“?');
+        $this->get(Help::getUrl())->assertOk()->assertSee('Im Handbuch suchen')->assertSee('Analytics mit einem KI-Assistenten analysieren')->assertSee('ausschließlich Hilfeartikel');
+        Livewire::test(Help::class)->set('category','Erste Schritte')->assertSee('Was ist ein Entwurf?')->assertSee('Website-Vorschau öffnen')->assertSee('Für Website übernehmen')->assertSee('Letzte Änderung zurücksetzen');
     }
 
     public function test_seo_page_explains_fields_and_warns_about_noindex(): void
     {
         Livewire::test(Seo::class)->assertSee('Suchmaschinen sind derzeit bewusst ausgeschlossen')
-            ->assertSee('Bestimmt, wie Seitentitel')->assertSee('bevorzugte öffentliche Hauptadresse')->assertSee('Vorschaubild beim Teilen');
+            ->assertSee('Globaler Standard für Dokumenttitel')->assertSee('Bevorzugte öffentliche Hauptadresse')->assertSee('Globales Vorschaubild');
     }
 
     public function test_analytics_provider_validation_and_consent_warning(): void

@@ -20,7 +20,7 @@ class Publication extends \Filament\Pages\Page
     }
     protected function getHeaderActions(): array
     {
-        return [Action::make('websitePreview')->label('Website-Vorschau öffnen')->icon('heroicon-o-computer-desktop')->url(fn()=>route('draft-preview.open'))->openUrlInNewTab(),
+        return [Action::make('help')->label('Anleitung')->url(fn()=>Help::getUrl(['article'=>'veroeffentlichung']).'#veroeffentlichung'),Action::make('websitePreview')->label('Website-Vorschau öffnen')->icon('heroicon-o-computer-desktop')->url(fn()=>route('draft-preview.open'))->openUrlInNewTab(),
             Action::make('review')->label(fn()=>app(FrontendPublication::class)->currentReview()['kind']==='stale'?'Änderungen erneut prüfen':'Änderungen prüfen')->action(fn()=> $this->review()),
             Action::make('apply')->label('Für Website übernehmen')->color('success')->visible(fn()=>app(FrontendPublication::class)->currentReview()['kind']==='current')->requiresConfirmation()->modalHeading('Diese geprüften Änderungen wirklich für die Website übernehmen?')->modalDescription('Nur die zuvor geprüften Änderungen werden übernommen. Die öffentliche Production-Website ist noch nicht verbunden.')->action(fn()=> $this->apply()),
             Action::make('discard')->label('Nicht veröffentlichte Änderungen verwerfen')->color('danger')->visible(fn()=>app(DraftStateSnapshot::class)->hasChanges())->requiresConfirmation()->modalHeading('Nicht veröffentlichte Änderungen verwerfen?')->modalDescription(function(){try{$items=app(DraftStateSnapshot::class)->preview()['descriptions'];return "Diese Änderungen gehen verloren:\n• ".implode("\n• ",$items)."\n\nDie Website selbst wird nicht verändert.";}catch(\Throwable $e){return $e->getMessage();}})->action(fn()=> $this->discard()),
