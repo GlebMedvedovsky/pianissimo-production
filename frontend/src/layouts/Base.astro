@@ -44,6 +44,12 @@ const draftPreview = Astro.locals.draftPreview;
     <meta property="og:description" content={description} />
     <title>{title ? `${title} — Pianissimo Production` : 'Pianissimo Production — Sebastian Greim'}</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style is:inline>
+      .js .scene-logo .logo-label { opacity: 0; visibility: hidden }
+      @media (prefers-reduced-motion: reduce) {
+        .js .scene-logo .logo-label { opacity: 1; visibility: visible }
+      }
+    </style>
     <script is:inline>window.addEventListener('popstate', function(e) { const id = e.state?.ppModal; const modal = document.querySelector('#project-dialog'); if (modal?.open || (typeof id === 'string' && /^[a-z0-9-]+$/.test(id) && document.querySelector('template[data-project-template="' + id + '"]'))) { e.stopImmediatePropagation(); window.dispatchEvent(new CustomEvent('pianissimo:modal-pop', { detail: e.state })); } }, true);</script>
     <ClientRouter fallback="swap" />
     <script is:inline>document.documentElement.classList.add('js'); if (location.hash === '#about') { const r = document.documentElement; const m = r.dataset.aboutMode; const t = m === 'follow-section' ? (history.state?.aboutContext === 'directing' ? 'light' : r.dataset.aboutDefault) : m; r.dataset.theme = t || 'dark'; r.dataset.aboutTheme = t || 'dark' }</script>

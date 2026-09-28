@@ -29,7 +29,7 @@ export function initScene(){
   if(!context.conditions?.motion)return;
   const select=gsap.utils.selector(scene);
   const revealStart=1.15;
-  const logoTextRevealStart=.65;
+  const logoTextRevealStart=.38;
   const logoTextRevealDuration=.25;
   const depthBlur=matchMedia('(max-width:600px)').matches?5:7;
   const reveal={progress:0};

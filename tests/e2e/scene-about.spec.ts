@@ -247,10 +247,10 @@ test("split-logo text reveals only after the split photos dominate and reverses 
   await expect(page.locator('.scene-logo .logo-left')).toBeVisible();
   expect(await opacity()).toEqual([0, 0]);
   await capture('earliest');
-  await setTimelineTime(.50);await page.waitForTimeout(120);
+  await setTimelineTime(.36);await page.waitForTimeout(120);
   expect(await opacity()).toEqual([0, 0]);
   await capture('mid');
-  await setTimelineTime(.70);await page.waitForTimeout(120);
+  await setTimelineTime(.50);await page.waitForTimeout(120);
   const emerging = await opacity();
   emerging.forEach(value => { expect(value).toBeGreaterThan(.2);expect(value).toBeLessThan(.9); });
   const backdrops = await page.evaluate(() => ({
@@ -260,10 +260,10 @@ test("split-logo text reveals only after the split photos dominate and reverses 
   expect(backdrops.split).toBeGreaterThan(.8);
   expect(backdrops.split).toBeGreaterThan(backdrops.hero);
   await capture('emerging');
-  await setTimelineTime(.92);await page.waitForTimeout(120);
+  await setTimelineTime(.70);await page.waitForTimeout(120);
   (await opacity()).forEach(value => expect(value).toBeGreaterThan(.97));
   await capture('full');
-  await setTimelineTime(.50);await page.waitForTimeout(120);
+  await setTimelineTime(.36);await page.waitForTimeout(120);
   (await opacity()).forEach(value => expect(value).toBeLessThan(.05));
 });
 
