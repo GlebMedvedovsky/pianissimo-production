@@ -261,9 +261,11 @@ document.addEventListener(
   "click",
   (event) => {
     const el = event.target as Element;
+    const draftPreview = document.documentElement.hasAttribute("data-draft-preview");
     const brand = el.closest<HTMLAnchorElement>("[data-brand-home]");
     if (
       brand &&
+      !draftPreview &&
       event.button === 0 &&
       !event.metaKey &&
       !event.ctrlKey &&
@@ -280,7 +282,7 @@ document.addEventListener(
       return;
     }
     const about = el.closest<HTMLAnchorElement>("[data-about]");
-    if (about) {
+    if (about && !draftPreview) {
       event.preventDefault();
       event.stopImmediatePropagation();
       const section = currentSection();

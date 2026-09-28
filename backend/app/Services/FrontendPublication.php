@@ -243,6 +243,7 @@ class FrontendPublication
     private function promoteSnapshot(array $candidate,array $plan): void
     {
         if(isset($candidate['receipt']['snapshotSha256']))app(DraftStateSnapshot::class)->promote($candidate['dir'].'/cms-draft-snapshot.json',$candidate['receipt']['snapshotSha256'],$plan['resultingManifestHash']);
+        app(DraftPreviewService::class)->invalidateAll();
     }
     public function rollbackReview(int $userId): array
     {

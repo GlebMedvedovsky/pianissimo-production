@@ -5,7 +5,7 @@ use App\Filament\Pages\Publication as PublicationPage;
 use App\Models\{AuditEvent,DraftPreview,MediaAsset,Publication,Setting,User};
 use App\Services\{ContentValidator,DraftPreviewService,DraftStateSnapshot,FrontendPublication,ManifestExporter,ManifestImporter,MediaStorage};
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\{File,Storage};
+use Illuminate\Support\Facades\{File,Http,Storage};
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -138,16 +138,49 @@ class DraftPreviewOwnerFlowTest extends TestCase
         auth()->logout();$this->get(route('draft-preview.open'))->assertRedirect();
         $this->actingAs($this->admin);$response=$this->get(route('draft-preview.open'));
         $response->assertRedirect();
-        $this->assertStringNotContainsString('token=',(string)$response->headers->get('Location'));
-        $this->assertStringContainsString('/draft-preview/site',(string)$response->headers->get('Location'));
+        $location=(string)$response->headers->get('Location');$this->assertStringNotContainsString('token=',$location);
+        $this->assertStringContainsString('/draft-preview/site',$location);parse_str((string)parse_url($location,PHP_URL_QUERY),$query);
+        $this->assertMatchesRegularExpression('/^\d+$/',(string)($query['preview']??''));
     }
 
     public function test_new_saved_draft_invalidates_old_snapshot_and_new_preview_contains_new_value(): void
     {
         $about=Setting::read('about');Setting::put('about',[...$about,'biography'=>['Draft A']]);$a=app(DraftPreviewService::class)->create($this->admin->id);
         Setting::put('about',[...$about,'biography'=>['Draft B']]);
+        $this->assertNotNull($a['preview']->fresh()->invalidated_at,'Saving Draft B must invalidate Preview A immediately.');
         try{app(DraftPreviewService::class)->resolve($a['token']);$this->fail('Draft A token must become stale.');}catch(\DomainException $e){$this->assertStringContainsString('geändert',$e->getMessage());}
         $b=app(DraftPreviewService::class)->create($this->admin->id);$this->assertSame(['Draft B'],app(DraftPreviewService::class)->manifest($b['preview'])['site']['biography']);
+    }
+
+    public function test_preview_status_binds_each_tab_to_its_snapshot_and_revalidates_saved_draft(): void
+    {
+        $about=Setting::read('about');Setting::put('about',[...$about,'biography'=>['Draft A']]);$a=app(DraftPreviewService::class)->create($this->admin->id);
+        $status=$this->withSession(['draft_preview_token'=>$a['token']])->get(route('draft-preview.status',['preview'=>$a['preview']->id]))->assertNoContent();
+        $this->assertStringContainsString('no-store',(string)$status->headers->get('Cache-Control'));
+
+        $b=app(DraftPreviewService::class)->create($this->admin->id);
+        $this->withSession(['draft_preview_token'=>$b['token']])->get(route('draft-preview.status',['preview'=>$a['preview']->id]))->assertForbidden();
+        $this->withSession(['draft_preview_token'=>$b['token']])->get(route('draft-preview.status',['preview'=>$b['preview']->id]))->assertNoContent();
+
+        Setting::put('about',[...$about,'biography'=>['Draft B']]);
+        $this->assertNotNull($b['preview']->fresh()->invalidated_at);
+        $this->withSession(['draft_preview_token'=>$b['token']])->get(route('draft-preview.status',['preview'=>$b['preview']->id]))->assertForbidden();
+    }
+
+    public function test_preview_font_proxy_is_authenticated_and_strictly_allowlisted(): void
+    {
+        auth()->logout();
+        $fontPath='C:/workspace/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2';
+        $this->get('/@fs/'.$fontPath)->assertRedirect();
+
+        $this->actingAs($this->admin);
+        Http::fake([
+            rtrim(config('cms.preview_frontend_internal_url'),'/').'/@fs/'.$fontPath=>Http::response('font-bytes',200,['Content-Type'=>'font/woff2']),
+        ]);
+        $response=$this->get('/@fs/'.$fontPath)->assertOk()->assertHeader('Content-Type','font/woff2');
+        $this->assertStringContainsString('no-store',(string)$response->headers->get('Cache-Control'));
+        $this->get('/@fs/C:/workspace/private/secret.woff2')->assertNotFound();
+        $this->get('/@fs/C:/workspace/node_modules/@fontsource/inter/files/../../package.json')->assertNotFound();
     }
 
     public function test_one_owner_review_action_prepares_candidate_review_and_blocks_stale_apply(): void

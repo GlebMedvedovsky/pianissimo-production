@@ -29,19 +29,24 @@ export function openProject(id: string, trigger?: HTMLElement) {
   if (activeId === id) return true;
   const project = content.projects.find((p) => p.id === id);
   if (!project) return false;
+  const projectPath = `/projects/${project.slug}/`;
+  if (document.documentElement.hasAttribute("data-draft-preview")) {
+    const previewId = new URL(location.href).searchParams.get("preview");
+    if (!previewId || !/^\d+$/.test(previewId)) return false;
+    location.assign(
+      `/draft-preview/site?preview=${encodeURIComponent(previewId)}&route=${encodeURIComponent(projectPath)}`,
+    );
+    return true;
+  }
   originFocus = trigger || (document.activeElement as HTMLElement);
   originFocus?.focus({ preventScroll: true });
   originScroll = scrollY;
   baseUrl = location.pathname + location.search + location.hash;
   if (!show(id)) return false;
-  const projectPath = `/projects/${project.slug}/`;
-  const url = document.documentElement.hasAttribute("data-draft-preview")
-    ? `/draft-preview/site?route=${encodeURIComponent(projectPath)}`
-    : projectPath;
   history.pushState(
     { ...history.state, ppModal: id, ppBase: baseUrl, ppScroll: originScroll },
     "",
-    url,
+    projectPath,
   );
   return true;
 }

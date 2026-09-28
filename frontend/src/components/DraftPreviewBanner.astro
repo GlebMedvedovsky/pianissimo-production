@@ -8,6 +8,8 @@ const { cmsUrl } = Astro.props;
 <script is:inline>
 (() => {
   const previewPath = '/draft-preview/site';
+  const previewId = new URL(location.href).searchParams.get('preview');
+  if (!previewId || !/^\d+$/.test(previewId)) return;
   const rewrite = () => document.querySelectorAll('a[href]').forEach(anchor => {
     if (anchor.hasAttribute('data-preview-skip') || anchor.hasAttribute('data-preview-original-href')) return;
     let url;
@@ -18,10 +20,25 @@ const { cmsUrl } = Astro.props;
     }
     if (url.origin !== location.origin || url.pathname === previewPath || url.pathname.startsWith('/media/')) return;
     anchor.dataset.previewOriginalHref = anchor.getAttribute('href');
-    anchor.setAttribute('href', previewPath + '?route=' + encodeURIComponent(url.pathname + url.search) + url.hash)
+    anchor.setAttribute('href', previewPath + '?preview=' + encodeURIComponent(previewId) + '&route=' + encodeURIComponent(url.pathname + url.search) + url.hash);
+    anchor.setAttribute('data-astro-reload', '')
   });
+  let checking = false;
+  const revalidate = async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      const response = await fetch('/draft-preview/status?preview=' + encodeURIComponent(previewId), { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) location.replace(location.href)
+    } catch {} finally {
+      checking = false
+    }
+  };
   rewrite();
-  document.addEventListener('astro:page-load', rewrite)
+  document.addEventListener('astro:page-load', rewrite);
+  addEventListener('focus', revalidate);
+  addEventListener('pageshow', revalidate);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void revalidate() })
 })();
 </script>
 <style>

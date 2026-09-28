@@ -11,7 +11,7 @@ class DraftPreviewService
     {
         $preview=DraftPreview::where('user_id',$userId)->whereNull('invalidated_at')->where('expires_at','>',now())->latest('id')->first();
         if(!$preview)return false;
-        try{$current=ManifestImporter::hash(app(ManifestExporter::class)->package(ContentValidator::POLICY_DRAFT_PREVIEW));}
+        try{$current=$this->currentDraftHash();}
         catch(\Throwable){return false;}
         return hash_equals($preview->draft_hash,$current);
     }
@@ -55,12 +55,17 @@ class DraftPreviewService
     {
         if(!preg_match('/^[a-f0-9]{64}$/',$token))throw new DomainException('Ungültige Vorschau-Berechtigung.');
         $preview=DraftPreview::where('token_hash',hash('sha256',$token))->first();
-        if(!$preview||$preview->invalidated_at)throw new DomainException('Diese Website-Vorschau ist nicht mehr gültig.');
+        if(!$preview)throw new DomainException('Diese Website-Vorschau ist nicht mehr gültig.');
+        if($preview->invalidated_at){
+            try{$draftChanged=!hash_equals($preview->draft_hash,$this->currentDraftHash());}catch(\Throwable){$draftChanged=false;}
+            if($draftChanged)throw new DomainException('Der gespeicherte Entwurf wurde geändert. Bitte öffnen Sie eine neue Website-Vorschau.');
+            throw new DomainException('Diese Website-Vorschau ist nicht mehr gültig.');
+        }
         if($preview->expires_at->isPast()){
             $this->invalidate($preview);
             throw new DomainException('Diese Website-Vorschau ist abgelaufen.');
         }
-        try{$current=ManifestImporter::hash(app(ManifestExporter::class)->package(ContentValidator::POLICY_DRAFT_PREVIEW));}
+        try{$current=$this->currentDraftHash();}
         catch(\Throwable $e){$this->invalidate($preview);throw new DomainException('Der gespeicherte Entwurf kann nicht mehr sicher als Vorschau angezeigt werden.',0,$e);}
         if(!hash_equals($preview->draft_hash,$current)){
             $this->invalidate($preview);
@@ -113,6 +118,11 @@ class DraftPreviewService
         DraftPreview::where('user_id',$userId)->whereNull('invalidated_at')->get()->each(fn($preview)=>$this->invalidate($preview));
     }
 
+    public function invalidateAll(): void
+    {
+        DraftPreview::whereNull('invalidated_at')->get()->each(fn($preview)=>$this->invalidate($preview));
+    }
+
     public function purgeExpired(): void
     {
         DraftPreview::where('expires_at','<=',now())->orWhereNotNull('invalidated_at')->get()->each(function($preview){
@@ -125,6 +135,11 @@ class DraftPreviewService
     {
         if(!$preview->invalidated_at)$preview->forceFill(['invalidated_at'=>now()])->save();
         $this->deleteFiles($preview);
+    }
+
+    private function currentDraftHash(): string
+    {
+        return ManifestImporter::hash(app(ManifestExporter::class)->package(ContentValidator::POLICY_DRAFT_PREVIEW));
     }
 
     private function copyAsset(array $asset,string $targetDirectory): array
