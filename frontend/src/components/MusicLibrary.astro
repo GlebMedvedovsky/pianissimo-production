@@ -1,9 +1,24 @@
 ---
-import {genres,emotions,type Manifest} from '../../../contracts/content';import {content as activeContent} from '../lib/content/data';import {selectTracks} from '../lib/content/selectors';import TrackList from './TrackList.astro';
-interface Props {content?:Manifest}
-const {content=activeContent}=Astro.props;
+import { genres, emotions, type Manifest } from '../../../contracts/content';
+import { content as activeContent } from '../lib/content/data';
+import { selectTracks } from '../lib/content/selectors';
+import TrackList from './TrackList.astro';
+interface Props {
+  content?: Manifest
+}
+const { content = activeContent } = Astro.props;
 ---
-<section class="music-library" id="music-library" aria-labelledby="library-title"><div class="section-title"><div><p class="eyebrow">A WORLD OF SOUND</p><h2 id="library-title">Music <em>library.</em></h2></div><p>Find the feeling.<br/>Explore music from the projects.</p></div>
- <div class="library-filters"><label>Genre<select id="genre-filter"><option value="">All genres</option>{genres.map(x=><option>{x}</option>)}</select></label><label>Emotion<select id="emotion-filter"><option value="">All emotions</option>{emotions.map(x=><option>{x}</option>)}</select></label><button class="text-link" data-reset-tracks>Reset filters ↺</button></div>
- <p class="library-notice">Listen here, or explore the available streaming links. Tracks without a play button are available through their linked platform.</p><TrackList tracks={selectTracks(content)} content={content}/><p class="empty-state library-empty" hidden role="status">No tracks match these filters. Try another combination.</p>
+<section class="music-library" id="music-library" aria-labelledby="library-title">
+  <div class="section-title">
+    <div><p class="eyebrow">A WORLD OF SOUND</p><h2 id="library-title">Music <em>library.</em></h2></div>
+    <p>Find the feeling.<br />Explore music from the projects.</p>
+  </div>
+  <div class="library-filters">
+    <label>Genre<select id="genre-filter"><option value="">All genres</option>{genres.map(x => <option>{x}</option>)}</select></label>
+    <label>Emotion<select id="emotion-filter"><option value="">All emotions</option>{emotions.map(x => <option>{x}</option>)}</select></label>
+    <button class="text-link" data-reset-tracks>Reset filters ↺</button>
+  </div>
+  <p class="library-notice">Listen here, or explore the available streaming links. Tracks without a play button are available through their linked platform.</p>
+  <TrackList tracks={selectTracks(content)} content={content} />
+  <p class="empty-state library-empty" hidden role="status">No tracks match these filters. Try another combination.</p>
 </section>

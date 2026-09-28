@@ -1,6 +1,49 @@
-import {chromium} from '@playwright/test';import {mkdir,writeFile} from 'node:fs/promises';
-await mkdir('.cache/browser-temp',{recursive:true});
-process.env.TEMP=new URL('../.cache/browser-temp',import.meta.url).pathname.replace(/^\/([A-Z]:)/,'$1');
-const browser=await chromium.launch({channel:'msedge',headless:true});const errors=[];const results=[];
-for(const viewport of [{width:1440,height:900},{width:390,height:844}]){const page=await browser.newPage({viewport});page.on('pageerror',e=>errors.push(String(e)));await page.goto('http://127.0.0.1:4322/');await page.getByRole('button',{name:'Necessary only',exact:true}).click();await page.evaluate(()=>scrollTo({top:innerHeight*1.25,behavior:'instant'}));await page.waitForTimeout(700);await page.screenshot({path:`docs/qa/edge-${viewport.width}-menu.png`});await page.getByRole('link',{name:'Explore Directing'}).click();await page.locator('[data-project-card]').first().click();await page.keyboard.press('Escape');await page.locator('header [data-about]').click();await page.waitForTimeout(700);results.push({viewport,url:page.url(),theme:await page.locator('#about').getAttribute('data-theme'),overflow:await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)});await page.screenshot({path:`docs/qa/edge-${viewport.width}-about.png`});await page.close();}
-await writeFile('docs/qa/edge-results.json',JSON.stringify({version:browser.version(),results,errors},null,2));await browser.close();console.log({results,errors});if(errors.length||results.some(r=>r.theme!=='light'||r.overflow))process.exitCode=1;
+import { chromium } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+await mkdir(".cache/browser-temp", { recursive: true });
+process.env.TEMP = new URL(
+  "../.cache/browser-temp",
+  import.meta.url,
+).pathname.replace(/^\/([A-Z]:)/, "$1");
+const browser = await chromium.launch({ channel: "msedge", headless: true });
+const errors = [];
+const results = [];
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  const page = await browser.newPage({ viewport });
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto("http://127.0.0.1:4322/");
+  await page
+    .getByRole("button", { name: "Necessary only", exact: true })
+    .click();
+  await page.evaluate(() =>
+    scrollTo({ top: innerHeight * 1.25, behavior: "instant" }),
+  );
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `docs/qa/edge-${viewport.width}-menu.png` });
+  await page.getByRole("link", { name: "Explore Directing" }).click();
+  await page.locator("[data-project-card]").first().click();
+  await page.keyboard.press("Escape");
+  await page.locator("header [data-about]").click();
+  await page.waitForTimeout(700);
+  results.push({
+    viewport,
+    url: page.url(),
+    theme: await page.locator("#about").getAttribute("data-theme"),
+    overflow: await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth + 1,
+    ),
+  });
+  await page.screenshot({ path: `docs/qa/edge-${viewport.width}-about.png` });
+  await page.close();
+}
+await writeFile(
+  "docs/qa/edge-results.json",
+  JSON.stringify({ version: browser.version(), results, errors }, null, 2),
+);
+await browser.close();
+console.log({ results, errors });
+if (errors.length || results.some((r) => r.theme !== "light" || r.overflow))
+  process.exitCode = 1;

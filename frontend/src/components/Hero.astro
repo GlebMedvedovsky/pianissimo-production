@@ -1,33 +1,47 @@
 ---
-import Logo from './Logo.astro';import MediaSlot from './MediaSlot.astro';import Icon from './Icon.astro';import About from './About.astro';import {content as activeContent} from '../lib/content/data';import type {Manifest} from '../../../contracts/content';
+import Logo from './Logo.astro';
+import MediaSlot from './MediaSlot.astro';
+import Icon from './Icon.astro';
+import About from './About.astro';
+import { content as activeContent } from '../lib/content/data';
+import type { Manifest } from '../../../contracts/content';
 import '../styles/home-backgrounds.css';
-import {logoAperture} from '../lib/navigation/logo-geometry';
-interface Props {content?:Manifest}
-const {content=activeContent}=Astro.props;
-const {composerMenu,directingMenu}=content.site.mediaSlots;
-const sharedMenuImage=!composerMenu.video&&!directingMenu.video&&(composerMenu.poster||composerMenu.image)===(directingMenu.poster||directingMenu.image);
+import { logoAperture } from '../lib/navigation/logo-geometry';
+interface Props {
+  content?: Manifest
+}
+const { content = activeContent } = Astro.props;
+const { composerMenu, directingMenu } = content.site.mediaSlots;
+const sharedMenuImage = !composerMenu.video && !directingMenu.video && (composerMenu.poster || composerMenu.image) === (directingMenu.poster || directingMenu.image);
 ---
 <section class="hero-scene" aria-label="Pianissimo — music and film">
- <div class="scene-sticky">
-  <svg class="scene-aperture" width="0" height="0" aria-hidden="true" focusable="false"><defs><clipPath id="scene-about-aperture" clipPathUnits="userSpaceOnUse"><path d={logoAperture}/></clipPath></defs></svg>
-  <About content={content}/>
-  <div class="scene-visuals">
-  <div class="hero-backdrop"><MediaSlot name="hero" eager content={content}/><div class="image-shade"></div></div>
-  <div class:list={['split-backdrop',{'shared-menu-background':sharedMenuImage}]}>
-   {sharedMenuImage?<>
-    <div class="menu-panorama"><MediaSlot name="composerMenu" content={content}/></div>
-    <div class="menu-portrait" aria-hidden="true"><div class="menu-portrait-half"><MediaSlot name="composerMenu" content={content}/></div><div class="menu-portrait-half"><MediaSlot name="directingMenu" content={content}/></div></div>
-    <div class="image-shade"></div>
-   </>:<><div class="background-half music-half"><MediaSlot name="composerMenu" content={content}/><div class="image-shade"></div></div><div class="background-half directing-half"><MediaSlot name="directingMenu" content={content}/><div class="image-shade"></div></div></>}
+  <div class="scene-sticky">
+    <svg class="scene-aperture" width="0" height="0" aria-hidden="true" focusable="false">
+      <defs><clipPath id="scene-about-aperture" clipPathUnits="userSpaceOnUse"><path d={logoAperture} /></clipPath></defs>
+    </svg>
+    <About content={content} />
+    <div class="scene-visuals">
+      <div class="hero-backdrop"><MediaSlot name="hero" eager content={content} /><div class="image-shade"></div></div>
+      <div class:list={['split-backdrop', { 'shared-menu-background': sharedMenuImage }]}>
+        {sharedMenuImage ? <>
+          <div class="menu-panorama"><MediaSlot name="composerMenu" content={content} /></div>
+          <div class="menu-portrait" aria-hidden="true"><div class="menu-portrait-half"><MediaSlot name="composerMenu" content={content} /></div><div class="menu-portrait-half"><MediaSlot name="directingMenu" content={content} /></div></div>
+          <div class="image-shade"></div>
+        </> : <><div class="background-half music-half"><MediaSlot name="composerMenu" content={content} /><div class="image-shade"></div></div><div class="background-half directing-half"><MediaSlot name="directingMenu" content={content} /><div class="image-shade"></div></div></>}
+      </div>
+      <div class="hero-heading"><p class="eyebrow">SEBASTIAN GREIM</p><h1>PIANISSIMO<span>PRODUCTION</span></h1></div>
+      <div class="scene-logo"><Logo menu /></div>
+      <div class="hero-note"><span>COMPOSER & FILMMAKER</span><span>{content.site.mediaSlots.hero.video ? 'SHOWREEL' : 'A MOMENT IN THE STUDIO'}</span></div>
+      {content.site.mediaSlots.hero.video && <div class="hero-controls">
+        <button data-hero-toggle data-state="play" data-tooltip="Play showreel" aria-label="Play showreel"><span class="hero-control-icon hero-control-icon--play"><Icon name="play" /></span><span class="hero-control-icon hero-control-icon--pause"><Icon name="pause" /></span></button>
+        <button data-showreel-sound data-state="off" data-tooltip="Enable sound" aria-label="Enable sound" aria-pressed="false"><span class="hero-control-icon hero-control-icon--sound"><Icon name="sound" /></span><span class="hero-control-icon hero-control-icon--sound-off"><Icon name="soundOff" /></span></button>
+        <button data-hero-full data-tooltip="View full frame" aria-label="View full frame"><Icon name="expand" /></button>
+        <span data-hero-status role="status"></span>
+      </div>}
+      <a class="scroll-cue" href="#main-menu"><span>Scroll</span><Icon name="down" /></a>
+      <a class="menu-about" href="#about" data-about>THE PERSON BEHIND THE WORK <Icon name="down" /></a>
+    </div>
   </div>
-  <div class="hero-heading"><p class="eyebrow">SEBASTIAN GREIM</p><h1>PIANISSIMO<span>PRODUCTION</span></h1></div>
-  <div class="scene-logo"><Logo menu/></div>
-  <div class="hero-note"><span>COMPOSER & FILMMAKER</span><span>{content.site.mediaSlots.hero.video?'SHOWREEL':'A MOMENT IN THE STUDIO'}</span></div>
-  {content.site.mediaSlots.hero.video&&<div class="hero-controls"><button data-hero-toggle data-state="play" data-tooltip="Play showreel" aria-label="Play showreel"><span class="hero-control-icon hero-control-icon--play"><Icon name="play"/></span><span class="hero-control-icon hero-control-icon--pause"><Icon name="pause"/></span></button><button data-showreel-sound data-state="off" data-tooltip="Enable sound" aria-label="Enable sound" aria-pressed="false"><span class="hero-control-icon hero-control-icon--sound"><Icon name="sound"/></span><span class="hero-control-icon hero-control-icon--sound-off"><Icon name="soundOff"/></span></button><button data-hero-full data-tooltip="View full frame" aria-label="View full frame"><Icon name="expand"/></button><span data-hero-status role="status"></span></div>}
-  <a class="scroll-cue" href="#main-menu"><span>Scroll</span><Icon name="down"/></a>
-  <a class="menu-about" href="#about" data-about>THE PERSON BEHIND THE WORK <Icon name="down"/></a>
-  </div>
- </div>
- <button class="hero-full-close" data-hero-close hidden>Close full frame ✕</button>
- <div id="main-menu" class="menu-anchor" aria-hidden="true"></div>
+  <button class="hero-full-close" data-hero-close hidden>Close full frame ✕</button>
+  <div id="main-menu" class="menu-anchor" aria-hidden="true"></div>
 </section>

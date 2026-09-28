@@ -1,12 +1,130 @@
-import {content} from '../content/client-data';
-let originFocus:HTMLElement|null=null;let originScroll=0;let activeId:string|null=null;let baseUrl='';
-const dialog=()=>document.querySelector<HTMLDialogElement>('#project-dialog')!;
-function parkPlayer(inDialog=false){const player=document.querySelector<HTMLElement>('.player');const target=inDialog?document.querySelector('#project-dialog-player-slot'):document.querySelector('#media-root');if(player&&target)target.append(player);}
-function show(id:string){const template=document.querySelector<HTMLTemplateElement>(`template[data-project-template="${id}"]`);if(!template)return false;const target=document.querySelector('#project-dialog-content')!;target.replaceChildren(template.content.cloneNode(true));activeId=id;parkPlayer(true);dialog().showModal();dialog().querySelector<HTMLButtonElement>('[data-close-project]')!.focus();return true;}
-export function openProject(id:string,trigger?:HTMLElement){if(activeId===id)return true;const project=content.projects.find(p=>p.id===id);if(!project)return false;originFocus=trigger||document.activeElement as HTMLElement;originFocus?.focus({preventScroll:true});originScroll=scrollY;baseUrl=location.pathname+location.search+location.hash;if(!show(id))return false;const projectPath=`/projects/${project.slug}/`;const url=document.documentElement.hasAttribute('data-draft-preview')?`/draft-preview/site?route=${encodeURIComponent(projectPath)}`:projectPath;history.pushState({...history.state,ppModal:id,ppBase:baseUrl,ppScroll:originScroll},'',url);return true;}
-function hide(){parkPlayer();const d=dialog();d.querySelectorAll<HTMLVideoElement>('video').forEach(v=>v.pause());if(d.open)d.close();document.querySelector('#project-dialog-content')?.replaceChildren();activeId=null;window.scrollTo({top:originScroll,behavior:'instant'});if(originFocus?.isConnected)originFocus.focus({preventScroll:true});requestAnimationFrame(()=>{if(!activeId&&originFocus?.isConnected)originFocus.focus({preventScroll:true})});}
-export function closeProject(){if(activeId&&history.state?.ppModal){history.back();}else hide();}
-document.addEventListener('astro:before-preparation',()=>{parkPlayer();});
-export function initProjectModal(){const d=dialog();d.addEventListener('cancel',event=>{event.preventDefault();closeProject()});d.addEventListener('click',event=>{if(event.target===d)closeProject()});if(document.documentElement.dataset.section==='project'&&history.state?.ppModal){const {ppModal,ppBase,ppScroll,...rest}=history.state;history.replaceState(rest,'');}}
-window.addEventListener('pianissimo:modal-pop',event=>{const state=(event as CustomEvent).detail;if(activeId){hide();if(state?.ppModal)show(state.ppModal);return;}if(state?.ppModal&&document.querySelector(`template[data-project-template="${state.ppModal}"]`)){originScroll=state.ppScroll||scrollY;baseUrl=state.ppBase;show(state.ppModal);}});
-document.addEventListener('click',event=>{const target=(event.target as Element).closest<HTMLElement>('[data-project],[data-close-project]');if(!target)return;if(event instanceof MouseEvent&&(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||event.button!==0))return;if(target.hasAttribute('data-close-project')){event.preventDefault();closeProject();return;}if(target.dataset.project&&openProject(target.dataset.project,target)){event.preventDefault();event.stopImmediatePropagation();}},true);
+import { content } from "../content/client-data";
+let originFocus: HTMLElement | null = null;
+let originScroll = 0;
+let activeId: string | null = null;
+let baseUrl = "";
+const dialog = () =>
+  document.querySelector<HTMLDialogElement>("#project-dialog")!;
+function parkPlayer(inDialog = false) {
+  const player = document.querySelector<HTMLElement>(".player");
+  const target = inDialog
+    ? document.querySelector("#project-dialog-player-slot")
+    : document.querySelector("#media-root");
+  if (player && target) target.append(player);
+}
+function show(id: string) {
+  const template = document.querySelector<HTMLTemplateElement>(
+    `template[data-project-template="${id}"]`,
+  );
+  if (!template) return false;
+  const target = document.querySelector("#project-dialog-content")!;
+  target.replaceChildren(template.content.cloneNode(true));
+  activeId = id;
+  parkPlayer(true);
+  dialog().showModal();
+  dialog().querySelector<HTMLButtonElement>("[data-close-project]")!.focus();
+  return true;
+}
+export function openProject(id: string, trigger?: HTMLElement) {
+  if (activeId === id) return true;
+  const project = content.projects.find((p) => p.id === id);
+  if (!project) return false;
+  originFocus = trigger || (document.activeElement as HTMLElement);
+  originFocus?.focus({ preventScroll: true });
+  originScroll = scrollY;
+  baseUrl = location.pathname + location.search + location.hash;
+  if (!show(id)) return false;
+  const projectPath = `/projects/${project.slug}/`;
+  const url = document.documentElement.hasAttribute("data-draft-preview")
+    ? `/draft-preview/site?route=${encodeURIComponent(projectPath)}`
+    : projectPath;
+  history.pushState(
+    { ...history.state, ppModal: id, ppBase: baseUrl, ppScroll: originScroll },
+    "",
+    url,
+  );
+  return true;
+}
+function hide() {
+  parkPlayer();
+  const d = dialog();
+  d.querySelectorAll<HTMLVideoElement>("video").forEach((v) => v.pause());
+  if (d.open) d.close();
+  document.querySelector("#project-dialog-content")?.replaceChildren();
+  activeId = null;
+  window.scrollTo({ top: originScroll, behavior: "instant" });
+  if (originFocus?.isConnected) originFocus.focus({ preventScroll: true });
+  requestAnimationFrame(() => {
+    if (!activeId && originFocus?.isConnected)
+      originFocus.focus({ preventScroll: true });
+  });
+}
+export function closeProject() {
+  if (activeId && history.state?.ppModal) {
+    history.back();
+  } else hide();
+}
+document.addEventListener("astro:before-preparation", () => {
+  parkPlayer();
+});
+export function initProjectModal() {
+  const d = dialog();
+  d.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeProject();
+  });
+  d.addEventListener("click", (event) => {
+    if (event.target === d) closeProject();
+  });
+  if (
+    document.documentElement.dataset.section === "project" &&
+    history.state?.ppModal
+  ) {
+    const { ppModal, ppBase, ppScroll, ...rest } = history.state;
+    history.replaceState(rest, "");
+  }
+}
+window.addEventListener("pianissimo:modal-pop", (event) => {
+  const state = (event as CustomEvent).detail;
+  if (activeId) {
+    hide();
+    if (state?.ppModal) show(state.ppModal);
+    return;
+  }
+  if (
+    state?.ppModal &&
+    document.querySelector(`template[data-project-template="${state.ppModal}"]`)
+  ) {
+    originScroll = state.ppScroll || scrollY;
+    baseUrl = state.ppBase;
+    show(state.ppModal);
+  }
+});
+document.addEventListener(
+  "click",
+  (event) => {
+    const target = (event.target as Element).closest<HTMLElement>(
+      "[data-project],[data-close-project]",
+    );
+    if (!target) return;
+    if (
+      event instanceof MouseEvent &&
+      (event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.altKey ||
+        event.button !== 0)
+    )
+      return;
+    if (target.hasAttribute("data-close-project")) {
+      event.preventDefault();
+      closeProject();
+      return;
+    }
+    if (target.dataset.project && openProject(target.dataset.project, target)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true,
+);
