@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Auth\{RequestPasswordReset, ResetPassword};
 use App\Filament\Pages;
 use App\Filament\Resources\Pages\{CreateUser, EditUser, ListUsers};
-use App\Models\{Publication, Setting, User};
+use App\Models\{MediaAsset, Publication, Setting, User};
 use App\Services\ManifestExporter;
 use Filament\Actions\DeleteAction;
 use Filament\Auth\Notifications\ResetPassword as ResetNotification;
@@ -197,7 +197,7 @@ class CmsAuthUiTest extends TestCase
             'Directing' => [Pages\Directing::class, 'directing', ['label' => 'Directing QA']],
             'Site-Einstellungen' => [Pages\Site::class, 'site', ['title' => 'CMS QA']],
             'Kontakt' => [Pages\Contact::class, 'contact', ['email' => 'public@example.test']],
-            'Social Links' => [Pages\Social::class, 'social', ['artistLinks' => ['spotify' => null, 'tidal' => null, 'deezer' => null, 'appleMusic' => null]]],
+            'Social Links' => [Pages\Social::class, 'social', ['links' => [['provider' => 'spotify', 'label' => 'Spotify QA', 'url' => 'https://open.spotify.com/artist/test', 'visible' => true, 'sort_order' => 0]]]],
             'SEO' => [Pages\Seo::class, 'seo', ['titleTemplate' => '%s QA', 'robots' => 'noindex, nofollow']],
             'Website-Farben' => [Pages\Appearance::class, 'appearance', ['dark' => '#111111', 'light' => '#ffffff', 'accent' => '#aa6633']],
             'About' => [Pages\About::class, 'about', ['title' => 'About QA', 'theme' => 'follow-section']],
@@ -214,7 +214,21 @@ class CmsAuthUiTest extends TestCase
     {
         $this->actingAs($this->user());
         $this->mock(ManifestExporter::class)->shouldNotReceive('export', 'package');
-        Setting::put($key, ['unmodeledKey' => 'preserve me']);
+        $initial = ['unmodeledKey' => 'preserve me'];
+        if (in_array($key, ['home', 'music', 'directing', 'about'], true)) {
+            $asset = MediaAsset::create([
+                'id' => 'settings-page-image',
+                'path' => 'media/settings-page-image.jpg',
+                'type' => 'image',
+                'purpose' => 'other',
+                'alt' => 'Synthetic settings-page image',
+                'state' => 'approved',
+                'rights_scope' => 'next_draft',
+                'crop' => ['x' => 50, 'y' => 50],
+            ]);
+            $initial['media'] = ['mode' => 'image', 'image' => $asset->id, 'video' => null, 'poster' => null];
+        }
+        Setting::put($key, $initial);
         $response = $this->get($page::getUrl())->assertOk();
         $dom = new \DOMDocument();
         @$dom->loadHTML($response->getContent());

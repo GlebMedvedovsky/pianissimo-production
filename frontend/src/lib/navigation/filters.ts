@@ -1,5 +1,95 @@
-const filters=new Map<string,string>();const library={genre:'',emotion:''};
-export function initFilters(signal:AbortSignal){const portfolio=document.querySelector<HTMLElement>('[data-portfolio]');if(portfolio){const section=portfolio.dataset.portfolio!;const apply=(filter:string)=>{filters.set(section,filter);let count=0;portfolio.querySelectorAll<HTMLElement>('[data-project-card]').forEach(card=>{const show=filter==='All'||(section==='music'?card.dataset.categories?.split('|').includes(filter):card.dataset.role===filter);card.hidden=!show;if(show)count++;});portfolio.querySelectorAll('[data-project-filter]').forEach(button=>button.setAttribute('aria-pressed',String((button as HTMLElement).dataset.projectFilter===filter)));portfolio.querySelector<HTMLElement>('.portfolio-empty')!.hidden=count>0;portfolio.querySelector('.project-count')!.textContent=`${count} project${count===1?'':'s'}`;};apply(filters.get(section)||portfolio.dataset.defaultFilter!);portfolio.addEventListener('click',event=>{const button=(event.target as Element).closest<HTMLElement>('[data-project-filter]');if(button)apply(button.dataset.projectFilter!)},{signal});}
- const genre=document.querySelector<HTMLSelectElement>('#genre-filter'),emotion=document.querySelector<HTMLSelectElement>('#emotion-filter');if(genre&&emotion){genre.value=library.genre;emotion.value=library.emotion;const apply=()=>{library.genre=genre.value;library.emotion=emotion.value;let count=0;document.querySelectorAll<HTMLElement>('.music-library [data-track-row]').forEach(row=>{row.hidden=!!((genre.value&&!row.dataset.genres?.split('|').includes(genre.value))||(emotion.value&&!row.dataset.emotions?.split('|').includes(emotion.value)));if(!row.hidden)count++;});document.querySelector<HTMLElement>('.library-empty')!.hidden=count>0;};genre.addEventListener('change',apply,{signal});emotion.addEventListener('change',apply,{signal});document.querySelector('[data-reset-tracks]')?.addEventListener('click',()=>{genre.value='';emotion.value='';apply()},{signal});apply();}
- const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('revealed');observer.unobserve(entry.target);}}),{threshold:.05});document.querySelectorAll('[data-project-card]').forEach(el=>observer.observe(el));signal.addEventListener('abort',()=>observer.disconnect(),{once:true});
+const filters = new Map<string, string>();
+const library = { genre: "", emotion: "" };
+export function initFilters(signal: AbortSignal) {
+  const portfolio = document.querySelector<HTMLElement>("[data-portfolio]");
+  if (portfolio) {
+    const section = portfolio.dataset.portfolio!;
+    const apply = (filter: string) => {
+      filters.set(section, filter);
+      let count = 0;
+      portfolio
+        .querySelectorAll<HTMLElement>("[data-project-card]")
+        .forEach((card) => {
+          const show =
+            filter === "All" ||
+            (section === "music"
+              ? card.dataset.categories?.split("|").includes(filter)
+              : card.dataset.role === filter);
+          card.hidden = !show;
+          if (show) count++;
+        });
+      portfolio
+        .querySelectorAll("[data-project-filter]")
+        .forEach((button) =>
+          button.setAttribute(
+            "aria-pressed",
+            String((button as HTMLElement).dataset.projectFilter === filter),
+          ),
+        );
+      portfolio.querySelector<HTMLElement>(".portfolio-empty")!.hidden =
+        count > 0;
+      portfolio.querySelector(".project-count")!.textContent =
+        `${count} project${count === 1 ? "" : "s"}`;
+    };
+    apply(filters.get(section) || portfolio.dataset.defaultFilter!);
+    portfolio.addEventListener(
+      "click",
+      (event) => {
+        const button = (event.target as Element).closest<HTMLElement>(
+          "[data-project-filter]",
+        );
+        if (button) apply(button.dataset.projectFilter!);
+      },
+      { signal },
+    );
+  }
+  const genre = document.querySelector<HTMLSelectElement>("#genre-filter"),
+    emotion = document.querySelector<HTMLSelectElement>("#emotion-filter");
+  if (genre && emotion) {
+    genre.value = library.genre;
+    emotion.value = library.emotion;
+    const apply = () => {
+      library.genre = genre.value;
+      library.emotion = emotion.value;
+      let count = 0;
+      document
+        .querySelectorAll<HTMLElement>(".music-library [data-track-row]")
+        .forEach((row) => {
+          row.hidden = !!(
+            (genre.value &&
+              !row.dataset.genres?.split("|").includes(genre.value)) ||
+            (emotion.value &&
+              !row.dataset.emotions?.split("|").includes(emotion.value))
+          );
+          if (!row.hidden) count++;
+        });
+      document.querySelector<HTMLElement>(".library-empty")!.hidden = count > 0;
+    };
+    genre.addEventListener("change", apply, { signal });
+    emotion.addEventListener("change", apply, { signal });
+    document.querySelector("[data-reset-tracks]")?.addEventListener(
+      "click",
+      () => {
+        genre.value = "";
+        emotion.value = "";
+        apply();
+      },
+      { signal },
+    );
+    apply();
+  }
+  const observer = new IntersectionObserver(
+    (entries) =>
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("revealed");
+          observer.unobserve(entry.target);
+        }
+      }),
+    { threshold: 0.05 },
+  );
+  document
+    .querySelectorAll("[data-project-card]")
+    .forEach((el) => observer.observe(el));
+  signal.addEventListener("abort", () => observer.disconnect(), { once: true });
 }

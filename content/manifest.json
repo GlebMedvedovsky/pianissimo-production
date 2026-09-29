@@ -6048,7 +6048,19 @@
     },
     "artistLinks": {
       "tidal": "https://tidal.com/artist/17793204/u",
-      "appleMusic": "https://music.apple.com/de/artist/sebastian-greim/1508687074"
+      "appleMusic": "https://music.apple.com/de/artist/sebastian-greim/1508687074",
+      "spotify": "https://open.spotify.com/intl-de/artist/1KsDRqYN2Y2Cvf2lVBt5Em"
+    },
+    "profileLinks": {
+      "imdb": "https://www.imdb.com/de/name/nm10952014/",
+      "crewUnited": "https://www.crew-united.com/de/Sebastian-Greim_711574.html",
+      "musicHub": "https://music-hub.bio/sebastiangreim"
+    },
+    "collective": {
+      "name": "Samples unterm Sofa",
+      "url": "https://samples-unterm-sofa.de/",
+      "logoAssetId": null,
+      "membershipText": "Proud member of Samples unterm Sofa – Filmmusic Collective"
     }
   }
 }

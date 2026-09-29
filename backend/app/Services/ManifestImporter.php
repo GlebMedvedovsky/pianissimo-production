@@ -81,22 +81,29 @@ class ManifestImporter
             ]);
             $settings=[
                 'site'=>['title'=>$site['title'],'description'=>$site['description'],'productionDomain'=>$site['productionDomain'],'language'=>$site['language']],
-                'home'=>['media'=>$site['mediaSlots']['hero'],'loop'=>true,'autoplayMuted'=>true],
-                'music'=>['media'=>$site['mediaSlots']['composerMenu'],'label'=>'Film Music'],
-                'directing'=>['media'=>$site['mediaSlots']['directingMenu'],'label'=>'Directing'],
-                'about'=>['title'=>'About','biography'=>$site['biography'],'media'=>$site['mediaSlots']['about'],'visible'=>true,'theme'=>'follow-section','getInTouch'=>'Get in touch'],
+                'home'=>['media'=>MediaSlotPolicy::hydrate('home',['media'=>$site['mediaSlots']['hero']])['media'],'loop'=>true,'autoplayMuted'=>true],
+                'music'=>['media'=>MediaSlotPolicy::hydrate('music',['media'=>$site['mediaSlots']['composerMenu']])['media'],'label'=>'Film Music'],
+                'directing'=>['media'=>MediaSlotPolicy::hydrate('directing',['media'=>$site['mediaSlots']['directingMenu']])['media'],'label'=>'Directing'],
+                'about'=>['title'=>'About','biography'=>$site['biography'],'media'=>MediaSlotPolicy::hydrate('about',['media'=>$site['mediaSlots']['about']])['media'],'visible'=>true,'theme'=>'follow-section','getInTouch'=>'Get in touch','collective'=>$site['collective']??[]],
                 'contact'=>[...$site['contacts'],'recipient'=>null,'footer'=>'','legalIdentity'=>''],
-                'social'=>['artistLinks'=>$site['artistLinks']??[]],
+                'social'=>['artistLinks'=>$site['artistLinks']??[],'profileLinks'=>$site['profileLinks']??[],'links'=>$site['socialLinks']??$this->legacySocialLinks($site)],
                 'impressum'=>['text'=>$site['legal']['notice'],'status'=>$site['legal']['approved']?'published':'draft'],
                 'privacy'=>['text'=>$site['legal']['privacy'],'status'=>$site['legal']['approved']?'published':'draft'],
-                'consent'=>['essential'=>true,'externalMedia'=>true,'analytics'=>false,'marketing'=>false,'bannerText'=>'','privacyLink'=>'/privacy/','status'=>'draft'],
+                'consent'=>['essential'=>true,'externalMedia'=>$site['consent']['externalMedia']??true,'analytics'=>$site['consent']['analytics']??false,'marketing'=>$site['consent']['marketing']??false,'bannerText'=>$site['consent']['bannerText']??'','privacyLink'=>$site['consent']['privacyLink']??'/privacy/','version'=>$site['consent']['version']??1,'status'=>'draft'],
                 'licenses'=>['text'=>'','status'=>'draft'],
                 'seo'=>['titleTemplate'=>'%s · Pianissimo Production','description'=>$site['description'],'canonicalBase'=>null,'ogAssetId'=>null,'robots'=>'noindex, nofollow','sitemap'=>false,'index'=>false],
-                'analytics'=>['enabled'=>false,'provider'=>'none','measurementId'=>null],
+                'analytics'=>['enabled'=>$site['analytics']['enabled']??false,'provider'=>$site['analytics']['provider']??'none','measurementId'=>$site['analytics']['measurementId']??null,'siteDomain'=>$site['analytics']['siteDomain']??null],
                 'appearance'=>['dark'=>'#141414','light'=>'#F3F0EA','accent'=>'#A66A3F'],
             ];
             foreach ($settings as $key=>$data) $put(Setting::class,$key,['data'=>$data]);
             return $report;
         });
+    }
+    private function legacySocialLinks(array $site): array
+    {
+        $labels=['imdb'=>'IMDb','crewUnited'=>'Crew United','musicHub'=>'Music Hub','spotify'=>'Spotify','tidal'=>'Tidal','appleMusic'=>'Apple Music','deezer'=>'Deezer'];
+        $providers=['crewUnited'=>'crew-united','musicHub'=>'music-hub','appleMusic'=>'apple-music']; $links=[]; $order=0;
+        foreach (['profileLinks','artistLinks'] as $group) foreach (($site[$group]??[]) as $provider=>$url) if ($url) $links[]=['provider'=>$providers[$provider]??$provider,'label'=>$labels[$provider]??$provider,'url'=>$url,'visible'=>true,'sort_order'=>$order++];
+        return $links;
     }
 }

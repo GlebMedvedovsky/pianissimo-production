@@ -408,10 +408,6 @@ p {
     transform: translate(-50%, -50%) scale(.14)
 }
 
-.js .logo-label {
-    opacity: 0
-}
-
 .hero-heading {
     position: absolute;
     top: 57%;
@@ -686,6 +682,22 @@ p {
     display: flex;
     gap: 15px;
     border-radius: 18px 0 0 18px
+}
+
+.social-rail .profile-link {
+    width: auto;
+    min-width: 33px;
+    padding: 0 5px;
+    font-size: 8px;
+    letter-spacing: .04em
+}
+
+.section-switch-shape {
+    display: none
+}
+
+.section-switch-copy {
+    display: contents
 }
 
 .section-switch span {
@@ -1153,6 +1165,7 @@ html:has(dialog[open]) {
 
 .platform-links {
     display: flex;
+    flex-wrap: wrap;
     gap: 15px;
     margin-top: 15px;
     font-size: 11px
@@ -1278,9 +1291,41 @@ form .form-status {
 }
 
 .consent-actions {
-    display: grid;
-    gap: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     margin: 25px 0
+}
+
+.consent-preferences {
+    display: grid;
+    gap: 10px;
+    margin-top: 22px
+}
+
+.consent-preferences label {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: start;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--border)
+}
+
+.consent-preferences input {
+    margin-top: 3px
+}
+
+.consent-preferences span,
+.consent-preferences small {
+    display: block
+}
+
+.consent-preferences small {
+    margin-top: 4px;
+    color: var(--muted);
+    line-height: 1.45
 }
 
 .small-dialog>a {
@@ -1289,35 +1334,61 @@ form .form-status {
 
 .cookie-notice {
     position: fixed;
-    bottom: 20px;
-    left: 24px;
-    z-index: 40;
-    max-width: calc(100vw - 48px);
-    display: flex;
-    align-items: center;
-    gap: 20px;
+    right: 24px;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    z-index: 60;
+    width: min(540px, calc(100vw - 48px));
+    display: grid;
+    gap: 14px;
     background: var(--background);
     color: var(--text);
     border: 1px solid var(--border);
-    padding: 17px 20px
+    padding: 18px 20px;
+    box-shadow: 0 14px 45px rgba(0,0,0,.18)
+}
+
+.player[hidden]~* .cookie-notice,
+body:has(.player[hidden]) .cookie-notice {
+    bottom: calc(20px + env(safe-area-inset-bottom))
+}
+
+.cookie-notice strong {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 500
 }
 
 .cookie-notice p {
     font-size: 11px;
     color: var(--text);
     line-height: 1.6;
-    margin: 0
+    margin: 5px 0 0
 }
 
-.cookie-notice p>span {
-    color: var(--muted);
-    font-size: 10px
+.cookie-notice-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px
 }
 
-.cookie-notice button {
+.cookie-notice button,
+.cookie-notice a {
     font-size: 10px;
     padding: 9px;
     border-bottom: 1px solid var(--border)
+}
+
+@media (max-width: 600px) {
+    .cookie-notice { right: 12px; bottom: calc(112px + env(safe-area-inset-bottom)); width: calc(100vw - 24px); padding: 15px }
+    body:has(.player[hidden]) .cookie-notice { bottom: calc(12px + env(safe-area-inset-bottom)) }
+    .cookie-notice-actions { display: grid; grid-template-columns: 1fr 1fr }
+    .cookie-notice button,.cookie-notice a { text-align: center }
+    .consent-actions { display: grid }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cookie-notice,.consent-dialog { scroll-behavior: auto }
 }
 
 .direct-project {
@@ -1340,26 +1411,6 @@ form .form-status {
     max-width: 700px;
     font-size: 15px;
     line-height: 2
-}
-
-.navigation-loader {
-    position: fixed;
-    right: 25px;
-    top: 22px;
-    width: 30px;
-    z-index: 100;
-    display: none
-}
-
-.is-loading .navigation-loader {
-    display: block;
-    animation: breathe .8s ease-in-out infinite alternate
-}
-
-@keyframes breathe {
-    to {
-        opacity: .3
-    }
 }
 
 .player {
@@ -1510,8 +1561,60 @@ form .form-status {
     animation: slide-out var(--transition-duration) ease both
 }
 
+.collective-membership {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    line-height: 1.5
+}
+
+.collective-membership img {
+    width: auto;
+    max-width: 72px;
+    height: 28px;
+    object-fit: contain
+}
+
 ::view-transition-new(root) {
     animation: slide-in var(--transition-duration) ease both
+}
+
+::view-transition-group(portfolio-header),
+::view-transition-group(portfolio-social),
+::view-transition-group(portfolio-player) {
+    animation: none
+}
+
+::view-transition-group(portfolio-header) {
+    z-index: 20
+}
+
+::view-transition-group(portfolio-social) {
+    z-index: 30
+}
+
+::view-transition-group(portfolio-player) {
+    z-index: 50
+}
+
+::view-transition-old(portfolio-header),
+::view-transition-old(portfolio-social),
+::view-transition-old(portfolio-player) {
+    animation: none;
+    opacity: 0;
+    mix-blend-mode: normal
+}
+
+::view-transition-new(portfolio-header),
+::view-transition-new(portfolio-social),
+::view-transition-new(portfolio-player) {
+    animation: none;
+    opacity: 1;
+    mix-blend-mode: normal
 }
 
 html[data-direction=left] {
@@ -1632,6 +1735,12 @@ html[data-direction=right] {
         border: 1px solid var(--border);
         padding: 3px;
         z-index: 25
+    }
+
+    .social-rail>*,
+    .social-rail .profile-link {
+        min-width: 40px;
+        height: 40px
     }
 
     .portfolio,
@@ -1788,6 +1897,29 @@ html[data-direction=right] {
     .site-header nav a,
     .site-header nav button {
         padding: 2px 0 7px
+    }
+
+    html[data-section=music],
+    html[data-section=directing] {
+        scroll-padding-top: calc(var(--portfolio-header-height, 110px) + 12px)
+    }
+
+    .site-header--portfolio {
+        position: fixed;
+        top: 0;
+        height: auto;
+        min-height: 0;
+        padding: calc(17px + env(safe-area-inset-top)) 24px 13px;
+        gap: 8px;
+        background: var(--background)
+    }
+
+    .site-header--portfolio+#content {
+        padding-top: var(--portfolio-header-height, 110px)
+    }
+
+    .site-header--portfolio+#content .portfolio {
+        padding-top: 43px
     }
 
     .hero-scene,
@@ -2249,6 +2381,37 @@ html[data-direction=right] {
 
     .site-header {
         height: 80px
+    }
+
+    html[data-section=music],
+    html[data-section=directing] {
+        scroll-padding-top: calc(var(--portfolio-header-height, 88px) + 12px)
+    }
+
+    .site-header--portfolio {
+        position: fixed;
+        top: 0;
+        height: auto;
+        min-height: 0;
+        padding: calc(8px + env(safe-area-inset-top)) var(--page-gutter) 8px;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 4px;
+        background: var(--background)
+    }
+
+    .site-header--portfolio+#content {
+        padding-top: var(--portfolio-header-height, 88px)
+    }
+
+    .site-header--portfolio nav {
+        width: 100%;
+        gap: 24px
+    }
+
+    .site-header--portfolio+#content .portfolio {
+        padding-top: 40px
     }
 
     .social-rail {

@@ -69,7 +69,7 @@ try {
   await page.getByText('Gespeichert',{exact:true}).waitFor();
   await page.reload(); assert.equal(await page.getByRole('textbox',{name:/^Titel/}).inputValue(),'Synthetic browser QA edited'); checks.push('Create/edit/save draft persists');
   await page.goto('http://127.0.0.1:8080/admin/publication');
-  await page.getByRole('button',{name:'Paket prüfen (Dry Run)',exact:true}).click();
+  await page.getByRole('button',{name:'Paket prüfen',exact:true}).click();
   await page.getByText('Validierung erfolgreich',{exact:true}).waitFor(); checks.push('Dry-run through real browser');
   await page.getByRole('button',{name:'Kandidat exportieren',exact:true}).click();
   await page.getByText('Lokales Paket erstellt',{exact:true}).waitFor(); checks.push('Candidate export through real browser');

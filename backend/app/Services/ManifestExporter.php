@@ -9,9 +9,10 @@ class ManifestExporter
 {
     private function object(?array $a): object { return (object)($a??[]); }
     private function links(?array $a): object { return (object) array_filter(Arr::only($a??[],['spotify','tidal','deezer','appleMusic']),fn($v)=>$v!==null && $v!==''); }
+    private function profileLinks(?array $a): object { return (object) array_filter(Arr::only($a??[],['imdb','crewUnited','musicHub']),fn($v)=>$v!==null && $v!==''); }
     private function optional(array $a): array { return array_filter($a,fn($v)=>$v!==null && $v!==''); }
-    private function media(string $key): array { return Arr::only(Setting::read($key)['media']??['image'=>null,'video'=>null,'poster'=>null],['image','video','poster']); }
-    public function package(): array
+    private function media(string $key): array { return MediaSlotPolicy::project($key,Setting::read($key)['media']??[]); }
+    public function package(string $validationPolicy=ContentValidator::POLICY_PUBLICATION): array
     {
         $trackIds=Track::where('status','published')->where('library_visible',true)->pluck('id')->all(); $assetIds=[]; $projects=[];
         foreach (Project::where('status','published')->orderBy('sort_order')->orderBy('id')->with(['memberships','mediaAssignments','soundtrack'])->get() as $p) {
@@ -50,7 +51,7 @@ class ManifestExporter
         }
         $tracks=[];
         foreach (Track::whereIn('id',array_unique($trackIds))->orderBy('id')->get() as $t) {
-            if ($t->audio_asset_id && !in_array($t->rights_scope,['existing_local_draft','next_draft','public'])) throw new DomainException("{$t->id}: Playback-Nutzung für den nächsten Entwurf ist unbestätigt.");
+            if ($validationPolicy===ContentValidator::POLICY_PUBLICATION && $t->audio_asset_id && !in_array($t->rights_scope,['existing_local_draft','next_draft','public'])) throw new DomainException("{$t->id}: Playback-Nutzung für den nächsten Entwurf ist unbestätigt.");
             $assetIds[]=$t->audio_asset_id;
             $tracks[]=['id'=>$t->id,'title'=>$t->title,'audioAssetId'=>$t->audio_asset_id,'duration'=>$t->duration,'peaks'=>$t->peaks,
                 'genres'=>$t->genres,'emotions'=>$t->emotions,'platformOverrides'=>$this->links($t->platform_overrides),'status'=>'published',
@@ -59,6 +60,7 @@ class ManifestExporter
         }
         $slots=['hero'=>$this->media('home'),'composerMenu'=>$this->media('music'),'directingMenu'=>$this->media('directing'),'about'=>$this->media('about')];
         foreach ($slots as $values) foreach ($values as $id) $assetIds[]=$id;
+        $assetIds[]=Setting::read('about')['collective']['logoAssetId']??null;
         $assetIds[]=Setting::read('seo')['ogAssetId']??null;
         foreach (Project::where('status','published')->get() as $p) $assetIds[]=$p->seo['ogAssetId']??null;
         $assets=[];
@@ -71,15 +73,22 @@ class ManifestExporter
         foreach (CvEntry::whereIn('status',['published','needs-confirmation'])->orderBy('sort_order')->orderBy('id')->get() as $r) {
             $cv[]=['date'=>$r->date,'text'=>implode(' — ',array_filter([$r->title,$r->institution,$r->description])),'status'=>$r->status,...$this->optional(['link'=>$r->link,'linkText'=>$r->link_text])];
         }
-        $site=Setting::read('site'); $contact=Setting::read('contact'); $about=Setting::read('about');
+        $site=Setting::read('site'); $contact=Setting::read('contact'); $about=Setting::read('about'); $social=Setting::read('social'); $consent=Setting::read('consent'); $analytics=Setting::read('analytics');
         $notice=Setting::read('impressum'); $privacy=Setting::read('privacy');
         $manifest=['schemaVersion'=>'1.0.0','mode'=>'prototype','sources'=>[],'assets'=>$assets,'projects'=>$projects,'tracks'=>$tracks,
             'site'=>['language'=>'en','title'=>$site['title']??'','description'=>$site['description']??'',
                 'biography'=>($about['visible']??true)?($about['biography']??[]):[],'cv'=>$cv,
                 'contacts'=>['email'=>$contact['email']??null,'instagram'=>$contact['instagram']??null,'spotify'=>$contact['spotify']??null,'samples'=>$contact['samples']??null],
                 'legal'=>['notice'=>$notice['text']??'','privacy'=>$privacy['text']??'','approved'=>($notice['status']??'draft')==='published' && ($privacy['status']??'draft')==='published'],
-                'productionDomain'=>$site['productionDomain']??null,'artistLinks'=>$this->links(Setting::read('social')['artistLinks']??[]),'mediaSlots'=>$slots]];
-        app(ContentValidator::class)->validate($manifest);
+                'productionDomain'=>$site['productionDomain']??null,'artistLinks'=>$this->links($social['artistLinks']??[]),
+                'profileLinks'=>$this->profileLinks($social['profileLinks']??[]),
+                'socialLinks'=>array_values(array_map(fn($link)=>Arr::only($link,['provider','label','url','visible','sort_order']),$social['links']??[])),
+                'consent'=>['version'=>(int)($consent['version']??1),'necessary'=>true,'externalMedia'=>(bool)($consent['externalMedia']??true),'analytics'=>(bool)($consent['analytics']??false),'marketing'=>(bool)($consent['marketing']??false),'bannerText'=>(string)($consent['bannerText']??''),'privacyLink'=>(string)($consent['privacyLink']??'/privacy/')],
+                'analytics'=>['enabled'=>(bool)($analytics['enabled']??false),'provider'=>(string)($analytics['provider']??'none'),'measurementId'=>($analytics['provider']??null)==='ga4'?($analytics['measurementId']??null):null,'siteDomain'=>($analytics['provider']??null)==='plausible'?($analytics['siteDomain']??null):null],
+                ...(!empty($about['collective']['name']) && !empty($about['collective']['url']) && !empty($about['collective']['membershipText'])?['collective'=>[
+                    'name'=>$about['collective']['name'],'url'=>$about['collective']['url'],'logoAssetId'=>$about['collective']['logoAssetId']??null,'membershipText'=>$about['collective']['membershipText'],
+                ]]:[]),'mediaSlots'=>$slots]];
+        app(ContentValidator::class)->validate($manifest,false,true,$validationPolicy);
         $extension=app(SettingsExporter::class)->export();
         return ['manifest'=>$manifest,'settings'=>$extension];
     }
@@ -101,12 +110,30 @@ class ManifestExporter
                     if (file_put_contents($directory.'/'.$file.'.pending',$text,LOCK_EX)===false || !rename($directory.'/'.$file.'.pending',$directory.'/'.$file)) throw new DomainException('Export konnte nicht atomar gespeichert werden.');
                 }
             }
+            $snapshotFile=$directory.'/cms-draft-snapshot.json';
+            $snapshot=json_encode(app(DraftStateSnapshot::class)->capture($hash),JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n";
+            if(is_file($snapshotFile)){if(file_get_contents($snapshotFile)!==$snapshot){if(\App\Models\Publication::where('hash',$hash)->latest('id')->value('status')!=='stale')throw new DomainException('Unveränderlicher CMS-Stand stimmt nicht überein.');$pending=$snapshotFile.'.pending';if(file_put_contents($pending,$snapshot,LOCK_EX)===false||!rename($pending,$snapshotFile))throw new DomainException('CMS-Stand konnte nicht erneuert werden.');}}
+            elseif(file_put_contents($snapshotFile.'.pending',$snapshot,LOCK_EX)===false||!rename($snapshotFile.'.pending',$snapshotFile))throw new DomainException('CMS-Stand konnte nicht gespeichert werden.');
+            $media=[];
+            foreach ($package['manifest']['assets'] as $asset) {
+                $record=MediaAsset::find($asset['id']);
+                if (!$record?->storage_path) continue;
+                if (!str_starts_with($record->path,'media/cms/')) throw new DomainException($record->id.': verwaltetes Medium liegt außerhalb des freigegebenen Pfads.');
+                $source=storage_path('app/private/'.$record->storage_path);
+                if (!is_file($source) || hash_file('sha256',$source)!==$record->sha256) throw new DomainException($record->id.': privates Original stimmt nicht mit der Prüfsumme überein.');
+                $mediaRelative=substr($record->path,10); $target=$directory.'/media/'.$mediaRelative;
+                if (!is_dir(dirname($target)) && !mkdir(dirname($target),0750,true) && !is_dir(dirname($target))) throw new DomainException('Kandidaten-Medienverzeichnis konnte nicht erstellt werden.');
+                if (is_file($target)) { if (hash_file('sha256',$target)!==$record->sha256) throw new DomainException('Unveränderliches Medien-Payload stimmt nicht überein.'); }
+                elseif (!copy($source,$target)) throw new DomainException('Medien-Payload konnte nicht gespeichert werden.');
+                $media[]=['path'=>$record->path,'sha256'=>$record->sha256,'size'=>(int)filesize($source),'assetId'=>$record->id];
+            }
+            $managedDeletes=MediaAsset::onlyTrashed()->where('path','like','media/cms/%')->pluck('path')->sort()->values()->all();
             $publication=Publication::firstOrCreate(['hash'=>$hash,'status'=>$publish?'published':'candidate'],['path'=>$relative,'user_id'=>$userId,'summary'=>$summary]);
             // Local apply uses an authenticated export receipt, never admin credentials.
             if ($userId && !$publish) {
                 $receipt=['version'=>1,'candidateHash'=>$hash,'adminUserId'=>$userId,
                     'manifestSha256'=>hash_file('sha256',$directory.'/manifest.json'),
-                    'settingsSha256'=>hash_file('sha256',$directory.'/cms-settings.json')];
+                    'settingsSha256'=>hash_file('sha256',$directory.'/cms-settings.json'),'snapshotSha256'=>hash_file('sha256',$snapshotFile),'media'=>$media,'managedDeletes'=>$managedDeletes];
                 $text=json_encode($receipt,JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR)."\n";
                 if (file_put_contents($directory.'/receipt.json.pending',$text,LOCK_EX)===false || !rename($directory.'/receipt.json.pending',$directory.'/receipt.json')) throw new DomainException('Export-Beleg konnte nicht gespeichert werden.');
             }

@@ -1,0 +1,84 @@
+---
+const { cmsUrl } = Astro.props;
+---
+<aside class="draft-preview-banner" role="status" aria-label="Draft preview">
+ <span>Entwurfs-Vorschau · Nicht veröffentlicht</span>
+ <a href={cmsUrl} data-preview-skip>Zurück zum CMS</a>
+</aside>
+<script is:inline>
+(() => {
+  const previewPath = '/draft-preview/site';
+  const previewId = new URL(location.href).searchParams.get('preview');
+  if (!previewId || !/^\d+$/.test(previewId)) return;
+  const rewrite = () => document.querySelectorAll('a[href]').forEach(anchor => {
+    if (anchor.hasAttribute('data-preview-skip') || anchor.hasAttribute('data-preview-original-href')) return;
+    let url;
+    try {
+      url = new URL(anchor.getAttribute('href'), location.origin)
+    } catch {
+      return
+    }
+    if (url.origin !== location.origin || url.pathname === previewPath || url.pathname.startsWith('/media/')) return;
+    anchor.dataset.previewOriginalHref = anchor.getAttribute('href');
+    anchor.setAttribute('href', previewPath + '?preview=' + encodeURIComponent(previewId) + '&route=' + encodeURIComponent(url.pathname + url.search) + url.hash);
+    anchor.setAttribute('data-astro-reload', '')
+  });
+  let checking = false;
+  const revalidate = async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      const response = await fetch('/draft-preview/status?preview=' + encodeURIComponent(previewId), { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) location.replace(location.href)
+    } catch {} finally {
+      checking = false
+    }
+  };
+  rewrite();
+  document.addEventListener('astro:page-load', rewrite);
+  addEventListener('focus', revalidate);
+  addEventListener('pageshow', revalidate);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void revalidate() })
+})();
+</script>
+<style>
+  .draft-preview-banner {
+    position: fixed;
+    z-index: 10000;
+    left: 50%;
+    bottom: max(10px,env(safe-area-inset-bottom));
+    translate: -50% 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: calc(100vw - 24px);
+    padding: 7px 11px;
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: 999px;
+    background: rgba(20,20,20,.9);
+    box-shadow: 0 4px 18px rgba(0,0,0,.22);
+    color: #f3f0ea;
+    font: 500 11px/1.2 var(--font-sans);
+    letter-spacing: .03em;
+    white-space: nowrap;
+    backdrop-filter: blur(8px)
+  }
+
+  .draft-preview-banner a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px
+  }
+
+  @media(max-width:520px) {
+    .draft-preview-banner {
+      gap: 8px;
+      font-size: 10px
+    }
+
+    .draft-preview-banner span {
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+  }
+</style>

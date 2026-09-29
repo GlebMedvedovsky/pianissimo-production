@@ -2,19 +2,25 @@
 namespace App\Services;
 
 use DomainException;
+use App\Models\MediaAsset;
 use Opis\JsonSchema\Validator;
 use Opis\JsonSchema\Errors\ErrorFormatter;
 
 class ContentValidator
 {
-    public function validate(array $m, bool $release = false, bool $checkFiles = true): void
+    public const POLICY_PUBLICATION='publication';
+    public const POLICY_DRAFT_PREVIEW='draft-preview';
+
+    public function validate(array $m, bool $release = false, bool $checkFiles = true, string $policy = self::POLICY_PUBLICATION): void
     {
+        if (!in_array($policy,[self::POLICY_PUBLICATION,self::POLICY_DRAFT_PREVIEW],true)) throw new DomainException('Unbekannte Validierungsrichtlinie.');
         // json_decode(..., true) cannot distinguish {} from []; restore known object slots.
         foreach ($m['projects']??[] as $i=>$p) {
             foreach (['memberships','platformLinks','externalLinks'] as $key) if (isset($p[$key])) $m['projects'][$i][$key]=(object)$p[$key];
         }
         foreach ($m['tracks']??[] as $i=>$t) if (isset($t['platformOverrides'])) $m['tracks'][$i]['platformOverrides']=(object)$t['platformOverrides'];
         if (isset($m['site']['artistLinks'])) $m['site']['artistLinks']=(object)$m['site']['artistLinks'];
+        if (isset($m['site']['profileLinks'])) $m['site']['profileLinks']=(object)$m['site']['profileLinks'];
         $schema=json_decode(file_get_contents(config('cms.schema')));
         $result=(new Validator())->validate(json_decode(json_encode($m, JSON_THROW_ON_ERROR)), $schema);
         if (!$result->isValid()) {
@@ -65,19 +71,31 @@ class ContentValidator
         foreach ($m['site']['mediaSlots'] as $slot=>$values) {
             $ref($values['image'],['image'], $slot); $ref($values['poster'],['image'],$slot); $ref($values['video'],['video'],$slot);
         }
-        $urls=[$m['site']['productionDomain'],...array_values((array)($m['site']['artistLinks']??[]))];
+        $ref($m['site']['collective']['logoAssetId']??null,['image'],'Kollektiv-Logo');
+        $urls=[$m['site']['productionDomain'],...array_values((array)($m['site']['artistLinks']??[])),...array_values((array)($m['site']['profileLinks']??[])),...array_column($m['site']['socialLinks']??[],'url'),$m['site']['collective']['url']??null];
         foreach (['instagram','spotify','samples'] as $key) $urls[]=$m['site']['contacts'][$key];
         foreach ($m['site']['cv'] as $r) $urls[]=$r['link']??null;
         foreach ($m['projects'] as $p) $urls=[...$urls,...array_values((array)$p['platformLinks']),...array_values((array)($p['externalLinks']??[])),$p['externalFilm']['url']??null];
         foreach ($m['tracks'] as $t) $urls=[...$urls,...array_values((array)$t['platformOverrides'])];
         foreach (array_filter($urls) as $url) if (!in_array(strtolower(parse_url($url,PHP_URL_SCHEME)??''),['http','https'],true)) $fail('Öffentliche Links müssen HTTP(S) verwenden.');
-        if ($m['mode']!=='test') {
+        if ($policy===self::POLICY_PUBLICATION && $m['mode']!=='test') {
             foreach ($m['assets'] as $a) if ($a['state']==='test') $fail('Test-Medium im regulären Paket.');
             foreach (array_merge($m['projects'],$m['tracks']) as $r) if ($r['status']==='test') $fail('Test-Datensatz im regulären Paket.');
         }
         if ($checkFiles) foreach ($m['assets'] as $a) {
             $root=realpath(config('cms.media_root'));
             $file=realpath(config('cms.media_root').'/'.substr($a['path'],6));
+            if (!$file && str_starts_with($a['path'],'media/cms/')) {
+                $managedRoot=realpath(config('cms.managed_media_root'));
+                $managedFile=realpath(config('cms.managed_media_root').'/'.substr($a['path'],10));
+                if ($managedRoot && $managedFile && str_starts_with($managedFile,$managedRoot.DIRECTORY_SEPARATOR)) { $root=$managedRoot; $file=$managedFile; }
+            }
+            if (!$file && str_starts_with($a['path'],'media/cms/')) {
+                $managed=MediaAsset::where('path',$a['path'])->whereNotNull('storage_path')->first();
+                $privateRoot=realpath(config('cms.media_originals_root'));
+                $private=$managed?realpath(storage_path('app/private/'.$managed->storage_path)):false;
+                if ($privateRoot && $private && str_starts_with($private,$privateRoot.DIRECTORY_SEPARATOR)) { $root=$privateRoot; $file=$private; }
+            }
             if (!$file || !$root || !str_starts_with($file,$root.DIRECTORY_SEPARATOR) || !is_file($file)) $fail("{$a['id']}: Web-Datei fehlt.");
             if (isset($a['sha256']) && hash_file('sha256',$file)!==$a['sha256']) $fail("{$a['id']}: Prüfsumme stimmt nicht.");
         }

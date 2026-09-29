@@ -9,8 +9,9 @@ services:
     volumes:
       - .:/var/www/html
       - ../contracts:/var/www/contracts:ro
-      - ../content/manifest.json:/var/www/input/manifest.json:ro
+      - ../content:/var/www/content
       - ../frontend/public/media:/var/www/media:ro
+      - ../frontend/public/media/cms:/var/www/managed-media
     depends_on:
       db:
         condition: service_healthy

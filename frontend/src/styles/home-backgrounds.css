@@ -3,7 +3,7 @@
   filter: none;
 }
 
-.hero-scene .hero-backdrop > .image-shade {
+.hero-scene .hero-backdrop>.image-shade {
   background:
     linear-gradient(180deg, rgb(0 0 0 / 50%), transparent 30%, rgb(0 0 0 / 12%) 60%, rgb(0 0 0 / 52%)),
     radial-gradient(ellipse at 50% 60%, rgb(0 0 0 / 32%), rgb(0 0 0 / 8%) 70%);
@@ -25,12 +25,27 @@
   display: none;
 }
 
-.shared-menu-background > .image-shade {
+.shared-menu-background>.image-shade {
   background: linear-gradient(180deg, rgb(0 0 0 / 10%), transparent 45%, rgb(0 0 0 / 44%));
 }
 
 .shared-menu-background .media-slot {
   transition: transform 800ms ease;
+}
+
+/* Keep the split-menu artwork monochrome only for precise hover devices.
+   The filter belongs to the image itself so logo, copy and overlays retain
+   their existing colour, while the media-slot keeps its current scale motion. */
+@media (hover: hover) and (pointer: fine) {
+  .hero-scene .split-backdrop .background-half .media-slot > img {
+    filter: grayscale(1);
+    transition: filter 400ms ease;
+  }
+
+  .scene-sticky:has(.composer-choice:hover, .composer-choice:focus-visible) .music-half .media-slot > img,
+  .scene-sticky:has(.director-choice:hover, .director-choice:focus-visible) .directing-half .media-slot > img {
+    filter: grayscale(0);
+  }
 }
 
 /* Two CSS windows onto the same photograph preserve piano and film sides on
@@ -71,6 +86,7 @@
 
 /* Clear the permanent bottom dock on portrait tablets as well as phones. */
 @media (min-width: 601px) and (max-width: 800px) {
+
   .hero-scene .scroll-cue,
   .hero-scene .menu-about {
     bottom: calc(82px + env(safe-area-inset-bottom));
