@@ -1,11 +1,53 @@
 import { defineConfig } from "astro/config";
+import { lstatSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { isFileServingAllowed } from "vite";
 import { audioFixtures } from "../scripts/fixture-middleware.mjs";
 
 const localPath = (relative) =>
   fileURLToPath(new URL(relative, import.meta.url)).replaceAll("\\", "/");
+
+const publicationBuild = process.env.PIANISSIMO_PUBLICATION_BUILD === "1";
+const publicationManifestPath = process.env.PIANISSIMO_MANIFEST_PATH;
+const publicationPublicDir = process.env.PIANISSIMO_PUBLIC_DIR;
+const publicationOutDir = process.env.PIANISSIMO_OUT_DIR;
+if (
+  !publicationBuild &&
+  (publicationManifestPath || publicationPublicDir || publicationOutDir)
+) {
+  throw new Error("Publication build paths require PIANISSIMO_PUBLICATION_BUILD=1.");
+}
+if (
+  publicationBuild &&
+  (![publicationManifestPath, publicationPublicDir, publicationOutDir].every(
+    (value) => value && isAbsolute(value),
+  ))
+) {
+  throw new Error("Publication build paths must be explicit absolute paths.");
+}
+
+const manifestModule = {
+  name: "pianissimo-manifest",
+  enforce: "pre",
+  resolveId(id) {
+    return id === "virtual:pianissimo-manifest"
+      ? "\0virtual:pianissimo-manifest"
+      : null;
+  },
+  load(id) {
+    if (id !== "\0virtual:pianissimo-manifest") return null;
+    const path = publicationBuild
+      ? publicationManifestPath
+      : localPath("../content/manifest.json");
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error("Manifest input must be a regular non-symlink file.");
+    }
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    return `export default ${JSON.stringify(parsed)};`;
+  },
+};
 
 const localDraftPreviewRoute = {
   name: "local-draft-preview-route",
@@ -74,12 +116,15 @@ const privateLocalMaterials = {
 
 export default defineConfig({
   output: "static",
+  ...(publicationBuild
+    ? { publicDir: publicationPublicDir, outDir: publicationOutDir }
+    : {}),
   trailingSlash: "always",
   devToolbar: { enabled: false },
   integrations: [localDraftPreviewRoute],
   server: { host: "127.0.0.1", port: 4321 },
   vite: {
-    plugins: [privateLocalMaterials, audioFixtures],
+    plugins: [manifestModule, privateLocalMaterials, audioFixtures],
     server: {
       allowedHosts: ["host.docker.internal"],
       // A shared viewing session must never silently move to another port.

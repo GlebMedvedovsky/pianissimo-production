@@ -37,3 +37,17 @@ Artisan::command('cms:admin {--reset : Reset an existing user password interacti
     $this->info('Admin gespeichert. Passwort wird nicht ausgegeben.');
     return 0;
 })->purpose('Create an admin or reset their password without exposing credentials');
+
+Artisan::command('cms:production-preflight {--check-database : Run a read-only database connectivity check}', function () {
+    $this->line('Pianissimo production preflight (CLI context)');
+    $checks = app(\App\Services\ProductionPreflight::class)->run((bool) $this->option('check-database'));
+    foreach ($checks as $check) {
+        $this->line(sprintf('%s: %s — %s', $check['status'], $check['label'], $check['detail']));
+    }
+
+    $failures = count(array_filter($checks, static fn (array $check): bool => $check['status'] === 'FAIL'));
+    $warnings = count(array_filter($checks, static fn (array $check): bool => $check['status'] === 'WARN'));
+    $this->line(sprintf('Result: %d FAIL, %d WARN', $failures, $warnings));
+
+    return $failures === 0 ? 0 : 1;
+})->purpose('Read-only production environment, path and runtime checks');

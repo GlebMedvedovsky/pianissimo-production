@@ -92,6 +92,23 @@ class ManifestExporter
         $extension=app(SettingsExporter::class)->export();
         return ['manifest'=>$manifest,'settings'=>$extension];
     }
+
+    /**
+     * Build the explicit production payload. Ordinary candidate and preview exports
+     * must keep using package(), whose mode remains prototype.
+     */
+    public function releasePackage(): array
+    {
+        $package=$this->package(ContentValidator::POLICY_PUBLICATION);
+        $package['manifest']['mode']='release';
+        $package['manifest']['sources']=[];
+        foreach ($package['manifest']['projects'] as &$project) $project['sourceIds']=[];
+        unset($project);
+        app(ContentValidator::class)->validate($package['manifest'],true,true,ContentValidator::POLICY_PUBLICATION);
+
+        return $package;
+    }
+
     public function export(bool $dryRun=true, bool $publish=false, ?int $userId=null): array
     {
         // Consistent read across all tables; never writes to the frontend or its input.

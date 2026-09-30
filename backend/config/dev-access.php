@@ -1,6 +1,9 @@
 <?php
-// Local-only access policy. Recheck the exact Docker gateway if its network is recreated.
-return [
-    'trusted_proxies' => ['172.21.0.1'],
-    'hosts' => ['127.0.0.1', 'localhost', '1nx12grf-8080.euw.devtunnels.ms'],
-];
+
+// Local defaults remain intentionally narrow. Production is default-deny and
+// only accepts explicit host and proxy values from the environment.
+return \App\Support\CmsAccessPolicy::configuration(
+    (string) env('APP_ENV', 'production'),
+    env('CMS_ALLOWED_HOSTS'),
+    env('CMS_TRUSTED_PROXIES'),
+);

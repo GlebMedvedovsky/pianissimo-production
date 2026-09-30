@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import raw from "../../content/manifest.json";
+import releasePolicyFixture from "../../backend/tests/Fixtures/kinnhakenhank-release-manifest.json";
 import { validateManifest } from "../../contracts/content";
 import {
   selectProjects,
@@ -78,6 +79,60 @@ test("release fails honestly; fixtures are blocked from prototype", () => {
     () => validateManifest(draft, true),
     /draft, test or unconfirmed/,
   );
+});
+test("Kinnhakenhank release policy has exact ID/SHA parity with PHP", () => {
+  const valid = structuredClone(releasePolicyFixture) as unknown as ReturnType<
+    typeof validateManifest
+  >;
+  assert.equal(validateManifest(valid, true).mode, "release");
+
+  const wrongSha = structuredClone(valid);
+  wrongSha.assets[1]!.sha256 = "a".repeat(64);
+  assert.throws(() => validateManifest(wrongSha, true), /checksum mismatch/);
+
+  const wrongId = structuredClone(valid);
+  wrongId.assets[1]!.id = "local-f-unapproved-trailer";
+  wrongId.projects[0]!.localTrailerAssetId = "local-f-unapproved-trailer";
+  assert.throws(() => validateManifest(wrongId, true), /approved V2 trailer ID/);
+
+  const external = structuredClone(valid);
+  external.projects[0]!.externalFilm = {
+    provider: "youtube",
+    videoId: "full-film",
+    url: "https://example.test/full-film",
+  };
+  assert.throws(() => validateManifest(external, true), /Kinnhakenhank/);
+
+  const hover = structuredClone(valid);
+  hover.assets.push({
+    id: "local-f-1967744a58884a30",
+    type: "video",
+    path: "media/kinnhakenhank-silent-preview.mp4",
+    duration: 18.28,
+    alt: "Unapproved silent preview",
+    crop: { x: 50, y: 50 },
+    origin: "Policy fixture",
+    source: "Policy fixture",
+    state: "approved",
+    sha256: "2".repeat(64),
+  });
+  hover.projects[0]!.memberships.music = {
+    order: 1,
+    role: "Composer",
+    coverAssetId: "release-cover",
+    crop: { x: 50, y: 50 },
+    hoverAssetId: "local-f-1967744a58884a30",
+  };
+  assert.throws(() => validateManifest(hover, true), /unapproved video reference/);
+});
+test("Letterboxd release regression still permits confirmed stills without video", () => {
+  const manifest = structuredClone(
+    releasePolicyFixture,
+  ) as unknown as ReturnType<typeof validateManifest>;
+  manifest.projects[0]!.id = "letterboxd-everything-everywhere-all-at-once";
+  manifest.projects[0]!.slug = "letterboxd-everything-everywhere-all-at-once";
+  delete manifest.projects[0]!.localTrailerAssetId;
+  assert.equal(validateManifest(manifest, true).mode, "release");
 });
 test("unsafe protocols and invalid optional values fail", () => {
   const bad = structuredClone(raw);

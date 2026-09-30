@@ -18,6 +18,7 @@ playwright-report/
 .env*
 !.env.example
 !.env.template
+!.env.production.example
 
 # Local task packages and questionnaires; keep the files on disk.
 /SEBASTIAN_*_STARTER/

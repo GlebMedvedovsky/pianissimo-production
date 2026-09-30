@@ -10,6 +10,8 @@ class ContentValidator
 {
     public const POLICY_PUBLICATION='publication';
     public const POLICY_DRAFT_PREVIEW='draft-preview';
+    public const KINNHAKENHANK_TRAILER_ASSET_ID='local-f-87d401c4a58387a5';
+    public const KINNHAKENHANK_TRAILER_SHA256='fab8ab6335ef8c48b9c070b434f915c5f62a301570ee510e8bc11165f2803252';
 
     public function validate(array $m, bool $release = false, bool $checkFiles = true, string $policy = self::POLICY_PUBLICATION): void
     {
@@ -55,7 +57,7 @@ class ContentValidator
             $ref($p['localTrailerAssetId']??null,['video'],$id);
             $ref($p['localTrailerPosterId']??null,['image'],$id);
             if ($id==='kinnhakenhank' && $p['externalFilm']!==null) $fail('Kinnhakenhank: nur der ausgewählte lokale V2-Trailer ist erlaubt.');
-            if ($id==='kinnhakenhank' && isset($p['localTrailerAssetId']) && $p['localTrailerAssetId']!=='local-f-87d401c4a58387a5') $fail('Kinnhakenhank: falscher lokaler Trailer; ausschließlich V2 verwenden.');
+            if ($id==='kinnhakenhank' && isset($p['localTrailerAssetId']) && $p['localTrailerAssetId']!==self::KINNHAKENHANK_TRAILER_ASSET_ID) $fail('Kinnhakenhank: falscher lokaler Trailer; ausschließlich V2 verwenden.');
             if ($id==='letterboxd-everything-everywhere-all-at-once' && ($p['externalFilm']!==null || isset($p['localTrailerAssetId']) || count(array_filter((array)$p['memberships'],fn($v)=>!empty($v['hoverAssetId']))))) $fail('Letterboxd: nur bestätigte Screenshots, kein Video.');
             $seen=[];
             foreach ($p['tracks'] as $t) {
@@ -105,6 +107,17 @@ class ContentValidator
             foreach (array_merge($m['projects'],$m['tracks'],$m['site']['cv']) as $r) if ($r['status']!=='published') $fail('Production gesperrt: offene Inhalte.');
             foreach ($m['tracks'] as $t) if (!$t['audioAssetId']) $fail('Production gesperrt: Playback fehlt.');
             if (!$m['site']['legal']['approved'] || !$m['site']['contacts']['email'] || !$m['site']['productionDomain']) $fail('Production gesperrt: Rechtstexte, Kontakt oder Domain fehlen.');
+            $kinnhakenhank=collect($m['projects'])->firstWhere('id','kinnhakenhank');
+            if ($kinnhakenhank) {
+                $trailerId=$kinnhakenhank['localTrailerAssetId']??null;
+                if ($trailerId!==self::KINNHAKENHANK_TRAILER_ASSET_ID) $fail('Kinnhakenhank: Production erfordert exakt den freigegebenen V2-Trailer.');
+                $trailer=$assets[self::KINNHAKENHANK_TRAILER_ASSET_ID]??null;
+                if (!is_array($trailer) || ($trailer['sha256']??null)!==self::KINNHAKENHANK_TRAILER_SHA256) $fail('Kinnhakenhank: Prüfsumme des freigegebenen V2-Trailers stimmt nicht.');
+                $videoReferences=[$trailerId];
+                foreach ((array)$kinnhakenhank['memberships'] as $member) if (!empty($member['hoverAssetId'])) $videoReferences[]=$member['hoverAssetId'];
+                foreach (array_filter($videoReferences) as $videoId) if ($videoId!==self::KINNHAKENHANK_TRAILER_ASSET_ID) $fail('Kinnhakenhank: nicht freigegebene Video-Referenz im Production-Paket.');
+                if ($kinnhakenhank['externalFilm']!==null) $fail('Kinnhakenhank: externe Filme sind im Production-Paket verboten.');
+            }
         }
     }
 }

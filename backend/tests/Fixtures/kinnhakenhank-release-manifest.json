@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "release",
+  "sources": [],
+  "assets": [
+    {
+      "id": "release-cover",
+      "type": "image",
+      "path": "media/release-cover.jpg",
+      "width": 1,
+      "height": 1,
+      "alt": "Release policy fixture cover",
+      "crop": { "x": 50, "y": 50 },
+      "origin": "Generated policy fixture",
+      "source": "Generated policy fixture",
+      "state": "approved",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "id": "local-f-87d401c4a58387a5",
+      "type": "video",
+      "path": "media/kinnhakenhank-v2.mp4",
+      "duration": 30,
+      "alt": "Approved Kinnhakenhank V2 trailer",
+      "crop": { "x": 50, "y": 50 },
+      "origin": "Approved V2 trailer derivative",
+      "source": "Private source registry",
+      "state": "approved",
+      "sourceSha256": "986d1c6251a6a14302d75a1ac03c0e7b6a6528c94dbc2e5c37d6aebe2092be00",
+      "sha256": "fab8ab6335ef8c48b9c070b434f915c5f62a301570ee510e8bc11165f2803252"
+    }
+  ],
+  "projects": [
+    {
+      "id": "kinnhakenhank",
+      "slug": "kinnhakenhank",
+      "title": "Kinnhakenhank",
+      "synopsis": "Release policy fixture",
+      "status": "published",
+      "order": 1,
+      "productionType": "Film",
+      "year": "2026",
+      "credits": [],
+      "categories": [],
+      "memberships": {},
+      "awards": [],
+      "gallery": [],
+      "externalFilm": null,
+      "platformLinks": {},
+      "tracks": [],
+      "sourceIds": [],
+      "localTrailerAssetId": "local-f-87d401c4a58387a5",
+      "externalLinks": {}
+    }
+  ],
+  "tracks": [],
+  "site": {
+    "language": "en",
+    "title": "Pianissimo release policy fixture",
+    "description": "Cross-runtime policy fixture",
+    "biography": [],
+    "cv": [],
+    "contacts": {
+      "email": "release@example.test",
+      "instagram": null,
+      "spotify": null,
+      "samples": null
+    },
+    "legal": {
+      "notice": "Approved fixture notice",
+      "privacy": "Approved fixture privacy text",
+      "approved": true
+    },
+    "productionDomain": "https://example.test",
+    "mediaSlots": {
+      "hero": { "image": null, "video": null, "poster": null },
+      "composerMenu": { "image": null, "video": null, "poster": null },
+      "directingMenu": { "image": null, "video": null, "poster": null },
+      "about": { "image": null, "video": null, "poster": null }
+    }
+  }
+}

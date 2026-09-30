@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "mode": "release",
+  "sources": [],
+  "assets": [
+    {
+      "id": "release-image",
+      "type": "image",
+      "path": "media/release-image.jpg",
+      "width": 1,
+      "height": 1,
+      "alt": "Release fixture",
+      "crop": {"x": 50, "y": 50},
+      "origin": "Dedicated production package test fixture",
+      "source": "Generated test bytes",
+      "state": "approved",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "projects": [],
+  "tracks": [],
+  "site": {
+    "language": "en",
+    "title": "Pianissimo release fixture",
+    "description": "Valid release-only fixture",
+    "biography": [],
+    "cv": [],
+    "contacts": {
+      "email": "release@example.test",
+      "instagram": null,
+      "spotify": null,
+      "samples": null
+    },
+    "legal": {
+      "notice": "Approved fixture notice",
+      "privacy": "Approved fixture privacy text",
+      "approved": true
+    },
+    "productionDomain": "https://example.test",
+    "consent": {
+      "version": 1,
+      "necessary": true,
+      "externalMedia": false,
+      "analytics": false,
+      "marketing": false,
+      "bannerText": "Fixture consent",
+      "privacyLink": "/privacy/"
+    },
+    "analytics": {
+      "enabled": false,
+      "provider": "none"
+    },
+    "mediaSlots": {
+      "hero": {"image": null, "video": null, "poster": null},
+      "composerMenu": {"image": null, "video": null, "poster": null},
+      "directingMenu": {"image": null, "video": null, "poster": null},
+      "about": {"image": null, "video": null, "poster": null}
+    }
+  }
+}

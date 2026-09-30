@@ -250,6 +250,9 @@ export type Project = z.infer<typeof projectSchema>;
 export type Track = z.infer<typeof trackSchema>;
 export type MediaAsset = z.infer<typeof assetSchema>;
 export type ContentValidationPolicy = "publication" | "draft-preview";
+export const KINNHAKENHANK_TRAILER_ASSET_ID = "local-f-87d401c4a58387a5";
+export const KINNHAKENHANK_TRAILER_SHA256 =
+  "fab8ab6335ef8c48b9c070b434f915c5f62a301570ee510e8bc11165f2803252";
 export function validateManifest(
   input: unknown,
   release = false,
@@ -347,6 +350,31 @@ export function validateManifest(
       !data.site.productionDomain
     )
       failures.push("legal/contact/domain approval missing");
+    const kinnhakenhank = data.projects.find((p) => p.id === "kinnhakenhank");
+    if (kinnhakenhank) {
+      const trailer = assets.get(KINNHAKENHANK_TRAILER_ASSET_ID);
+      if (
+        kinnhakenhank.localTrailerAssetId !==
+        KINNHAKENHANK_TRAILER_ASSET_ID
+      )
+        failures.push("Kinnhakenhank requires the approved V2 trailer ID");
+      if (trailer?.sha256 !== KINNHAKENHANK_TRAILER_SHA256)
+        failures.push("Kinnhakenhank approved V2 trailer checksum mismatch");
+      const videoReferences = [
+        kinnhakenhank.localTrailerAssetId,
+        ...Object.values(kinnhakenhank.memberships).map(
+          (membership) => membership.hoverAssetId,
+        ),
+      ].filter((value): value is string => Boolean(value));
+      if (
+        videoReferences.some(
+          (assetId) => assetId !== KINNHAKENHANK_TRAILER_ASSET_ID,
+        )
+      )
+        failures.push("Kinnhakenhank contains an unapproved video reference");
+      if (kinnhakenhank.externalFilm)
+        failures.push("Kinnhakenhank external film is prohibited");
+    }
     if (failures.length) throw Error(`Release blocked: ${failures.join("; ")}`);
   }
   return data;

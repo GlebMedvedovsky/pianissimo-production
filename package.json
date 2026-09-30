@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "npm run dev --workspace frontend",
     "build": "npm run content:validate && npm run build --workspace frontend && node scripts/check-dist.mjs",
+    "build:publication": "node scripts/run-ts.mjs scripts/build-publication-cli.ts",
     "preview": "npm run preview --workspace frontend",
     "check": "npm run check --workspace frontend && tsc --noEmit -p tsconfig.json",
     "test": "node scripts/run-ts.mjs --test",

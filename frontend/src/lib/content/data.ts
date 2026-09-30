@@ -1,4 +1,4 @@
-import raw from '../../../../content/manifest.json';
+import raw from 'virtual:pianissimo-manifest';
 import {validateManifest} from '../../../../contracts/content';
 import type {Manifest} from '../../../../contracts/content';
 import {publicContent} from '../../../../contracts/public-content';

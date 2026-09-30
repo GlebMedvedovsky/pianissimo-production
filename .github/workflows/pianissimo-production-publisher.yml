@@ -1,0 +1,397 @@
+name: Pianissimo production publisher
+
+on:
+  workflow_dispatch:
+    inputs:
+      publication_id:
+        description: Immutable CMS production publication UUID
+        required: true
+        type: string
+      sequence:
+        description: Monotonic production publication sequence
+        required: true
+        type: string
+      package_sha256:
+        description: Logical immutable package SHA-256
+        required: true
+        type: string
+      source_revision:
+        description: Exact 40-character source Git revision
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pianissimo-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CMS_URL: ${{ vars.PIANISSIMO_CMS_URL }}
+      PUBLICATION_ID: ${{ inputs.publication_id }}
+      PUBLICATION_SEQUENCE: ${{ inputs.sequence }}
+      PACKAGE_SHA256: ${{ inputs.package_sha256 }}
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      CLAIM_RUNNER_ID: github-${{ github.run_id }}
+      ATTEMPT_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
+      PACKAGE_ARCHIVE: ${{ runner.temp }}/pianissimo-publication.tar
+      PACKAGE_HEADERS: ${{ runner.temp }}/pianissimo-publication.headers
+      PACKAGE_DIR: ${{ runner.temp }}/pianissimo-publication
+      OUTPUT_DIR: ${{ runner.temp }}/pianissimo-static
+      RELEASE_ARCHIVE: ${{ runner.temp }}/pianissimo-static-release.tar
+      RELEASE_FILE_LIST: ${{ runner.temp }}/pianissimo-static-release.files
+      SSH_DIR: ${{ runner.temp }}/pianissimo-ssh
+      SSH_KEY_FILE: ${{ runner.temp }}/pianissimo-ssh/id_ed25519
+      SSH_KNOWN_HOSTS_FILE: ${{ runner.temp }}/pianissimo-ssh/known_hosts
+      SSH_HOST: ${{ vars.NETCUP_SSH_HOST }}
+      SSH_USER: ${{ vars.NETCUP_SSH_USER }}
+      SSH_PORT: ${{ vars.NETCUP_SSH_PORT }}
+      REMOTE_INCOMING_ROOT: ${{ vars.NETCUP_PIANISSIMO_PRODUCTION_INCOMING_ROOT }}
+      REMOTE_BACKEND_ROOT: ${{ vars.NETCUP_PIANISSIMO_BACKEND_ROOT }}
+      REMOTE_PHP_BIN: ${{ vars.NETCUP_PHP_BIN }}
+    steps:
+      - name: Enforce disabled-by-default workflow gate
+        env:
+          WORKFLOW_ENABLED: ${{ vars.PIANISSIMO_PRODUCTION_WORKFLOW_ENABLED }}
+        run: |
+          set -euo pipefail
+          test "$WORKFLOW_ENABLED" = "true" || { echo "Production publisher workflow is disabled."; exit 1; }
+
+      - name: Validate inputs and non-secret configuration
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "$PUBLICATION_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+          [[ "$PUBLICATION_SEQUENCE" =~ ^[1-9][0-9]*$ ]]
+          [[ "$PACKAGE_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CMS_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]
+          [[ "$SSH_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$SSH_USER" =~ ^[A-Za-z0-9._-]+$ ]]
+          [[ "$SSH_PORT" =~ ^[1-9][0-9]{0,4}$ ]] && (( SSH_PORT <= 65535 ))
+          [[ "$REMOTE_INCOMING_ROOT" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          [[ "$REMOTE_BACKEND_ROOT" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          [[ "$REMOTE_PHP_BIN" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          for remote_path in "$REMOTE_INCOMING_ROOT" "$REMOTE_BACKEND_ROOT" "$REMOTE_PHP_BIN"; do
+            [[ "$remote_path" != *"//"* && "$remote_path" != *"/./"* && "$remote_path" != *"/../"* ]]
+          done
+          test -n "$PUBLISHER_TOKEN"
+
+      - name: Checkout exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+
+      - name: Verify checked-out source revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Claim immutable publication
+        id: claim
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          body="$(jq -cn --arg runner_id "$CLAIM_RUNNER_ID" '{runner_id:$runner_id}')"
+          response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/claim")"
+          test "$(jq -r '.publication_id' <<<"$response")" = "$PUBLICATION_ID"
+          test "$(jq -r '.sequence | tostring' <<<"$response")" = "$PUBLICATION_SEQUENCE"
+          test "$(jq -r '.package_sha256' <<<"$response")" = "$PACKAGE_SHA256"
+          test "$(jq -r '.source_revision' <<<"$response")" = "$SOURCE_REVISION"
+          echo "claimed=true" >> "$GITHUB_OUTPUT"
+          echo "state=$(jq -r '.resume.state' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "build_required=$(jq -r '.resume.build_required' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "upload_required=$(jq -r '.resume.upload_required' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "activation_required=$(jq -r '.resume.activation_required' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "notify_building=$(jq -r '.resume.notify_building' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "notify_built=$(jq -r '.resume.notify_built' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "notify_uploading=$(jq -r '.resume.notify_uploading' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "release_sha256=$(jq -r '.release_sha256 // ""' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "release_files_sha256=$(jq -r '.release_files_sha256 // ""' <<<"$response")" >> "$GITHUB_OUTPUT"
+          echo "release_metadata_sha256=$(jq -r '.release_metadata_sha256 // ""' <<<"$response")" >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify deterministic package transport
+        if: steps.claim.outputs.build_required == 'true'
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -D "$PACKAGE_HEADERS" \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "X-Pianissimo-Runner-Id: $CLAIM_RUNNER_ID" \
+            -o "$PACKAGE_ARCHIVE" \
+            "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/package"
+          transport_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Transport-Sha256:/ {gsub("\\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
+          logical_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Package-Sha256:/ {gsub("\\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
+          [[ "$transport_sha" =~ ^[0-9a-f]{64}$ ]]
+          test "$logical_sha" = "$PACKAGE_SHA256"
+          test "$(sha256sum "$PACKAGE_ARCHIVE" | awk '{print $1}')" = "$transport_sha"
+
+      - name: Safely extract immutable publication package
+        if: steps.claim.outputs.build_required == 'true'
+        run: |
+          set -euo pipefail
+          node scripts/extract-publication-transport.mjs \
+            "$PACKAGE_ARCHIVE" "$PACKAGE_DIR" "$PUBLICATION_ID" "$PUBLICATION_SEQUENCE" "$PACKAGE_SHA256" "$SOURCE_REVISION"
+
+      - name: Notify CMS that build started
+        if: steps.claim.outputs.notify_building == 'true'
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          body="$(jq -cn --arg runner_id "$CLAIM_RUNNER_ID" '{runner_id:$runner_id,status:"building"}')"
+          curl --fail-with-body --silent --show-error --output /dev/null \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/status"
+
+      - name: Install locked dependencies
+        if: steps.claim.outputs.build_required == 'true'
+        run: npm ci
+
+      - name: Build exact isolated production publication
+        if: steps.claim.outputs.build_required == 'true'
+        run: npm run build:publication -- --package "$PACKAGE_DIR" --out "$OUTPUT_DIR"
+
+      - name: Verify static output and create immutable release archive
+        id: release
+        run: |
+          set -euo pipefail
+          if test "${{ steps.claim.outputs.build_required }}" = "true"; then
+            test -f "$OUTPUT_DIR/index.html"
+            test -z "$(find "$OUTPUT_DIR" -type l -print -quit)"
+            test -z "$(find "$OUTPUT_DIR" ! -type d ! -type f -print -quit)"
+            release_files_sha="$(node scripts/create-release-integrity.mjs "$OUTPUT_DIR" "$PACKAGE_DIR/publication.json")"
+            [[ "$release_files_sha" =~ ^[0-9a-f]{64}$ ]]
+            release_metadata_sha="$(sha256sum "$OUTPUT_DIR/.pianissimo-release.json" | awk '{print $1}')"
+            [[ "$release_metadata_sha" =~ ^[0-9a-f]{64}$ ]]
+            find "$OUTPUT_DIR" -mindepth 1 -printf '%P\0' | sort -z > "$RELEASE_FILE_LIST"
+            tar --sort=name --format=ustar --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+              --no-recursion --null -C "$OUTPUT_DIR" -cf "$RELEASE_ARCHIVE" --files-from="$RELEASE_FILE_LIST"
+            release_sha="$(sha256sum "$RELEASE_ARCHIVE" | awk '{print $1}')"
+            claimed_release_sha="${{ steps.claim.outputs.release_sha256 }}"
+            claimed_files_sha="${{ steps.claim.outputs.release_files_sha256 }}"
+            claimed_metadata_sha="${{ steps.claim.outputs.release_metadata_sha256 }}"
+            test -z "$claimed_release_sha" || test "$release_sha" = "$claimed_release_sha"
+            test -z "$claimed_files_sha" || test "$release_files_sha" = "$claimed_files_sha"
+            test -z "$claimed_metadata_sha" || test "$release_metadata_sha" = "$claimed_metadata_sha"
+          else
+            release_sha="${{ steps.claim.outputs.release_sha256 }}"
+            release_files_sha="${{ steps.claim.outputs.release_files_sha256 }}"
+            release_metadata_sha="${{ steps.claim.outputs.release_metadata_sha256 }}"
+          fi
+          [[ "$release_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$release_files_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$release_metadata_sha" =~ ^[0-9a-f]{64}$ ]]
+          echo "sha256=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "files_sha256=$release_files_sha" >> "$GITHUB_OUTPUT"
+          echo "metadata_sha256=$release_metadata_sha" >> "$GITHUB_OUTPUT"
+          echo "filename=pianissimo-static-release-$PUBLICATION_SEQUENCE-$PUBLICATION_ID-$release_sha.tar" >> "$GITHUB_OUTPUT"
+          echo "partname=.pianissimo-$PUBLICATION_SEQUENCE-$PUBLICATION_ID-$release_sha-$ATTEMPT_ID.part" >> "$GITHUB_OUTPUT"
+
+      - name: Notify CMS that build completed
+        if: steps.claim.outputs.notify_built == 'true'
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          body="$(jq -cn --arg runner_id "$CLAIM_RUNNER_ID" --arg release_sha256 "${{ steps.release.outputs.sha256 }}" \
+            --arg release_files_sha256 "${{ steps.release.outputs.files_sha256 }}" \
+            --arg release_metadata_sha256 "${{ steps.release.outputs.metadata_sha256 }}" \
+            '{runner_id:$runner_id,status:"built",release_sha256:$release_sha256,release_files_sha256:$release_files_sha256,release_metadata_sha256:$release_metadata_sha256}')"
+          curl --fail-with-body --silent --show-error --output /dev/null \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/status"
+
+      - name: Mark publication uploading
+        if: steps.claim.outputs.notify_uploading == 'true'
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          body="$(jq -cn --arg runner_id "$CLAIM_RUNNER_ID" '{runner_id:$runner_id,status:"uploading"}')"
+          curl --fail-with-body --silent --show-error --output /dev/null \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/status"
+
+      - name: Configure strict production SSH identity
+        id: ssh
+        if: steps.claim.outputs.upload_required == 'true' || steps.claim.outputs.activation_required == 'true'
+        env:
+          SSH_PRIVATE_KEY_MATERIAL: ${{ secrets.NETCUP_PRODUCTION_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS_MATERIAL: ${{ secrets.NETCUP_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY_MATERIAL"
+          test -n "$SSH_KNOWN_HOSTS_MATERIAL"
+          install -m 700 -d "$SSH_DIR"
+          printf '%s\n' "$SSH_PRIVATE_KEY_MATERIAL" > "$SSH_KEY_FILE"
+          printf '%s\n' "$SSH_KNOWN_HOSTS_MATERIAL" > "$SSH_KNOWN_HOSTS_FILE"
+          chmod 600 "$SSH_KEY_FILE" "$SSH_KNOWN_HOSTS_FILE"
+          ssh-keygen -y -f "$SSH_KEY_FILE" > /dev/null
+          ssh-keygen -F "$SSH_HOST" -f "$SSH_KNOWN_HOSTS_FILE" > /dev/null || \
+            ssh-keygen -F "[$SSH_HOST]:$SSH_PORT" -f "$SSH_KNOWN_HOSTS_FILE" > /dev/null
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect marked private production incoming directory
+        if: steps.claim.outputs.upload_required == 'true'
+        run: |
+          set -euo pipefail
+          ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$SSH_KNOWN_HOSTS_FILE" \
+            "$SSH_USER@$SSH_HOST" sh -s -- "$REMOTE_INCOMING_ROOT" "${{ steps.release.outputs.partname }}" <<'REMOTE'
+          set -eu
+          root="$1"; part="$2"
+          case "$root" in /*) ;; *) exit 41 ;; esac
+          case "$root" in *'..'*|*'//'*) exit 42 ;; esac
+          case "$part" in *[!A-Za-z0-9._-]*|'') exit 43 ;; esac
+          case "$part" in .pianissimo-*.part) ;; *) exit 44 ;; esac
+          test -d "$root" && test ! -L "$root"
+          test -f "$root/.pianissimo-production-incoming" && test ! -L "$root/.pianissimo-production-incoming"
+          test "$(cat "$root/.pianissimo-production-incoming")" = "pianissimo-production-incoming-v1"
+          test ! -e "$root/$part" && test ! -L "$root/$part"
+          REMOTE
+
+      - name: Upload release archive to unique partial file
+        if: steps.claim.outputs.upload_required == 'true'
+        run: |
+          set -euo pipefail
+          scp -P "$SSH_PORT" -i "$SSH_KEY_FILE" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$SSH_KNOWN_HOSTS_FILE" \
+            "$RELEASE_ARCHIVE" "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_ROOT/${{ steps.release.outputs.partname }}"
+
+      - name: Verify remote archive and atomically finalize incoming transfer
+        if: steps.claim.outputs.upload_required == 'true'
+        run: |
+          set -euo pipefail
+          ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$SSH_KNOWN_HOSTS_FILE" \
+            "$SSH_USER@$SSH_HOST" sh -s -- \
+            "$REMOTE_INCOMING_ROOT" "${{ steps.release.outputs.partname }}" "${{ steps.release.outputs.filename }}" "${{ steps.release.outputs.sha256 }}" <<'REMOTE'
+          set -eu
+          root="$1"; part="$2"; final="$3"; expected="$4"
+          case "$root" in /*) ;; *) exit 51 ;; esac
+          case "$root" in *'..'*|*'//'*) exit 52 ;; esac
+          case "$part" in *[!A-Za-z0-9._-]*|'') exit 53 ;; esac
+          case "$part" in .pianissimo-*.part) ;; *) exit 54 ;; esac
+          case "$final" in *[!A-Za-z0-9._-]*|'') exit 55 ;; esac
+          case "$final" in pianissimo-static-release-*.tar) ;; *) exit 56 ;; esac
+          case "$expected" in *[!0-9a-f]*|'') exit 57 ;; esac
+          test "${#expected}" -eq 64
+          test -f "$root/.pianissimo-production-incoming" && test ! -L "$root/.pianissimo-production-incoming"
+          test "$(cat "$root/.pianissimo-production-incoming")" = "pianissimo-production-incoming-v1"
+          test -f "$root/$part" && test ! -L "$root/$part"
+          test "$(sha256sum "$root/$part" | awk '{print $1}')" = "$expected"
+          if test -e "$root/$final" || test -L "$root/$final"; then
+            test -f "$root/$final" && test ! -L "$root/$final"
+            test "$(sha256sum "$root/$final" | awk '{print $1}')" = "$expected"
+            rm -f -- "$root/$part"
+          else
+            mv -- "$root/$part" "$root/$final"
+          fi
+          REMOTE
+
+      - name: Mark publication uploaded
+        if: steps.claim.outputs.upload_required == 'true'
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          body="$(jq -cn --arg runner_id "$CLAIM_RUNNER_ID" '{runner_id:$runner_id,status:"uploaded"}')"
+          curl --fail-with-body --silent --show-error --output /dev/null \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/status"
+
+      - name: Activate and confirm production release on server
+        if: steps.claim.outputs.activation_required == 'true'
+        run: |
+          set -euo pipefail
+          ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$SSH_KNOWN_HOSTS_FILE" \
+            "$SSH_USER@$SSH_HOST" sh -s -- \
+            "$REMOTE_BACKEND_ROOT" "$REMOTE_PHP_BIN" "$PUBLICATION_ID" "$PUBLICATION_SEQUENCE" \
+            "${{ steps.release.outputs.filename }}" "${{ steps.release.outputs.sha256 }}" "$CLAIM_RUNNER_ID" <<'REMOTE'
+          set -eu
+          backend="$1"; php_bin="$2"; publication="$3"; sequence="$4"; archive="$5"; sha="$6"; runner="$7"
+          case "$backend" in /*) ;; *) exit 61 ;; esac
+          case "$php_bin" in /*) ;; *) exit 62 ;; esac
+          case "$backend$php_bin" in *'..'*|*'//'*) exit 63 ;; esac
+          case "$publication" in ????????-????-4???-[89ab]???-????????????) ;; *) exit 64 ;; esac
+          case "$sequence" in ''|*[!0-9]*|0) exit 65 ;; esac
+          case "$archive" in pianissimo-static-release-*.tar) ;; *) exit 66 ;; esac
+          case "$sha" in *[!0-9a-f]*|'') exit 67 ;; esac
+          test "${#sha}" -eq 64
+          case "$runner" in *[!A-Za-z0-9._:-]*|'') exit 68 ;; esac
+          test "$archive" = "pianissimo-static-release-$sequence-$publication-$sha.tar"
+          test -d "$backend" && test -x "$php_bin"
+          cd "$backend"
+          exec "$php_bin" artisan pianissimo:production:activate "$publication" "$sequence" "$archive" "$sha" --runner="$runner" --no-interaction
+          REMOTE
+
+      - name: Remove only this run's abandoned partial upload
+        if: ${{ failure() && steps.ssh.outputs.configured == 'true' }}
+        continue-on-error: true
+        run: |
+          set +e
+          ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$SSH_KNOWN_HOSTS_FILE" \
+            "$SSH_USER@$SSH_HOST" sh -s -- "$REMOTE_INCOMING_ROOT" "${{ steps.release.outputs.partname }}" <<'REMOTE'
+          root="$1"; part="$2"
+          case "$root" in /*) ;; *) exit 71 ;; esac
+          case "$root" in *'..'*|*'//'*) exit 72 ;; esac
+          case "$part" in *[!A-Za-z0-9._-]*|'') exit 73 ;; esac
+          case "$part" in .pianissimo-*.part) ;; *) exit 74 ;; esac
+          test -f "$root/.pianissimo-production-incoming" && test ! -L "$root/.pianissimo-production-incoming" || exit 75
+          test "$(cat "$root/.pianissimo-production-incoming")" = "pianissimo-production-incoming-v1" || exit 76
+          rm -f -- "$root/$part"
+          REMOTE
+
+      - name: Report sanitized failure to CMS
+        if: ${{ failure() && steps.claim.outputs.claimed == 'true' }}
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set +e
+          body="$(jq -cn --arg runner_id "$CLAIM_RUNNER_ID" '{runner_id:$runner_id,status:"failed",error_code:"workflow_failed",error_message:"GitHub Actions production build failed."}')"
+          curl --silent --show-error --output /dev/null \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/status"
+
+      - name: Delete temporary publication and build material
+        if: always()
+        run: |
+          rm -rf -- "$PACKAGE_ARCHIVE" "$PACKAGE_HEADERS" "$PACKAGE_DIR" "$OUTPUT_DIR" "$RELEASE_ARCHIVE" "$RELEASE_FILE_LIST" "$SSH_DIR"
