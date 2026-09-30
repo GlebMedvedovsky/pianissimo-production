@@ -43,9 +43,15 @@ class DraftPreviewService
                 'media'=>$media,
                 'expires_at'=>now()->addMinutes((int)config('cms.preview_ttl_minutes',15)),
             ]);
-            return ['preview'=>$preview,'token'=>$token,'draftHash'=>$draftHash];
+            $previewPackage=null;
+            if(config('cms.preview_driver')==='package')$previewPackage=app(DraftPreviewPackageService::class)->prepare($preview,$this->manifest($preview));
+            return ['preview'=>$preview,'token'=>$token,'draftHash'=>$draftHash,'package'=>$previewPackage];
         } catch (\Throwable $e) {
             File::deleteDirectory($pending);
+            if(isset($preview)&&$preview instanceof DraftPreview){
+                app(DraftPreviewPackageService::class)->delete($preview);
+                $preview->delete();
+            }
             if(is_dir($directory)&&!DraftPreview::where('snapshot_path',$relative)->exists())File::deleteDirectory($directory);
             throw $e;
         }
@@ -71,6 +77,17 @@ class DraftPreviewService
             $this->invalidate($preview);
             throw new DomainException('Der gespeicherte Entwurf wurde geändert. Bitte öffnen Sie eine neue Website-Vorschau.');
         }
+        return $preview;
+    }
+
+    public function resolveForPublisher(string $identifier): DraftPreview
+    {
+        if(!preg_match('/^[a-f0-9]{32}$/D',$identifier))throw new DomainException('Ungültige Vorschau-Kennung.');
+        $preview=DraftPreview::where('snapshot_path','draft-previews/'.$identifier)->first();
+        if(!$preview||$preview->invalidated_at)throw new DomainException('Diese Website-Vorschau ist nicht mehr gültig.');
+        if($preview->expires_at->isPast()){$this->invalidate($preview);throw new DomainException('Diese Website-Vorschau ist abgelaufen.');}
+        try{$current=$this->currentDraftHash();}catch(\Throwable $e){$this->invalidate($preview);throw new DomainException('Der gespeicherte Entwurf kann nicht mehr sicher als Vorschau angezeigt werden.',0,$e);}
+        if(!hash_equals($preview->draft_hash,$current)){$this->invalidate($preview);throw new DomainException('Der gespeicherte Entwurf wurde geändert.');}
         return $preview;
     }
 
@@ -194,6 +211,12 @@ class DraftPreviewService
 
     private function deleteFiles(DraftPreview $preview): void
     {
-        if(preg_match('#^draft-previews/[a-f0-9]{32}$#',$preview->snapshot_path))File::deleteDirectory(rtrim(config('cms.preview_storage_root'),DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.basename($preview->snapshot_path));
+        if(preg_match('#^draft-previews/[a-f0-9]{32}$#',$preview->snapshot_path)){
+            $identifier=basename($preview->snapshot_path);
+            File::deleteDirectory(rtrim(config('cms.preview_storage_root'),DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$identifier);
+            app(DraftPreviewPackageService::class)->delete($preview);
+            foreach(['preview_result_root','preview_incoming_root'] as $key){$path=rtrim((string)config('cms.'.$key),DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$identifier;if(is_link($path))@unlink($path);elseif(is_dir($path))File::deleteDirectory($path);}
+            @unlink(rtrim((string)config('cms.preview_result_root'),DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$identifier.'.json');
+        }
     }
 }

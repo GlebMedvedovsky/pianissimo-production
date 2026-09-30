@@ -134,6 +134,16 @@ final class ProductionPreflight
             'CMS_PREVIEW_DRIVER',
             'driver must be a recognized value',
         );
+        if (config('cms.preview_driver') === 'package') {
+            $repository = (string) config('publisher.github.repository');
+            $ref = (string) config('publisher.github.ref');
+            $workflow = (string) config('publisher.github.preview_workflow');
+            $token = (string) config('publisher.github.token');
+            $this->add($checks, preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#D', $repository) === 1, 'CMS_GITHUB_REPOSITORY', 'owner/repository is required for package previews');
+            $this->add($checks, $ref !== '' && strlen($ref) <= 255 && preg_match('#^[A-Za-z0-9._/-]+$#D', $ref) === 1 && ! str_contains($ref, '..') && ! str_contains($ref, '//'), 'CMS_GITHUB_REF', 'a safe exact branch or tag is required for package previews');
+            $this->add($checks, preg_match('/^[A-Za-z0-9_.-]+\.ya?ml$/D', $workflow) === 1, 'CMS_PREVIEW_WORKFLOW', 'a workflow filename is required for package previews');
+            $this->add($checks, strlen($token) >= 32 && strlen($token) <= 512 && preg_match('/\s/', $token) !== 1, 'CMS_GITHUB_TOKEN', 'an Actions:write token is required for package previews');
+        }
         $this->add($checks, config('mail.default') === 'log', 'MAIL_MAILER', 'must remain log');
         $this->record($checks, 'PASS', 'External side effects', 'no SMTP, analytics or tracking action is performed');
 

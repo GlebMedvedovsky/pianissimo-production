@@ -9,6 +9,7 @@ const localPath = (relative) =>
   fileURLToPath(new URL(relative, import.meta.url)).replaceAll("\\", "/");
 
 const publicationBuild = process.env.PIANISSIMO_PUBLICATION_BUILD === "1";
+const previewBuild = process.env.PIANISSIMO_PREVIEW_BUILD === "1";
 const publicationManifestPath = process.env.PIANISSIMO_MANIFEST_PATH;
 const publicationPublicDir = process.env.PIANISSIMO_PUBLIC_DIR;
 const publicationOutDir = process.env.PIANISSIMO_OUT_DIR;
@@ -117,13 +118,21 @@ const privateLocalMaterials = {
 export default defineConfig({
   output: "static",
   ...(publicationBuild
-    ? { publicDir: publicationPublicDir, outDir: publicationOutDir }
+    ? {
+        publicDir: publicationPublicDir,
+        outDir: publicationOutDir,
+        cacheDir: resolve(publicationOutDir, "../.astro-cache"),
+        build: { server: resolve(publicationOutDir, "../.astro-server") },
+      }
     : {}),
   trailingSlash: "always",
   devToolbar: { enabled: false },
   integrations: [localDraftPreviewRoute],
   server: { host: "127.0.0.1", port: 4321 },
   vite: {
+    define: {
+      "import.meta.env.PIANISSIMO_PREVIEW_BUILD": JSON.stringify(previewBuild ? "1" : "0"),
+    },
     plugins: [manifestModule, privateLocalMaterials, audioFixtures],
     server: {
       allowedHosts: ["host.docker.internal"],

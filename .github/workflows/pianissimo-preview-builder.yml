@@ -1,0 +1,121 @@
+name: Pianissimo private preview builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_identifier:
+        description: Opaque private preview identifier
+        required: true
+        type: string
+      package_sha256:
+        description: Immutable preview package SHA-256
+        required: true
+        type: string
+      source_revision:
+        description: Exact frontend source revision
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pianissimo-preview-${{ inputs.preview_identifier }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CMS_URL: ${{ vars.PIANISSIMO_CMS_URL }}
+      PREVIEW_ID: ${{ inputs.preview_identifier }}
+      PACKAGE_SHA256: ${{ inputs.package_sha256 }}
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      PACKAGE_ARCHIVE: ${{ runner.temp }}/pianissimo-preview.tar
+      PACKAGE_HEADERS: ${{ runner.temp }}/pianissimo-preview.headers
+      PACKAGE_DIR: ${{ runner.temp }}/pianissimo-preview-package
+      OUTPUT_DIR: ${{ runner.temp }}/pianissimo-preview-output
+      OUTPUT_ARCHIVE: ${{ runner.temp }}/pianissimo-preview-result.tar
+      OUTPUT_LIST: ${{ runner.temp }}/pianissimo-preview-result.files
+    steps:
+      - name: Enforce preview workflow gate and validate inputs
+        env:
+          WORKFLOW_ENABLED: ${{ vars.PIANISSIMO_PREVIEW_WORKFLOW_ENABLED }}
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$WORKFLOW_ENABLED" = "true"
+          [[ "$PREVIEW_ID" =~ ^[a-f0-9]{32}$ ]]
+          [[ "$PACKAGE_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$SOURCE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$CMS_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]
+          test -n "$PUBLISHER_TOKEN"
+
+      - name: Checkout exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+
+      - name: Verify checked-out source revision
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Download immutable private preview package
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error -D "$PACKAGE_HEADERS" \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -o "$PACKAGE_ARCHIVE" "$CMS_URL/api/publisher/v1/previews/$PREVIEW_ID/package"
+          transport_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Transport-Sha256:/ {gsub("\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
+          logical_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Package-Sha256:/ {gsub("\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
+          test "$logical_sha" = "$PACKAGE_SHA256"
+          test "$(sha256sum "$PACKAGE_ARCHIVE" | awk '{print $1}')" = "$transport_sha"
+          node scripts/extract-preview-transport.mjs "$PACKAGE_ARCHIVE" "$PACKAGE_DIR" "$PREVIEW_ID" "$PACKAGE_SHA256" "$SOURCE_REVISION"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build exact private preview
+        run: npm run build:preview -- --package "$PACKAGE_DIR" --out "$OUTPUT_DIR"
+
+      - name: Validate and archive private preview result
+        id: result
+        run: |
+          set -euo pipefail
+          files_sha="$(node scripts/create-release-integrity.mjs "$OUTPUT_DIR" "$PACKAGE_DIR/preview.json")"
+          metadata_sha="$(sha256sum "$OUTPUT_DIR/.pianissimo-release.json" | awk '{print $1}')"
+          find "$OUTPUT_DIR" -mindepth 1 -printf '%P\0' | sort -z > "$OUTPUT_LIST"
+          tar --sort=name --format=ustar --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            --no-recursion --null -C "$OUTPUT_DIR" -cf "$OUTPUT_ARCHIVE" --files-from="$OUTPUT_LIST"
+          archive_sha="$(sha256sum "$OUTPUT_ARCHIVE" | awk '{print $1}')"
+          echo "files_sha=$files_sha" >> "$GITHUB_OUTPUT"
+          echo "metadata_sha=$metadata_sha" >> "$GITHUB_OUTPUT"
+          echo "archive_sha=$archive_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Upload validated private preview result
+        env:
+          PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --output /dev/null \
+            -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+            -H "Content-Type: application/x-tar" \
+            -H "X-Pianissimo-Package-Sha256: $PACKAGE_SHA256" \
+            -H "X-Pianissimo-Archive-Sha256: ${{ steps.result.outputs.archive_sha }}" \
+            -H "X-Pianissimo-Files-Sha256: ${{ steps.result.outputs.files_sha }}" \
+            -H "X-Pianissimo-Metadata-Sha256: ${{ steps.result.outputs.metadata_sha }}" \
+            --data-binary "@$OUTPUT_ARCHIVE" \
+            "$CMS_URL/api/publisher/v1/previews/$PREVIEW_ID/result"
+
+      - name: Remove preview material
+        if: always()
+        run: rm -rf -- "$PACKAGE_ARCHIVE" "$PACKAGE_HEADERS" "$PACKAGE_DIR" "$OUTPUT_DIR" "$OUTPUT_ARCHIVE" "$OUTPUT_LIST"

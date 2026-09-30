@@ -1,6 +1,6 @@
 # Pianissimo production environment and preflight
 
-This document covers the production environment contract, host/proxy policy, read-only preflight, immutable production package/build contract, and the Task 5 authenticated transfer/activation implementation. Manual infrastructure verification has occurred, but no application deployment, publication rehearsal, migration/bootstrap, public document-root cutover, production preview, SMTP, analytics, or tracking has been performed.
+This document covers the production environment contract, host/proxy policy, read-only preflight, immutable production publication pipeline, and the private package Draft Preview pipeline. Manual infrastructure verification has occurred, but this repository change does not deploy, publish, switch the public document root, enable SMTP, analytics, or tracking.
 
 Start from `backend/.env.production.example` and store the real production file only on the host. Generate `APP_KEY` securely on the deployment workstation. Supply the database password through the private host environment; it is intentionally absent from the example and must never be committed, logged or pasted into diagnostics.
 
@@ -16,9 +16,9 @@ Required application values are `APP_ENV`, `APP_KEY`, `APP_DEBUG`, `APP_URL`, `A
 
 `CMS_ALLOWED_HOSTS` must explicitly contain `admin.pianissimo-production.de`. `CMS_TRUSTED_PROXIES` is empty by default. Add only an exact IP address or CIDR after Netcup confirms that the request reaches PHP through that proxy; hostnames and wildcards are rejected. Forwarded host/protocol/port headers are not trusted from other peers.
 
-The non-path CMS settings are `CMS_ALLOWED_HOSTS`, `CMS_TRUSTED_PROXIES`, `CMS_PUBLIC_SITE_URL`, `CMS_SOURCE_REVISION`, `CMS_PUBLICATION_DRIVER`, `CMS_PREVIEW_DRIVER`, `CMS_PREVIEW_TTL_MINUTES` and `CMS_MEDIA_MAX_KB`.
+The non-path CMS settings are `CMS_ALLOWED_HOSTS`, `CMS_TRUSTED_PROXIES`, `CMS_PUBLIC_SITE_URL`, `CMS_SOURCE_REVISION`, `CMS_PUBLICATION_DRIVER`, `CMS_PREVIEW_DRIVER`, `CMS_PREVIEW_TTL_MINUTES` and `CMS_MEDIA_MAX_KB`. When `CMS_PREVIEW_DRIVER=package`, the package builder additionally requires `CMS_GITHUB_REPOSITORY`, `CMS_GITHUB_REF`, `CMS_PREVIEW_WORKFLOW` and `CMS_GITHUB_TOKEN`. The token needs only Actions write access to the configured repository.
 
-The required path settings are `CMS_SCHEMA`, `CMS_ACTIVE_MANIFEST`, `CMS_MEDIA_ROOT`, `CMS_MANAGED_MEDIA_ROOT`, `CMS_MEDIA_ORIGINALS_ROOT`, `CMS_PRIVATE_MEDIA_ROOT`, `CMS_PUBLICATION_PACKAGE_ROOT`, `CMS_FRONTEND_APPLY_STATE`, `CMS_PREVIEW_STORAGE_ROOT`, `CMS_PREVIEW_PACKAGE_ROOT`, `CMS_PREVIEW_INCOMING_ROOT`, `CMS_PREVIEW_RESULT_ROOT`, `CMS_PRODUCTION_INCOMING_ROOT`, `CMS_STATIC_RELEASE_ROOT` and `CMS_PUBLIC_SITE_ROOT`. `CMS_PUBLIC_SITE_ROOT` identifies the current static document root only so the preflight can prove that immutable release storage is separate. These variables configure future drivers but do not implement or activate those drivers.
+The required path settings are `CMS_SCHEMA`, `CMS_ACTIVE_MANIFEST`, `CMS_MEDIA_ROOT`, `CMS_MANAGED_MEDIA_ROOT`, `CMS_MEDIA_ORIGINALS_ROOT`, `CMS_PRIVATE_MEDIA_ROOT`, `CMS_PUBLICATION_PACKAGE_ROOT`, `CMS_FRONTEND_APPLY_STATE`, `CMS_PREVIEW_STORAGE_ROOT`, `CMS_PREVIEW_PACKAGE_ROOT`, `CMS_PREVIEW_INCOMING_ROOT`, `CMS_PREVIEW_RESULT_ROOT`, `CMS_PRODUCTION_INCOMING_ROOT`, `CMS_STATIC_RELEASE_ROOT` and `CMS_PUBLIC_SITE_ROOT`. `CMS_PUBLIC_SITE_ROOT` identifies the current static document root only so preflight and preview storage checks can prove that private package/result storage is separate from public files.
 
 Keep these production values in their verified SSH-chroot form beginning with `/pianissimo-production.de`; the same `.env` is used by CLI and FastCGI. `CmsConfiguration` derives the runtime site root as two `dirname()` levels above Laravel `base_path()` because the backend is installed at `<site-root>/app/backend`. It replaces only an exact `/pianissimo-production.de` path component (the root itself or that root followed by `/`) across every required CMS production filesystem setting. Under SSH/CLI the replacement is effectively unchanged. Under FastCGI, for example, `/pianissimo-production.de/releases/static` resolves to `/var/www/vhosts/hosting213834.a2e58.netcup.net/pianissimo-production.de/releases/static`. Other absolute roots, including names that merely begin similarly such as `/pianissimo-production.de-backup`, are not translated.
 
@@ -100,6 +100,40 @@ For Kinnhakenhank, PHP and TypeScript release validation both require local trai
 
 The current real manifest remains blocked from release. Its known release failures include unapproved assets, missing required audio, incomplete legal/contact/domain approval, and the unapproved Kinnhakenhank hover video. Validation was not weakened to make current content pass.
 
+## Private package Draft Preview
+
+`CMS_PREVIEW_DRIVER` has two deliberately separate modes:
+
+- `local-http` preserves the development flow. Laravel posts the saved, validated draft to the local Astro dev renderer configured by `CMS_PREVIEW_FRONTEND_INTERNAL_URL` and rewrites dev-asset URLs to `CMS_PREVIEW_FRONTEND_URL`.
+- `package` never reads or calls either frontend URL. It does not require `host.docker.internal`, localhost, or a persistent Astro process on Netcup.
+
+For `package`, opening **Website-Vorschau** creates the existing expiring `DraftPreview` snapshot and a second immutable build package below `CMS_PREVIEW_PACKAGE_ROOT`. The package contains only a draft-preview-policy manifest with analytics forced off, exact referenced media, canonical metadata, the exact `CMS_SOURCE_REVISION`, and SHA-256/size inventory. It never changes the active manifest, production publication records, `releases/static/current`, or the public document root.
+
+The CMS then dispatches `.github/workflows/pianissimo-preview-builder.yml` at the configured ref. The workflow is disabled unless repository variable `PIANISSIMO_PREVIEW_WORKFLOW_ENABLED` is exactly `true`. It checks out the exact source revision, downloads the package through the bearer-authenticated publisher API, safely extracts and revalidates it, runs the isolated static Astro preview build, creates the same full-file integrity format used by static production releases, and uploads the deterministic result archive to the CMS. No SSH access and no production activation command are used by this workflow.
+
+The CMS streams the upload into `CMS_PREVIEW_INCOMING_ROOT`, verifies the archive digest, USTAR structure, paths, types, entry limits, full output inventory, metadata identity, manifest/package/source hashes, and every media hash/size. Only then is the result atomically moved below `CMS_PREVIEW_RESULT_ROOT`. Both roots remain private and outside the CMS/public-site document roots.
+
+While the build is pending, `/draft-preview/site` returns a private `202` page that reloads after three seconds. When ready, Laravel serves the requested home, Film Music, Directing, legal, privacy, and actual project routes plus their Astro assets. Every browser route requires the authenticated CMS session and the matching expiring preview token/ID. Responses use `private, no-store`, `X-Robots-Tag: noindex, nofollow, noarchive`, and MIME/path allowlists. Draft changes, a newer preview, expiry, media tampering, result tampering, or package/source mismatch invalidate or block the preview. Cleanup removes its snapshot, package, incoming data, result, and receipt. The public production website is never used as a preview host.
+
+Required GitHub values for package preview are:
+
+- secret `PIANISSIMO_PUBLISHER_API_TOKEN`, exactly matching the CMS `CMS_PUBLISHER_API_TOKEN`;
+- variable `PIANISSIMO_CMS_URL=https://admin.pianissimo-production.de`;
+- variable `PIANISSIMO_PREVIEW_WORKFLOW_ENABLED=true` only when preview builds are intentionally enabled.
+
+Required CMS values are `CMS_GITHUB_REPOSITORY=<owner/repository>`, `CMS_GITHUB_REF=<deployed branch or tag>`, `CMS_PREVIEW_WORKFLOW=pianissimo-preview-builder.yml`, and a fine-grained `CMS_GITHUB_TOKEN` with only Actions write permission for that repository. Keep `CMS_PREVIEW_FRONTEND_URL` and `CMS_PREVIEW_FRONTEND_INTERNAL_URL` unset in production.
+
+### Production deployment steps for package preview
+
+1. Deploy the backend, frontend source, `scripts/`, and `.github/workflows/pianissimo-preview-builder.yml` from one committed revision. Do not change the public document root or production release pointer.
+2. Set `CMS_SOURCE_REVISION` to that exact lowercase 40-character commit SHA. Set `CMS_PREVIEW_DRIVER=package`; leave both `CMS_PREVIEW_FRONTEND_*` variables absent.
+3. In the private production environment set `CMS_GITHUB_REPOSITORY`, `CMS_GITHUB_REF`, `CMS_PREVIEW_WORKFLOW=pianissimo-preview-builder.yml`, and the restricted `CMS_GITHUB_TOKEN`. Do not print the token during verification.
+4. Ensure the configured `CMS_PREVIEW_STORAGE_ROOT`, `CMS_PREVIEW_PACKAGE_ROOT`, `CMS_PREVIEW_INCOMING_ROOT`, and `CMS_PREVIEW_RESULT_ROOT` directories exist outside both web document roots and are writable by the FastCGI user. Preserve the existing absolute SSH-chroot paths; runtime translation handles FastCGI. Set the FastCGI request-body/`post_max_size` limit high enough for the complete static preview archive (the application independently caps it at 2 GiB); keep the limit no lower than the largest validated draft media set plus frontend assets.
+5. Configure the GitHub secret/variables listed above, then enable `PIANISSIMO_PREVIEW_WORKFLOW_ENABLED=true`.
+6. From `backend/`, run `php artisan optimize:clear`, then `php artisan cms:production-preflight --check-database`. This change adds no database migration.
+7. Sign in to the production CMS, save a harmless draft, open **Website-Vorschau**, and verify the workflow completes and the private preview renders. Confirm a logged-out request redirects to login, response headers contain `no-store`/`noindex`, and changing the draft makes the old tab stale.
+8. Do not run the production activation command and do not modify `releases/static/current`; preview deployment is complete without publishing anything.
+
 ## Authenticated production publisher API
 
 Task 4 adds a stateless publisher API under `/api/publisher/v1`. It does not use the Filament/admin session and has no browser login flow. Every endpoint requires `Authorization: Bearer <token>` with the dedicated `CMS_PUBLISHER_API_TOKEN`. The token must be a high-entropy value of 32–512 non-whitespace characters supplied only through environment/configuration. It is compared with `hash_equals`, is never stored in the database, returned, or included in publisher audit metadata, and an absent or malformed configuration fails closed. Publisher routes are rate-limited to 30 requests per minute per resolved client IP and all responses use private/no-store caching.
@@ -112,7 +146,7 @@ The implemented endpoints are:
 
 The download is a deterministic uncompressed POSIX ustar transport. It contains only `publication.json`, `manifest.json`, and the exact sorted `media/...` inventory. Headers use fixed permissions, owner/group zero, timestamp zero, validated relative names, regular-file entries only, and two zero end blocks. `packageSha256` remains the Task 2 logical content digest and is returned as `X-Pianissimo-Package-Sha256`. The SHA-256 of the tar bytes is a separate transport digest returned as `X-Pianissimo-Transport-Sha256`; GitHub Actions verifies both distinctions and safely extracts without invoking a general archive extractor. This does not require `ZipArchive` and does not change the Task 2 package contract.
 
-`ProductionWorkflowDispatcher::payload()` prepares the exact non-secret dispatch inputs without making a network call: `publication_id`, decimal `sequence`, logical `package_sha256`, and exact `source_revision`. Optional future server-side dispatch configuration is named `CMS_GITHUB_REPOSITORY`, `CMS_GITHUB_REF`, `CMS_PRODUCTION_WORKFLOW`, and `CMS_GITHUB_TOKEN`. Task 4 does not wire automatic dispatch into Apply and does not call GitHub. If an adapter is added later for the documented workflow-dispatch endpoint, use a fine-grained PAT or GitHub App token restricted to this repository with only **Actions: write** permission; a classic broad `repo` PAT is not required.
+`ProductionWorkflowDispatcher::payload()` prepares the exact non-secret production-publication inputs without making a network call: `publication_id`, decimal `sequence`, logical `package_sha256`, and exact `source_revision`. Production Apply still does not automatically dispatch GitHub. The package Draft Preview separately uses `CMS_GITHUB_REPOSITORY`, `CMS_GITHUB_REF`, `CMS_PREVIEW_WORKFLOW`, and `CMS_GITHUB_TOKEN` for its own narrowly scoped workflow dispatch. Use a fine-grained PAT or GitHub App token restricted to this repository with only **Actions: write** permission; a classic broad `repo` PAT is not required.
 
 ## GitHub Actions production build boundary
 
@@ -126,7 +160,7 @@ Configure these GitHub values:
 
 The immutable claim identity is `github-${github.run_id}` and therefore stays constant across GitHub re-runs. `github.run_attempt` is used only in the temporary partial-upload name. The workflow validates inputs/configuration and the server-returned identity, then conditionally resumes: `dispatched`/`building` rebuild; `built` rebuilds and must reproduce both stored release digests without moving lifecycle backwards; `uploading` rebuilds and resumes transfer; `uploaded` skips build and upload; `activating` resumes activation; `active` is complete; and `failed` first follows the explicit server reset described above. A different `run_id` cannot take the immutable claim. After a successful claim, failures send only a generic allowlisted callback. Temporary package, build, headers, release archive, and attempt-owned partial-upload material are always cleaned up.
 
-Task 5 extends that boundary as documented below. Production publishing is still not operational until the host is bootstrapped and an explicitly authorized Netcup rehearsal succeeds. External production Draft Preview, SFTP media import, SMTP, analytics/tracking, HSTS, and public-domain cutover remain out of scope.
+Task 5 extends that boundary as documented below. Production publishing is still not operational until the host is bootstrapped and an explicitly authorized Netcup rehearsal succeeds. The private package Draft Preview above is isolated from publication and does not authorize that rehearsal. SFTP media import, SMTP, analytics/tracking, HSTS, and public-domain cutover remain out of scope.
 
 ## Netcup static release layout and safety markers
 

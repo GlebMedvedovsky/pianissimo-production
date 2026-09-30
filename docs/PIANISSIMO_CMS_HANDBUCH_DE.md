@@ -187,6 +187,7 @@ Vor einer späteren Production-Freigabe Domain/Canonical, Titel, Beschreibungen,
 - Benutzer verwalten: `System → Benutzer`. Nur notwendige Konten führen; neue Passwörter separat sicher übermitteln.
 - Passwort zurücksetzen: Anmeldeseite → **Passwort vergessen** oder `System → Benutzer → Bearbeiten`. SMTP/Production-Mailversand ist nicht eingerichtet.
 - Veröffentlichung: `System → Veröffentlichung`; Entwurf → Vorschau → Prüfen → Übernehmen.
+- Website-Vorschau in Production: Der private Paket-Build kann nach dem Öffnen kurz den Hinweis **Website-Vorschau wird erstellt** zeigen und lädt danach automatisch neu. Das ist keine Veröffentlichung; die öffentliche Website bleibt unverändert. Das Vorschau-Fenster erfordert die aktive CMS-Anmeldung, läuft automatisch ab und wird nach jeder gespeicherten Änderung ungültig.
 - Änderung nicht sichtbar: Speicherbestätigung prüfen, neue Vorschau öffnen, Status/Blockierungen kontrollieren, erneut prüfen und übernehmen.
 - „Vorschau nicht mehr aktuell“: Entwurf wurde danach geändert. Neue Vorschau öffnen und **Änderungen erneut prüfen** wählen.
 - Technische Details: `System → Veröffentlichung → Technische Details` nur für Administrator/Support. Keine Hashes, Pfade oder Logs in redaktionelle Inhalte übernehmen.

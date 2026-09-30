@@ -6,17 +6,26 @@ use App\Models\{Project,Track,MediaAsset,Setting,CvEntry,User,ExternalService,Pu
 use App\Services\{ManifestImporter,ManifestExporter,ContentValidator};
 use Livewire\Livewire;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\File;
 
 class CmsTest extends TestCase
 {
     use RefreshDatabase;
     private array $input;
+    private string $exportRoot;
     protected function setUp(): void
     {
         parent::setUp();
+        $this->exportRoot='cms-tests/'.getmypid().'-'.bin2hex(random_bytes(5));
+        config(['cms.export_prefix'=>$this->exportRoot]);
         $this->input=json_decode(file_get_contents(config('cms.manifest')),true);
         app(ManifestImporter::class)->import($this->input);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+    }
+    protected function tearDown(): void
+    {
+        if(isset($this->exportRoot))File::deleteDirectory(storage_path('app/private/'.$this->exportRoot));
+        parent::tearDown();
     }
     private function admin(): User { $u=User::create(['name'=>'Synthetic QA','email'=>'qa@example.test','password'=>bin2hex(random_bytes(20))]); $this->actingAs($u); return $u; }
     public function test_import_is_idempotent_and_shared_projects_are_not_duplicated(): void

@@ -53,8 +53,8 @@ export async function createReleaseIntegrity(outputDirectory, publicationPath) {
   const publication = JSON.parse(await readFile(resolve(publicationPath), "utf8"));
   const metadata = {
     releaseContractVersion: 1,
-    publicationId: publication.publicationId,
-    sequence: publication.sequence,
+    publicationId: publication.publicationId ?? publication.previewIdentifier,
+    sequence: publication.sequence ?? publication.previewId,
     sourceRevision: publication.sourceRevision,
     packageSha256: publication.packageSha256,
     manifestSha256: publication.manifestSha256,

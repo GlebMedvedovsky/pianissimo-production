@@ -28,7 +28,11 @@ class DraftPreviewOwnerFlowTest extends TestCase
             'cms.frontend_apply_state'=>$this->fixtureRoot.'/apply',
             'cms.export_prefix'=>'draft-preview-tests/'.basename($this->fixtureRoot).'/exports',
             'cms.preview_storage_root'=>$this->fixtureRoot.'/previews',
+            'cms.preview_package_root'=>$this->fixtureRoot.'/preview-packages',
+            'cms.preview_incoming_root'=>$this->fixtureRoot.'/preview-incoming',
+            'cms.preview_result_root'=>$this->fixtureRoot.'/preview-results',
             'cms.preview_ttl_minutes'=>15,
+            'cms.preview_driver'=>'local-http',
         ]);
         $this->admin=User::create(['name'=>'Preview QA','email'=>bin2hex(random_bytes(4)).'@example.test','password'=>bin2hex(random_bytes(20))]);
         $this->actingAs($this->admin);
@@ -141,6 +145,66 @@ class DraftPreviewOwnerFlowTest extends TestCase
         $location=(string)$response->headers->get('Location');$this->assertStringNotContainsString('token=',$location);
         $this->assertStringContainsString('/draft-preview/site',$location);parse_str((string)parse_url($location,PHP_URL_QUERY),$query);
         $this->assertMatchesRegularExpression('/^\d+$/',(string)($query['preview']??''));
+    }
+
+    public function test_package_preview_dispatches_private_build_and_never_calls_local_frontend_renderer(): void
+    {
+        config([
+            'cms.preview_driver'=>'package',
+            'cms.source_revision'=>str_repeat('a',40),
+            'publisher.github.repository'=>'pianissimo/production',
+            'publisher.github.ref'=>'main',
+            'publisher.github.preview_workflow'=>'pianissimo-preview-builder.yml',
+            'publisher.github.token'=>str_repeat('g',40),
+        ]);
+        Http::preventStrayRequests();
+        Http::fake(['https://api.github.com/repos/pianissimo/production/actions/workflows/pianissimo-preview-builder.yml/dispatches'=>Http::response('',204)]);
+
+        $open=$this->get(route('draft-preview.open'))->assertRedirect();
+        $location=(string)$open->headers->get('Location');
+        $this->get($location)->assertStatus(202)->assertHeader('X-Robots-Tag','noindex, nofollow, noarchive');
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn($request)=>$request->url()==='https://api.github.com/repos/pianissimo/production/actions/workflows/pianissimo-preview-builder.yml/dispatches'
+            && $request['inputs']['source_revision']===str_repeat('a',40)
+            && preg_match('/^[a-f0-9]{32}$/D',$request['inputs']['preview_identifier'])===1);
+        $this->assertStringNotContainsString('host.docker.internal',Http::recorded()[0][0]->url());
+    }
+
+    public function test_local_http_preview_still_posts_saved_manifest_to_development_renderer(): void
+    {
+        config(['cms.preview_driver'=>'local-http','cms.preview_frontend_internal_url'=>'http://host.docker.internal:4321','cms.preview_frontend_url'=>'http://127.0.0.1:4321']);
+        $created=app(DraftPreviewService::class)->create($this->admin->id);
+        Http::fake(['http://host.docker.internal:4321/draft-preview/*'=>Http::response('<!doctype html><html><head><script src="/@vite/client"></script></head><body>LOCAL PREVIEW</body></html>',200,['Content-Type'=>'text/html'])]);
+        $response=$this->withSession(['draft_preview_token'=>$created['token']])->get(route('draft-preview.site',['preview'=>$created['preview']->id,'route'=>'/']));
+        $response->assertOk()->assertSee('LOCAL PREVIEW',false)->assertHeader('X-Robots-Tag','noindex, nofollow, noarchive');
+        Http::assertSent(fn($request)=>$request->method()==='POST'&&str_starts_with($request->url(),'http://host.docker.internal:4321/draft-preview/'));
+    }
+
+    public function test_package_transport_is_private_authenticated_and_bound_to_unexpired_preview(): void
+    {
+        $publisherToken=str_repeat('p',48);
+        config(['cms.preview_driver'=>'package','cms.source_revision'=>str_repeat('a',40),'publisher.api_token'=>$publisherToken]);
+        $created=app(DraftPreviewService::class)->create($this->admin->id);
+        $identifier=basename($created['preview']->snapshot_path);
+        $url='/api/publisher/v1/previews/'.$identifier.'/package';
+
+        $unauthorized=$this->get($url)->assertUnauthorized();$this->assertStringContainsString('no-store',(string)$unauthorized->headers->get('Cache-Control'));
+        $response=$this->withHeader('Authorization','Bearer '.$publisherToken)->get($url)->assertOk()->assertHeader('Content-Type','application/x-tar');
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/',(string)$response->headers->get('X-Pianissimo-Transport-Sha256'));
+        $this->assertSame($created['package']['packageSha256'],$response->headers->get('X-Pianissimo-Package-Sha256'));
+
+        $created['preview']->update(['expires_at'=>now()->subSecond()]);
+        $this->withHeader('Authorization','Bearer '.$publisherToken)->get($url)->assertServerError();
+    }
+
+    public function test_preview_media_checksum_tampering_remains_blocked(): void
+    {
+        $asset=$this->jpg('qa-preview-tamper','test','unconfirmed');$about=Setting::read('about');Setting::put('about',[...$about,'media'=>[...$about['media'],'image'=>$asset->id]]);
+        $created=app(DraftPreviewService::class)->create($this->admin->id);
+        $media=$created['preview']->media[$asset->id];
+        file_put_contents($this->fixtureRoot.'/previews/'.basename($created['preview']->snapshot_path).'/media/'.$media['file'],'tampered');
+        $this->withSession(['draft_preview_token'=>$created['token']])->get(route('draft-preview.media',$media['file']))->assertForbidden();
     }
 
     public function test_new_saved_draft_invalidates_old_snapshot_and_new_preview_contains_new_value(): void

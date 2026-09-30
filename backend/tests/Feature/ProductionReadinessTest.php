@@ -292,6 +292,10 @@ class ProductionReadinessTest extends TestCase
             'cms.source_revision' => str_repeat('a', 40),
             'cms.publication_driver' => 'package',
             'cms.preview_driver' => 'package',
+            'publisher.github.repository' => 'pianissimo/production',
+            'publisher.github.ref' => 'main',
+            'publisher.github.preview_workflow' => 'pianissimo-preview-builder.yml',
+            'publisher.github.token' => str_repeat('g', 40),
             'cms.explicit_environment' => array_fill_keys(array_keys(config('cms.production_path_variables')), true),
             'mail.default' => 'log',
         ]);

@@ -23,7 +23,7 @@ interface Props {
   content?: Manifest
 }
 const { title, section = 'home', theme = 'dark', content = activeContent, description = content.site.description } = Astro.props;
-const draftPreview = Astro.locals.draftPreview;
+const draftPreview = Astro.locals.draftPreview ?? (import.meta.env.PIANISSIMO_PREVIEW_BUILD === '1' ? { cmsUrl: '/admin' } : undefined);
 ---
 <!doctype html>
 <html
