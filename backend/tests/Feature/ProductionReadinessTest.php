@@ -83,6 +83,90 @@ class ProductionReadinessTest extends TestCase
         $this->assertSame($configuration['active_manifest'], $configuration['manifest']);
     }
 
+    public function test_ssh_chroot_production_path_remains_effectively_unchanged(): void
+    {
+        $configuration = CmsConfiguration::make(
+            static fn (string $name, mixed $default = null): mixed => $name === 'CMS_SCHEMA'
+                ? '/pianissimo-production.de/private/contracts/manifest.schema.json'
+                : $default,
+            '/pianissimo-production.de/app/backend',
+        );
+
+        $this->assertSame(
+            '/pianissimo-production.de/private/contracts/manifest.schema.json',
+            $configuration['schema'],
+        );
+    }
+
+    public function test_fastcgi_runtime_root_replaces_the_ssh_chroot_prefix(): void
+    {
+        $configuration = CmsConfiguration::make(
+            static fn (string $name, mixed $default = null): mixed => $name === 'CMS_STATIC_RELEASE_ROOT'
+                ? '/pianissimo-production.de/releases/static'
+                : $default,
+            '/var/www/vhosts/hosting213834.a2e58.netcup.net/pianissimo-production.de/app/backend',
+        );
+
+        $this->assertSame(
+            '/var/www/vhosts/hosting213834.a2e58.netcup.net/pianissimo-production.de/releases/static',
+            $configuration['static_release_root'],
+        );
+    }
+
+    public function test_unrelated_absolute_paths_and_similar_prefixes_are_not_translated(): void
+    {
+        $values = [
+            'CMS_SCHEMA' => '/srv/shared/contracts/manifest.schema.json',
+            'CMS_ACTIVE_MANIFEST' => '/pianissimo-production.de-backup/manifest.json',
+        ];
+        $configuration = CmsConfiguration::make(
+            static fn (string $name, mixed $default = null): mixed => $values[$name] ?? $default,
+            '/var/www/vhosts/hosting213834.a2e58.netcup.net/pianissimo-production.de/app/backend',
+        );
+
+        $this->assertSame('/srv/shared/contracts/manifest.schema.json', $configuration['schema']);
+        $this->assertSame('/pianissimo-production.de-backup/manifest.json', $configuration['active_manifest']);
+        $this->assertSame($configuration['active_manifest'], $configuration['manifest']);
+    }
+
+    public function test_every_production_path_variable_uses_the_runtime_translation(): void
+    {
+        $pathVariables = [
+            'CMS_SCHEMA' => 'schema',
+            'CMS_ACTIVE_MANIFEST' => 'active_manifest',
+            'CMS_MEDIA_ROOT' => 'media_root',
+            'CMS_MANAGED_MEDIA_ROOT' => 'managed_media_root',
+            'CMS_MEDIA_ORIGINALS_ROOT' => 'media_originals_root',
+            'CMS_PRIVATE_MEDIA_ROOT' => 'private_media_root',
+            'CMS_PUBLICATION_PACKAGE_ROOT' => 'publication_package_root',
+            'CMS_FRONTEND_APPLY_STATE' => 'frontend_apply_state',
+            'CMS_PREVIEW_STORAGE_ROOT' => 'preview_storage_root',
+            'CMS_PREVIEW_PACKAGE_ROOT' => 'preview_package_root',
+            'CMS_PREVIEW_INCOMING_ROOT' => 'preview_incoming_root',
+            'CMS_PREVIEW_RESULT_ROOT' => 'preview_result_root',
+            'CMS_PRODUCTION_INCOMING_ROOT' => 'production_incoming_root',
+            'CMS_STATIC_RELEASE_ROOT' => 'static_release_root',
+            'CMS_PUBLIC_SITE_ROOT' => 'public_site_root',
+        ];
+        $values = [];
+        foreach ($pathVariables as $variable => $key) {
+            $values[$variable] = '/pianissimo-production.de/test-paths/'.$key;
+        }
+
+        $runtimeSiteRoot = '/var/www/vhosts/hosting213834.a2e58.netcup.net/pianissimo-production.de';
+        $configuration = CmsConfiguration::make(
+            static fn (string $name, mixed $default = null): mixed => $values[$name] ?? $default,
+            $runtimeSiteRoot.'/app/backend',
+        );
+
+        $this->assertSame($pathVariables, $configuration['production_path_variables']);
+        foreach ($pathVariables as $variable => $key) {
+            $this->assertSame($runtimeSiteRoot.'/test-paths/'.$key, $configuration[$key]);
+            $this->assertTrue($configuration['explicit_environment'][$variable]);
+        }
+        $this->assertSame($configuration['active_manifest'], $configuration['manifest']);
+    }
+
     public function test_production_host_is_accepted_and_unapproved_host_is_rejected(): void
     {
         config(['dev-access.hosts' => ['admin.pianissimo-production.de']]);

@@ -8,9 +8,9 @@ After the production implementation is committed and pushed, run `git rev-parse 
 
 ## Verified infrastructure facts and remaining checks
 
-The following were manually verified on the real Netcup account without deploying the application: the SSH host, user and port; deployment-key login without a password; CLI PHP at `/usr/local/php84/bin/php` reporting PHP 8.4.24; `/usr/bin/sha256sum`; the production incoming directory and static release root; both exact safety marker files and their required contents; SSH-user write access to both roots; atomic replacement using a relative symlink plus rename; and the present absence of `releases/static/current`.
+The following were manually verified on the real Netcup account without deploying the application: the SSH host, user and port; deployment-key login without a password; CLI PHP at `/usr/local/php84/bin/php` reporting PHP 8.4.24; `/usr/bin/sha256sum`; the production incoming directory and static release root; both exact safety marker files and their required contents; SSH-user write access to both roots; atomic replacement using a relative symlink plus rename; the present absence of `releases/static/current`; and the different absolute namespace used by FastCGI. The SSH/CLI site root is `/pianissimo-production.de`, while FastCGI sees that same directory as `/var/www/vhosts/hosting213834.a2e58.netcup.net/pianissimo-production.de`.
 
-The following remain unverified and block a production rehearsal or cutover: FastCGI/web-user write permissions; FastCGI-visible absolute/chroot paths; deployed Laravel database connectivity; production PHP extensions through the actual deployment; real CMS HTTPS/proxy behavior; migrations/bootstrap; the gated end-to-end publication rehearsal; and the public document-root cutover.
+The following remain unverified and block a production rehearsal or cutover: FastCGI/web-user write permissions; deployed Laravel database connectivity; production PHP extensions through the actual deployment; real CMS HTTPS/proxy behavior; migrations/bootstrap; the gated end-to-end publication rehearsal; and the public document-root cutover.
 
 Required application values are `APP_ENV`, `APP_KEY`, `APP_DEBUG`, `APP_URL`, `APP_LOCALE`, `APP_FALLBACK_LOCALE`, `SESSION_DRIVER`, `SESSION_SECURE_COOKIE`, `SESSION_COOKIE`, `CACHE_STORE`, `QUEUE_CONNECTION` and `MAIL_MAILER`. Production uses the values shown in the example: German locale with English fallback, a secure named session cookie, file cache, synchronous queue and log-only mail. `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE` and `DB_USERNAME` contain known non-secret settings; the secret database password must be supplied separately.
 
@@ -19,6 +19,10 @@ Required application values are `APP_ENV`, `APP_KEY`, `APP_DEBUG`, `APP_URL`, `A
 The non-path CMS settings are `CMS_ALLOWED_HOSTS`, `CMS_TRUSTED_PROXIES`, `CMS_PUBLIC_SITE_URL`, `CMS_SOURCE_REVISION`, `CMS_PUBLICATION_DRIVER`, `CMS_PREVIEW_DRIVER`, `CMS_PREVIEW_TTL_MINUTES` and `CMS_MEDIA_MAX_KB`.
 
 The required path settings are `CMS_SCHEMA`, `CMS_ACTIVE_MANIFEST`, `CMS_MEDIA_ROOT`, `CMS_MANAGED_MEDIA_ROOT`, `CMS_MEDIA_ORIGINALS_ROOT`, `CMS_PRIVATE_MEDIA_ROOT`, `CMS_PUBLICATION_PACKAGE_ROOT`, `CMS_FRONTEND_APPLY_STATE`, `CMS_PREVIEW_STORAGE_ROOT`, `CMS_PREVIEW_PACKAGE_ROOT`, `CMS_PREVIEW_INCOMING_ROOT`, `CMS_PREVIEW_RESULT_ROOT`, `CMS_PRODUCTION_INCOMING_ROOT`, `CMS_STATIC_RELEASE_ROOT` and `CMS_PUBLIC_SITE_ROOT`. `CMS_PUBLIC_SITE_ROOT` identifies the current static document root only so the preflight can prove that immutable release storage is separate. These variables configure future drivers but do not implement or activate those drivers.
+
+Keep these production values in their verified SSH-chroot form beginning with `/pianissimo-production.de`; the same `.env` is used by CLI and FastCGI. `CmsConfiguration` derives the runtime site root as two `dirname()` levels above Laravel `base_path()` because the backend is installed at `<site-root>/app/backend`. It replaces only an exact `/pianissimo-production.de` path component (the root itself or that root followed by `/`) across every required CMS production filesystem setting. Under SSH/CLI the replacement is effectively unchanged. Under FastCGI, for example, `/pianissimo-production.de/releases/static` resolves to `/var/www/vhosts/hosting213834.a2e58.netcup.net/pianissimo-production.de/releases/static`. Other absolute roots, including names that merely begin similarly such as `/pianissimo-production.de-backup`, are not translated.
+
+The translation changes only the runtime values returned by CMS configuration. It does not change `.env`, relax the requirement that every production path be explicitly configured and absolute, or alter publication placement and workflow checks. Because the result depends on the current PHP namespace, do not generate an SSH/CLI config cache and share it with FastCGI; clear any existing cached configuration and allow `config/cms.php` to run in each runtime namespace.
 
 After installing the backend and creating the listed directories/files, run from the backend directory:
 
@@ -155,7 +159,7 @@ chmod 0640 /pianissimo-production.de/private/incoming/production/.pianissimo-pro
 chmod 0640 /pianissimo-production.de/releases/static/.pianissimo-production-root
 ```
 
-Do not use `chmod 777`. Ownership and the final group must be chosen for the actual Netcup SSH/FastCGI users during that bootstrap. SSH chroot paths are configuration values and must not be assumed to equal FastCGI absolute paths; confirm the latter before the first rehearsal.
+Do not use `chmod 777`. Ownership and the final group must be chosen for the actual Netcup SSH/FastCGI users during that bootstrap. Keep the verified SSH-chroot paths in `.env`; `CmsConfiguration` translates their `/pianissimo-production.de` prefix to the site root visible to the current runtime.
 
 ## Static archive validation and activation
 

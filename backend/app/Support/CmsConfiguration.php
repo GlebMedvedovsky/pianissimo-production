@@ -4,7 +4,9 @@ namespace App\Support;
 
 final class CmsConfiguration
 {
-    public static function make(?callable $environment = null): array
+    private const PRODUCTION_SITE_ROOT = '/pianissimo-production.de';
+
+    public static function make(?callable $environment = null, ?string $applicationBasePath = null): array
     {
         $environment ??= static fn (string $name, mixed $default = null): mixed => env($name, $default);
         $get = static fn (string $name, mixed $default = null): mixed => $environment($name, $default);
@@ -62,10 +64,30 @@ final class CmsConfiguration
             'explicit_environment' => [],
         ];
 
+        $runtimeSiteRoot = dirname($applicationBasePath ?? base_path(), 2);
         foreach ($paths as $variable => $key) {
+            $configuration[$key] = self::translateProductionPath($configuration[$key], $runtimeSiteRoot);
             $configuration['explicit_environment'][$variable] = $get($variable) !== null && trim((string) $get($variable)) !== '';
         }
+        $configuration['manifest'] = $configuration['active_manifest'];
 
         return $configuration;
+    }
+
+    private static function translateProductionPath(mixed $configuredPath, string $runtimeSiteRoot): mixed
+    {
+        if (! is_string($configuredPath)) {
+            return $configuredPath;
+        }
+
+        if ($configuredPath === self::PRODUCTION_SITE_ROOT) {
+            return $runtimeSiteRoot;
+        }
+
+        if (str_starts_with($configuredPath, self::PRODUCTION_SITE_ROOT.'/')) {
+            return $runtimeSiteRoot.substr($configuredPath, strlen(self::PRODUCTION_SITE_ROOT));
+        }
+
+        return $configuredPath;
     }
 }
