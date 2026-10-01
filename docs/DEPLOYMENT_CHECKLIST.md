@@ -98,15 +98,16 @@ Verified on 2026-10-01: Webhosting 2000 is active; WCP webspace is 75 GB with ab
 
 Do not use PHP `disk_total_space()` / `disk_free_space()` values as account capacity: they exposed the shared host filesystem (about 4.1 TiB total / 462 GiB free), not the WCP account quota. The shell also lacks `stat`, `unlink`, and `df`.
 
+A controlled production SFTP import for `pianissimo-sftp-test` verified the incoming-file selection and consumption, canonical private original, and `MediaAsset` database row. Its redirect to the edit page then exposed the Filament local-disk hydration defect addressed by `feature/netcup-production-hardening`: canonical `storage_path` state must not enter a create-upload component on edit, and authenticated managed-media reads must use `MediaStorage`. After reviewed patch deployment, re-open that existing record, save harmless metadata, and verify **Datei ansehen** before deleting the test record.
+
 The following still require live verification after deployment:
 
 - account-quota headroom and temporary double-space needs while a large incoming file is copied/validated;
 - streamed SFTP-import timing under FastCGI with representative media, including timeout behavior and the final agreed application/import limits;
 - successful 4 MiB raw chunk request and finalization duration;
-- incoming-media SSH/FastCGI ownership and permissions, because that directory is not deployed yet;
 - absence of an SSH-generated config cache after `optimize:clear`;
 - end-to-end package download, chunk upload/finalization, private serving, expiry, invalidation, and cleanup;
-- SFTP media listing/import, incomplete-transfer rejection, successful source consumption, failed-source preservation, and canonical-original cleanup.
+- the existing `pianissimo-sftp-test` edit/open path after this patch, plus incomplete-transfer rejection, failed-source preservation, and canonical-original cleanup for a controlled failed import.
 
 Stop if any measured environment differs from `NETCUP_RUNBOOK.md`; update the runbook through review before improvising.
 

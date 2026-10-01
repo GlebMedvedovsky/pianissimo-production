@@ -81,10 +81,21 @@ class Fields
     }
     public static function asset(): array
     {
-        return [Section::make('Datei')->columnSpanFull()->schema([
-            Radio::make('_mode')->label('Quelle')->options(['upload'=>'Neue Datei hochladen','existing'=>'Vorhandene Web-Datei registrieren'])->default('upload')->inline()->live()->dehydrated(false)->visible(fn(string $operation)=>$operation==='create'),
+        return self::assetSchema(false);
+    }
+    public static function assetForCreate(): array
+    {
+        return self::assetSchema(true);
+    }
+    private static function assetSchema(bool $includeUpload): array
+    {
+        $sourceFields = $includeUpload ? [
+            Radio::make('_mode')->label('Quelle')->options(['upload'=>'Neue Datei hochladen','existing'=>'Vorhandene Web-Datei registrieren'])->default('upload')->inline()->live()->dehydrated(false),
             self::id(),
             FileUpload::make('storage_path')->label('Datei auswählen')->disk('local')->directory(fn(\Filament\Schemas\Components\Utilities\Get $get)=>'media/originals/'.($get('id')?:'pending'))->storeFileNamesIn('original_name')->acceptedFileTypes(\App\Services\MediaStorage::acceptedMimeTypes())->maxSize(config('cms.media_upload_max_kb'))->visibility('private')->downloadable()->openable()->helperText('Drag & Drop oder Datei auswählen. Sehr große Datei? Nutzen Sie Medien → Große Datei importieren oder öffnen Sie die Anleitung.')->required(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='create' && $get('_mode')==='upload')->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='create' && $get('_mode')==='upload'),
+        ] : [self::id()];
+        return [Section::make('Datei')->columnSpanFull()->schema([
+            ...$sourceFields,
             TextInput::make('path')->label('Relativer Web-Pfad')->required()->regex('#^media/[a-zA-Z0-9/_-]+\.(webp|jpg|jpeg|png|mp3|wav|ogg|mp4|webm)$#')->unique(ignoreRecord:true)->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='edit' || $get('_mode')==='existing')->disabled(fn(string $operation)=>$operation==='edit')->dehydrated(),
             Select::make('type')->label('Medientyp')->options(['image'=>'Bild','audio'=>'Audio','video'=>'Video'])->required()->visible(fn(string $operation,\Filament\Schemas\Components\Utilities\Get $get)=>$operation==='edit' || $get('_mode')==='existing')->disabled(fn(string $operation)=>$operation==='edit')->dehydrated(),
         ])->columns(2),Section::make('Beschreibung und Freigabe')->columnSpanFull()->schema([

@@ -3,6 +3,10 @@ namespace App\Filament\Resources\Pages;
 class CreateMediaAsset extends \Filament\Resources\Pages\CreateRecord
 {
     protected static string $resource = \App\Filament\Resources\MediaAssetResource::class;
+    public function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
+    {
+        return $schema->components(\App\Filament\Fields::assetForCreate())->columns(2);
+    }
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         if (!empty($data['storage_path'])) $data=array_merge($data,app(\App\Services\MediaStorage::class)->inspectStored($data['storage_path'],$data['id'],$data['original_name']??null));

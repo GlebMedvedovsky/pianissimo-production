@@ -8,9 +8,10 @@ Route::post('/admin-theme', function (\Illuminate\Http\Request $request) {
 })->middleware(['auth','throttle:60,1']);
 Route::get('/admin-media/{asset}', function (\App\Models\MediaAsset $asset) {
     if ($asset->storage_path) {
-        $root=realpath(config('cms.media_originals_root'));
-        $file=realpath(storage_path('app/private/'.$asset->storage_path));
-        if($root && $file && str_starts_with($file,$root.DIRECTORY_SEPARATOR) && is_file($file)) return response()->file($file,['Cache-Control'=>'no-store'])->setPrivate();
+        try {
+            $file=app(\App\Services\MediaStorage::class)->resolveStored($asset->storage_path);
+            return response()->file($file,['Cache-Control'=>'no-store'])->setPrivate();
+        } catch (\DomainException) {}
     }
     foreach ([config('cms.media_root'), config('cms.private_media_root')] as $directory) {
         $root=realpath($directory);

@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\Help;
 use App\Filament\Resources\MediaAssetResource;
-use App\Filament\Resources\Pages\ListMediaAssets;
+use App\Filament\Resources\Pages\{CreateMediaAsset, EditMediaAsset, ListMediaAssets};
 use App\Models\{AuditEvent, MediaAsset, User};
 use App\Services\{LargeMediaImportService, MediaStorage};
 use DomainException;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use ReflectionMethod;
@@ -309,13 +311,82 @@ class LargeMediaImportTest extends TestCase
                 'incoming_file' => 'ui-import.png',
                 ...$this->attributes('ui-import'),
             ])
-            ->assertHasNoActionErrors();
+            ->assertHasNoActionErrors()
+            ->assertRedirect(MediaAssetResource::getUrl('edit', ['record' => 'ui-import']));
         $this->assertDatabaseHas('media_assets', ['id' => 'ui-import', 'original_name' => 'ui-import.png']);
         $this->assertFileDoesNotExist($source);
+
+        $asset = MediaAsset::findOrFail('ui-import');
+        $canonical = app(MediaStorage::class)->resolveStored($asset->storage_path);
+        $this->assertFileExists($canonical);
+        $this->assertFileDoesNotExist(storage_path('app/private/'.$asset->storage_path));
+        $this->get(MediaAssetResource::getUrl('edit', ['record' => $asset]))->assertOk();
+        $edit = Livewire::test(EditMediaAsset::class, ['record' => $asset->id]);
+        $this->assertNull($edit->instance()->form->getComponent('storage_path', withHidden: true));
+        $edit
+            ->assertFormFieldDoesNotExist('storage_path')
+            ->assertActionExists('replace')
+            ->fillForm(['alt' => 'Imported media edited safely'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame('Imported media edited safely', $asset->fresh()->alt);
+        Livewire::test(ListMediaAssets::class)
+            ->assertTableActionExists('preview', record: $asset)
+            ->assertTableActionExists('edit', record: $asset)
+            ->assertTableActionExists('usages', record: $asset)
+            ->assertTableActionExists('delete', record: $asset);
+        $response = $this->get(route('admin.media', $asset))->assertOk();
+        $this->assertSame(realpath($canonical), realpath($response->baseResponse->getFile()->getPathname()));
 
         Livewire::test(Help::class)->set('article', 'grosse-dateien-sftp')
             ->assertSee('Große Dateien per SFTP hochladen')->assertSee('FileZilla')->assertSee(LargeMediaImportService::SSH_INCOMING_PATH)
             ->assertSee('Große Datei importieren')->assertSee('SFTP-Liste aktualisieren');
+    }
+
+    public function test_browser_upload_exists_only_on_create_and_edit_replace_use_canonical_storage(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $user = User::create(['name' => 'Browser Owner', 'email' => 'browser-owner@example.test', 'password' => bin2hex(random_bytes(20))]);
+        $this->actingAs($user);
+
+        $create = Livewire::test(CreateMediaAsset::class);
+        $this->assertInstanceOf(FileUpload::class, $create->instance()->form->getComponent('storage_path', withHidden: true));
+        $create
+            ->assertFormFieldExists('storage_path', checkFieldUsing: fn ($field): bool => $field instanceof FileUpload)
+            ->fillForm([
+                '_mode' => 'upload',
+                'id' => 'browser-canonical',
+                'storage_path' => UploadedFile::fake()->createWithContent('browser.png', $this->png()),
+                'purpose' => 'other',
+                'alt' => 'Browser canonical',
+                'state' => 'temporary',
+                'rights_scope' => 'next_draft',
+                'crop' => ['x' => 50, 'y' => 50],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $asset = MediaAsset::findOrFail('browser-canonical');
+        $oldPath = $asset->storage_path;
+        $oldCanonical = app(MediaStorage::class)->resolveStored($oldPath);
+        $this->assertFileExists($oldCanonical);
+        $this->assertFileDoesNotExist(storage_path('app/private/'.$oldPath));
+        $this->get(MediaAssetResource::getUrl('edit', ['record' => $asset]))->assertOk();
+
+        $edit = Livewire::test(EditMediaAsset::class, ['record' => $asset->id]);
+        $this->assertNull($edit->instance()->form->getComponent('storage_path', withHidden: true));
+        $edit
+            ->assertFormFieldDoesNotExist('storage_path')
+            ->assertActionExists('replace')
+            ->callAction('replace', data: [
+                'replacement' => UploadedFile::fake()->createWithContent('replacement.png', $this->png(256)),
+            ])
+            ->assertHasNoActionErrors();
+
+        $asset->refresh();
+        $this->assertNotSame($oldPath, $asset->storage_path);
+        $this->assertFileExists(app(MediaStorage::class)->resolveStored($asset->storage_path));
+        $this->assertFileDoesNotExist(storage_path('app/private/'.$asset->storage_path));
     }
 
     private function attributes(string $id): array
