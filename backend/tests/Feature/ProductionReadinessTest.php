@@ -9,6 +9,7 @@ use App\Http\Middleware\LocalCmsAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Http\Request;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -40,9 +41,12 @@ class ProductionReadinessTest extends TestCase
         $this->assertSame(base_path('../frontend/public/media/cms'), $configuration['managed_media_root']);
         $this->assertSame(storage_path('app/private/frontend-apply'), $configuration['frontend_apply_state']);
         $this->assertSame(storage_path('app/private/media/originals'), $configuration['media_originals_root']);
+        $this->assertSame(storage_path('app/private/media-incoming'), $configuration['media_incoming_root']);
         $this->assertSame(storage_path('app/private/draft-previews'), $configuration['preview_storage_root']);
         $this->assertSame(storage_path('app/private/04a/prepared/media'), $configuration['private_media_root']);
         $this->assertSame(512000, $configuration['media_max_kb']);
+        $this->assertSame(512000, $configuration['media_upload_max_kb']);
+        $this->assertSame(512000, $configuration['media_import_max_kb']);
         $this->assertSame(15, $configuration['preview_ttl_minutes']);
         $this->assertSame('http://127.0.0.1:4321', $configuration['preview_frontend_url']);
         $this->assertSame('http://host.docker.internal:4321', $configuration['preview_frontend_internal_url']);
@@ -61,6 +65,7 @@ class ProductionReadinessTest extends TestCase
             'CMS_MEDIA_ROOT' => '/private/media',
             'CMS_MANAGED_MEDIA_ROOT' => '/private/media/managed',
             'CMS_MEDIA_ORIGINALS_ROOT' => '/private/media/originals',
+            'CMS_MEDIA_INCOMING_ROOT' => '/private/incoming/media',
             'CMS_PRIVATE_MEDIA_ROOT' => '/private/media/prepared',
             'CMS_PUBLICATION_PACKAGE_ROOT' => '/private/packages/production',
             'CMS_FRONTEND_APPLY_STATE' => '/private/runtime/apply',
@@ -113,6 +118,34 @@ class ProductionReadinessTest extends TestCase
         );
     }
 
+    public function test_media_transport_application_and_sftp_limits_are_separate(): void
+    {
+        $values = [
+            'CMS_MEDIA_MAX_KB' => 64,
+            'CMS_MEDIA_APPLICATION_MAX_KB' => 500,
+            'CMS_MEDIA_UPLOAD_MAX_KB' => 64,
+            'CMS_MEDIA_IMPORT_MAX_KB' => 400,
+        ];
+        $configuration = CmsConfiguration::make(
+            static fn (string $name, mixed $default = null): mixed => $values[$name] ?? $default,
+        );
+
+        $this->assertSame(500, $configuration['media_max_kb']);
+        $this->assertSame(64, $configuration['media_upload_max_kb']);
+        $this->assertSame(400, $configuration['media_import_max_kb']);
+        foreach (['CMS_MEDIA_APPLICATION_MAX_KB', 'CMS_MEDIA_UPLOAD_MAX_KB', 'CMS_MEDIA_IMPORT_MAX_KB'] as $variable) {
+            $this->assertTrue($configuration['explicit_environment'][$variable]);
+        }
+    }
+
+    public function test_livewire_temporary_upload_limit_matches_the_cms_browser_ceiling(): void
+    {
+        $expected = ['required', 'file', 'max:'.config('cms.media_upload_max_kb')];
+
+        $this->assertSame($expected, config('livewire.temporary_file_upload.rules'));
+        $this->assertSame($expected, FileUploadConfiguration::rules());
+    }
+
     public function test_unrelated_absolute_paths_and_similar_prefixes_are_not_translated(): void
     {
         $values = [
@@ -137,6 +170,7 @@ class ProductionReadinessTest extends TestCase
             'CMS_MEDIA_ROOT' => 'media_root',
             'CMS_MANAGED_MEDIA_ROOT' => 'managed_media_root',
             'CMS_MEDIA_ORIGINALS_ROOT' => 'media_originals_root',
+            'CMS_MEDIA_INCOMING_ROOT' => 'media_incoming_root',
             'CMS_PRIVATE_MEDIA_ROOT' => 'private_media_root',
             'CMS_PUBLICATION_PACKAGE_ROOT' => 'publication_package_root',
             'CMS_FRONTEND_APPLY_STATE' => 'frontend_apply_state',
@@ -230,6 +264,35 @@ class ProductionReadinessTest extends TestCase
         $this->assertSame('FAIL', $this->check($checks, 'CMS_PREVIEW_INCOMING_ROOT path')['status']);
     }
 
+    public function test_preflight_requires_safe_writable_media_incoming_root_and_consistent_limits(): void
+    {
+        $this->configurePreflight();
+        config(['cms.media_import_max_kb' => 70000]);
+        $checks = app(ProductionPreflight::class)->run();
+        $this->assertSame('FAIL', $this->check($checks, 'SFTP media import limit')['status']);
+
+        config([
+            'cms.media_import_max_kb' => 65536,
+            'cms.media_incoming_root' => $this->fixtureRoot.'/missing-media-incoming',
+        ]);
+        $checks = app(ProductionPreflight::class)->run();
+        $this->assertSame('FAIL', $this->check($checks, 'CMS_MEDIA_INCOMING_ROOT path')['status']);
+
+        config([
+            'cms.media_incoming_root' => $this->fixtureRoot.'/media-incoming',
+            'cms.explicit_environment.CMS_MEDIA_IMPORT_MAX_KB' => false,
+        ]);
+        $checks = app(ProductionPreflight::class)->run();
+        $this->assertSame('FAIL', $this->check($checks, 'CMS_MEDIA_IMPORT_MAX_KB')['status']);
+
+        config([
+            'cms.explicit_environment.CMS_MEDIA_IMPORT_MAX_KB' => true,
+            'livewire.temporary_file_upload.rules' => ['required', 'file', 'max:12288'],
+        ]);
+        $checks = app(ProductionPreflight::class)->run();
+        $this->assertSame('FAIL', $this->check($checks, 'Livewire temporary upload limit')['status']);
+    }
+
     public function test_preflight_does_not_expose_secrets_or_mutate_filesystem_or_database(): void
     {
         $this->configurePreflight();
@@ -264,7 +327,7 @@ class ProductionReadinessTest extends TestCase
         foreach (['schema.json', 'manifest.json'] as $file) {
             file_put_contents($this->fixtureRoot.'/'.$file, '{}');
         }
-        foreach (['media', 'private-media', 'originals', 'packages', 'apply', 'preview-storage', 'preview-packages', 'preview-incoming', 'preview-results', 'production-incoming', 'static-releases', 'active-site'] as $directory) {
+        foreach (['media', 'private-media', 'originals', 'media-incoming', 'packages', 'apply', 'preview-storage', 'preview-packages', 'preview-incoming', 'preview-results', 'production-incoming', 'static-releases', 'active-site'] as $directory) {
             File::ensureDirectoryExists($this->fixtureRoot.'/'.$directory);
         }
 
@@ -279,6 +342,11 @@ class ProductionReadinessTest extends TestCase
             'cms.media_root' => $this->fixtureRoot.'/media',
             'cms.managed_media_root' => $this->fixtureRoot.'/media',
             'cms.media_originals_root' => $this->fixtureRoot.'/originals',
+            'cms.media_incoming_root' => $this->fixtureRoot.'/media-incoming',
+            'cms.media_max_kb' => 65536,
+            'cms.media_upload_max_kb' => 65536,
+            'cms.media_import_max_kb' => 65536,
+            'livewire.temporary_file_upload.rules' => ['required', 'file', 'max:65536'],
             'cms.private_media_root' => $this->fixtureRoot.'/private-media',
             'cms.publication_package_root' => $this->fixtureRoot.'/packages',
             'cms.frontend_apply_state' => $this->fixtureRoot.'/apply',
@@ -296,7 +364,10 @@ class ProductionReadinessTest extends TestCase
             'publisher.github.ref' => 'main',
             'publisher.github.preview_workflow' => 'pianissimo-preview-builder.yml',
             'publisher.github.token' => str_repeat('g', 40),
-            'cms.explicit_environment' => array_fill_keys(array_keys(config('cms.production_path_variables')), true),
+            'cms.explicit_environment' => array_fill_keys([
+                ...array_keys(config('cms.production_path_variables')),
+                'CMS_MEDIA_APPLICATION_MAX_KB', 'CMS_MEDIA_UPLOAD_MAX_KB', 'CMS_MEDIA_IMPORT_MAX_KB',
+            ], true),
             'mail.default' => 'log',
         ]);
     }

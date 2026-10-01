@@ -59,6 +59,25 @@ Danach liegt das Bild im CMS-Entwurf. Es ist noch keiner Seite und keinem Projek
 - Video: `Inhalte → Medien → Erstellen`, stabile ID vergeben, MP4 oder WebM wählen, Status/Freigabe/Rechte pflegen und **Erstellen**. Ein Poster ist ein separates Bild.
 - Audio: gleicher Pfad; unterstützte Audiodatei wählen und danach unter `Inhalte → Tracks → Track bearbeiten` als **Playback-Datei** zuordnen. Nur bestätigte Versionen öffentlich freigeben.
 
+### Große Dateien per SFTP hochladen
+
+Normale Bilder, Videos und Audiodateien laden Sie weiterhin direkt über `Inhalte → Medien → Erstellen` hoch. Verwenden Sie SFTP nur für ungewöhnlich große Dateien, die der normale Browser-Upload nicht zuverlässig übertragen kann.
+
+1. Öffnen Sie auf dem Mac **FileZilla Client** oder ein anderes Programm, das **SFTP / SSH File Transfer Protocol** unterstützt. Normales FTP ist nicht gleichwertig.
+2. Legen Sie eine SFTP-Verbindung mit Server `hosting213834.a2e58.netcup.net`, Port `22` und Benutzer `hosting213834` an. Verwenden Sie die separat sicher gespeicherten Pianissimo-Zugangsdaten. Tragen Sie kein Passwort in das CMS oder in Notizen im Repository ein.
+3. Öffnen Sie auf dem Server genau diesen Ordner: `/pianissimo-production.de/private/incoming/media/`.
+4. Laden Sie die große Datei dort hoch. Laden Sie sie niemals nach `httpdocs`, `public` oder direkt nach `media/originals`.
+5. Warten Sie unbedingt, bis FileZilla die Übertragung als vollständig abgeschlossen zeigt.
+6. Öffnen Sie im CMS `Inhalte → Medien` und wählen Sie **SFTP-Liste aktualisieren**.
+7. Wählen Sie **Große Datei importieren**. Der Upload-Ordner wird nur zur Orientierung angezeigt und kann nicht bearbeitet werden.
+8. Wählen Sie die fertig übertragene Datei aus der angebotenen Liste. Sie müssen keinen Dateipfad eintippen.
+9. Vergeben Sie eine einmalige stabile ID, ergänzen Sie Beschreibung, Materialstatus, Nutzungsfreigabe und Rechte und starten Sie den Import.
+10. Warten Sie auf die Erfolgs- oder Fehlermeldung. Das CMS prüft Größe, unterstützten Dateityp und Dateiinhalt und übernimmt die Datei erst danach sicher in die Mediathek.
+
+Nach erfolgreichem Import verschwindet die Datei aus der SFTP-Liste und erscheint normal unter **Medien**. Sie kann anschließend wie jedes andere Medium einer Seite, einem Projekt oder Track zugeordnet werden. Verschieben Sie Dateien im privaten Medienspeicher niemals von Hand.
+
+Falls der Import scheitert, prüfen Sie zuerst, ob FileZilla wirklich fertig ist und ob der Dateityp unterstützt wird. Aktualisieren Sie die SFTP-Liste und versuchen Sie den kontrollierten CMS-Import erneut. Verschieben Sie die Datei nicht in einen anderen Serverordner. Bleibt der Fehler bestehen, senden Sie dem technischen Administrator nur Dateiname und angezeigte Fehlermeldung – niemals Passwort oder Zugangsdaten.
+
 ### 11. Ein neues Medium einer Seite zuordnen
 
 Nach dem Upload die Zielseite oder das Projekt öffnen, das ausdrücklich benannte Feld `Bild`, `Video`, `Video-Poster`, `Projekt-Cover`, `Galeriebild`, `Trailer-Poster` oder `Playback-Datei` belegen und **Entwurf speichern**. Die Angabe **Hauptverwendung** erstellt keine Zuordnung.

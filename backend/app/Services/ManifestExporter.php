@@ -136,7 +136,7 @@ class ManifestExporter
                 $record=MediaAsset::find($asset['id']);
                 if (!$record?->storage_path) continue;
                 if (!str_starts_with($record->path,'media/cms/')) throw new DomainException($record->id.': verwaltetes Medium liegt außerhalb des freigegebenen Pfads.');
-                $source=storage_path('app/private/'.$record->storage_path);
+                $source=app(MediaStorage::class)->resolveStored($record->storage_path);
                 if (!is_file($source) || hash_file('sha256',$source)!==$record->sha256) throw new DomainException($record->id.': privates Original stimmt nicht mit der Prüfsumme überein.');
                 $mediaRelative=substr($record->path,10); $target=$directory.'/media/'.$mediaRelative;
                 if (!is_dir(dirname($target)) && !mkdir(dirname($target),0750,true) && !is_dir(dirname($target))) throw new DomainException('Kandidaten-Medienverzeichnis konnte nicht erstellt werden.');

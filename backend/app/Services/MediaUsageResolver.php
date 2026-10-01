@@ -6,7 +6,7 @@ use App\Filament\Resources\ProjectResource;
 use App\Filament\Resources\TrackResource;
 use App\Models\{MediaAsset,Membership,Project,ProjectMedia,Setting,Track};
 use DomainException;
-use Illuminate\Support\Facades\{DB,Storage};
+use Illuminate\Support\Facades\DB;
 
 class MediaUsageResolver
 {
@@ -72,7 +72,7 @@ class MediaUsageResolver
     {
         if ($this->usages($asset)) throw new DomainException('Die Datei wird noch verwendet und kann nicht gelöscht werden.');
         $path=$asset->storage_path; $asset->delete();
-        if ($path) Storage::disk('local')->delete($path);
+        if ($path) app(MediaStorage::class)->deleteStored($path);
         app(AuditLogger::class)->record('media',$asset->id,'delete',$asset->sha256);
     }
 

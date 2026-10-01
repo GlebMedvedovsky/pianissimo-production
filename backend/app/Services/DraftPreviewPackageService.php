@@ -226,9 +226,14 @@ final class DraftPreviewPackageService
     {
         $configured = (string) config('cms.preview_package_root');
         if (! $this->absoluteSafe($configured)) throw new DomainException('Der Vorschau-Paketpfad ist ungültig.');
+        $runtimeSiteRoot = $this->runtimeSiteRoot();
+        if (! $this->inside($configured, $runtimeSiteRoot)) throw new DomainException('Der Vorschau-Paketpfad ist ungültig.');
+        if ($this->containsSymlinkComponent($configured, $runtimeSiteRoot)) throw new DomainException('Der Vorschau-Paketpfad ist nicht verfügbar.');
         File::ensureDirectoryExists($configured, 0750);
         $root = realpath($configured);
-        if ($root === false || $this->containsSymlinkComponent($configured) || is_link($configured) || ! is_dir($root)) throw new DomainException('Der Vorschau-Paketpfad ist nicht verfügbar.');
+        $resolvedRuntimeSiteRoot = realpath($runtimeSiteRoot);
+        if ($root === false || $resolvedRuntimeSiteRoot === false || ! $this->inside($root, $resolvedRuntimeSiteRoot)
+            || $this->containsSymlinkComponent($configured, $runtimeSiteRoot) || ! is_dir($root)) throw new DomainException('Der Vorschau-Paketpfad ist nicht verfügbar.');
         foreach ([public_path(), config('cms.public_site_root'), config('cms.static_release_root')] as $forbidden) {
             $resolved = is_string($forbidden) ? realpath($forbidden) : false;
             if ($resolved && ($this->inside($root, $resolved) || $this->inside($resolved, $root))) throw new DomainException('Vorschau-Pakete müssen außerhalb öffentlicher Pfade liegen.');
@@ -326,10 +331,25 @@ final class DraftPreviewPackageService
         return $candidate === $root || str_starts_with($candidate, $root.'/');
     }
 
-    private function containsSymlinkComponent(string $path): bool
+    private function runtimeSiteRoot(?string $applicationBasePath = null): string
     {
-        $path=str_replace('\\','/',$path);$prefix=str_starts_with($path,'/')?'/':'';
-        foreach(array_values(array_filter(explode('/',$path),static fn(string $part):bool=>$part!=='')) as $part){$prefix=$prefix===''||str_ends_with($prefix,'/')?$prefix.$part:$prefix.'/'.$part;if(is_link($prefix))return true;}
+        return rtrim(str_replace('\\', '/', dirname($applicationBasePath ?? base_path(), 2)), '/');
+    }
+
+    private function containsSymlinkComponent(string $path, ?string $runtimeSiteRoot = null, ?callable $isLink = null): bool
+    {
+        $path = rtrim(str_replace('\\', '/', $path), '/');
+        $runtimeSiteRoot = rtrim(str_replace('\\', '/', $runtimeSiteRoot ?? $this->runtimeSiteRoot()), '/');
+        $isLink ??= static fn (string $candidate): bool => is_link($candidate);
+        if (! $this->inside($path, $runtimeSiteRoot)) return true;
+        if ($isLink($runtimeSiteRoot)) return true;
+        $relative = ltrim(substr($path, strlen($runtimeSiteRoot)), '/');
+        if ($relative === '') return false;
+        $prefix = $runtimeSiteRoot;
+        foreach (explode('/', $relative) as $part) {
+            $prefix .= '/'.$part;
+            if ($isLink($prefix)) return true;
+        }
         return false;
     }
 }

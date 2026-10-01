@@ -179,7 +179,7 @@ class DraftPreviewService
     {
         if($record->storage_path){
             if(!preg_match('#^media/originals/[a-z0-9]+(?:-[a-z0-9]+)*/[A-Za-z0-9-]+\.[A-Za-z0-9]+$#',$record->storage_path))throw new DomainException($record->id.': Privater Medienpfad ist ungültig.');
-            return $this->inside(config('cms.media_originals_root'),storage_path('app/private/'.$record->storage_path));
+            return app(MediaStorage::class)->resolveStored($record->storage_path);
         }
         if(!preg_match('#^media/[a-zA-Z0-9/_-]+\.(?:webp|jpg|jpeg|png|mp3|wav|ogg|mp4|webm)$#',$publicPath)||str_contains($publicPath,'..'))throw new DomainException($record->id.': Öffentlicher Medienpfad ist ungültig.');
         $relative=preg_replace('#^media/#','',$publicPath);
@@ -214,9 +214,8 @@ class DraftPreviewService
         if(preg_match('#^draft-previews/[a-f0-9]{32}$#',$preview->snapshot_path)){
             $identifier=basename($preview->snapshot_path);
             File::deleteDirectory(rtrim(config('cms.preview_storage_root'),DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$identifier);
+            app(DraftPreviewResultService::class)->delete($preview);
             app(DraftPreviewPackageService::class)->delete($preview);
-            foreach(['preview_result_root','preview_incoming_root'] as $key){$path=rtrim((string)config('cms.'.$key),DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$identifier;if(is_link($path))@unlink($path);elseif(is_dir($path))File::deleteDirectory($path);}
-            @unlink(rtrim((string)config('cms.preview_result_root'),DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$identifier.'.json');
         }
     }
 }

@@ -41,8 +41,30 @@ final class ProductionPreflight
                 $variable,
                 'required production path variable must be explicitly configured',
             );
-            $this->pathCheck($checks, $variable, (string) config("cms.$key"), in_array($key, ['schema', 'active_manifest'], true));
+            $this->pathCheck(
+                $checks,
+                $variable,
+                (string) config("cms.$key"),
+                in_array($key, ['schema', 'active_manifest'], true),
+                $key === 'media_incoming_root',
+            );
         }
+
+        foreach (['CMS_MEDIA_APPLICATION_MAX_KB', 'CMS_MEDIA_UPLOAD_MAX_KB', 'CMS_MEDIA_IMPORT_MAX_KB'] as $variable) {
+            $this->add($checks, ($explicit[$variable] ?? false) === true, $variable, 'required production media limit must be explicitly configured');
+        }
+        $applicationMediaMax = (int) config('cms.media_max_kb');
+        $browserMediaMax = (int) config('cms.media_upload_max_kb');
+        $importMediaMax = (int) config('cms.media_import_max_kb');
+        $this->add($checks, $applicationMediaMax > 0, 'Application media limit', 'must be a positive KiB value');
+        $this->add($checks, $browserMediaMax > 0 && $browserMediaMax <= $applicationMediaMax, 'Browser media upload limit', 'must be positive and no greater than the application media limit');
+        $this->add($checks, $importMediaMax > 0 && $importMediaMax <= $applicationMediaMax, 'SFTP media import limit', 'must be positive and no greater than the application media limit');
+        $this->add(
+            $checks,
+            $this->livewireTemporaryUploadMaxKb() === $browserMediaMax,
+            'Livewire temporary upload limit',
+            'effective Livewire max rule must exactly match CMS_MEDIA_UPLOAD_MAX_KB',
+        );
 
         $this->add($checks, PHP_VERSION_ID >= 80400, 'PHP version', 'PHP 8.4 or newer is required');
         foreach (['pdo_mysql', 'fileinfo', 'mbstring', 'openssl', 'json', 'tokenizer', 'xml', 'curl'] as $extension) {
@@ -88,6 +110,7 @@ final class ProductionPreflight
             'media root' => 'media_root',
             'managed media root' => 'managed_media_root',
             'media originals root' => 'media_originals_root',
+            'media incoming root' => 'media_incoming_root',
             'private media root' => 'private_media_root',
             'publication package root' => 'publication_package_root',
             'frontend apply state' => 'frontend_apply_state',
@@ -150,7 +173,7 @@ final class ProductionPreflight
         return $checks;
     }
 
-    private function pathCheck(array &$checks, string $variable, string $path, bool $file): void
+    private function pathCheck(array &$checks, string $variable, string $path, bool $file, bool $writable = false): void
     {
         $resolved = $this->resolvedPath($path);
         if ($resolved === null) {
@@ -159,11 +182,12 @@ final class ProductionPreflight
         }
 
         $exists = $file ? is_file($path) && is_readable($path) : is_dir($path);
+        if ($exists && $writable) $exists = is_readable($path) && is_writable($path);
         $this->add(
             $checks,
             $exists,
             "$variable path",
-            $file ? 'configured file must exist and be readable' : 'configured directory must exist',
+            $file ? 'configured file must exist and be readable' : ($writable ? 'configured directory must exist and be readable/writable' : 'configured directory must exist'),
         );
     }
 
@@ -175,6 +199,20 @@ final class ProductionPreflight
             'Laravel sessions' => storage_path('framework/sessions'),
             'Laravel bootstrap cache' => base_path('bootstrap/cache'),
         ];
+    }
+
+    private function livewireTemporaryUploadMaxKb(): ?int
+    {
+        $rules = config('livewire.temporary_file_upload.rules');
+        if (is_string($rules)) $rules = explode('|', $rules);
+        if (! is_array($rules)) return null;
+
+        foreach ($rules as $rule) {
+            if (is_string($rule) && preg_match('/^max:(\d+)$/D', $rule, $matches) === 1) {
+                return (int) $matches[1];
+            }
+        }
+        return null;
     }
 
     private function resolvedPath(string $path): ?string
@@ -198,11 +236,29 @@ final class ProductionPreflight
         $prefix = $drive === null ? '/' : $drive.'/';
         $normalized = $prefix.implode('/', $parts);
 
+        $runtimeSiteRoot = rtrim(str_replace('\\', '/', dirname(base_path(), 2)), '/');
+        if (PHP_OS_FAMILY === 'Windows') {
+            $normalized = strtolower($normalized);
+            $runtimeSiteRoot = strtolower($runtimeSiteRoot);
+        }
+        if (! $this->inside($normalized, $runtimeSiteRoot) || is_link($runtimeSiteRoot)) return null;
+        $resolvedRuntimeSiteRoot = realpath($runtimeSiteRoot);
+        if ($resolvedRuntimeSiteRoot === false) return null;
+        $resolvedRuntimeSiteRoot = rtrim(str_replace('\\', '/', $resolvedRuntimeSiteRoot), '/');
+        if (PHP_OS_FAMILY === 'Windows') $resolvedRuntimeSiteRoot = strtolower($resolvedRuntimeSiteRoot);
+
+        $relative = ltrim(substr($normalized, strlen($runtimeSiteRoot)), '/');
+        $prefix = $runtimeSiteRoot;
+        foreach ($relative === '' ? [] : explode('/', $relative) as $part) {
+            $prefix .= '/'.$part;
+            if (is_link($prefix)) return null;
+        }
+
         $probe = $normalized;
         $suffix = [];
-        while (! file_exists($probe)) {
+        while ($probe !== $runtimeSiteRoot && ! file_exists($probe)) {
             $parent = str_replace('\\', '/', dirname($probe));
-            if ($parent === $probe || $parent === '.') {
+            if ($parent === $probe || $parent === '.' || ! $this->inside($parent, $runtimeSiteRoot)) {
                 return null;
             }
             array_unshift($suffix, basename($probe));
@@ -218,7 +274,8 @@ final class ProductionPreflight
             $resolved .= '/'.implode('/', $suffix);
         }
 
-        return PHP_OS_FAMILY === 'Windows' ? strtolower($resolved) : $resolved;
+        if (PHP_OS_FAMILY === 'Windows') $resolved = strtolower($resolved);
+        return $this->inside($resolved, $resolvedRuntimeSiteRoot) ? $resolved : null;
     }
 
     private function inside(string $candidate, string $root): bool

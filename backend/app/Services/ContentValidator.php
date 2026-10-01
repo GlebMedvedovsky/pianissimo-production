@@ -94,9 +94,8 @@ class ContentValidator
             }
             if (!$file && str_starts_with($a['path'],'media/cms/')) {
                 $managed=MediaAsset::where('path',$a['path'])->whereNotNull('storage_path')->first();
-                $privateRoot=realpath(config('cms.media_originals_root'));
-                $private=$managed?realpath(storage_path('app/private/'.$managed->storage_path)):false;
-                if ($privateRoot && $private && str_starts_with($private,$privateRoot.DIRECTORY_SEPARATOR)) { $root=$privateRoot; $file=$private; }
+                try {$private=$managed?app(MediaStorage::class)->resolveStored($managed->storage_path):false;} catch (DomainException) {$private=false;}
+                if ($private) { $root=realpath(config('cms.media_originals_root')); $file=$private; }
             }
             if (!$file || !$root || !str_starts_with($file,$root.DIRECTORY_SEPARATOR) || !is_file($file)) $fail("{$a['id']}: Web-Datei fehlt.");
             if (isset($a['sha256']) && hash_file('sha256',$file)!==$a['sha256']) $fail("{$a['id']}: Prüfsumme stimmt nicht.");

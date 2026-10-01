@@ -26,7 +26,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       CMS_URL: ${{ vars.PIANISSIMO_CMS_URL }}
       PREVIEW_ID: ${{ inputs.preview_identifier }}
@@ -38,6 +38,8 @@ jobs:
       OUTPUT_DIR: ${{ runner.temp }}/pianissimo-preview-output
       OUTPUT_ARCHIVE: ${{ runner.temp }}/pianissimo-preview-result.tar
       OUTPUT_LIST: ${{ runner.temp }}/pianissimo-preview-result.files
+      OUTPUT_CHUNKS: ${{ runner.temp }}/pianissimo-preview-result-chunks
+      PREVIEW_CHUNK_BYTES: "4194304"
     steps:
       - name: Enforce preview workflow gate and validate inputs
         env:
@@ -101,21 +103,46 @@ jobs:
           echo "metadata_sha=$metadata_sha" >> "$GITHUB_OUTPUT"
           echo "archive_sha=$archive_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Upload validated private preview result
+      - name: Upload validated private preview result in fixed chunks
         env:
           PUBLISHER_TOKEN: ${{ secrets.PIANISSIMO_PUBLISHER_API_TOKEN }}
         run: |
           set -euo pipefail
+          mkdir -m 700 "$OUTPUT_CHUNKS"
+          split -b "$PREVIEW_CHUNK_BYTES" -d -a 6 -- "$OUTPUT_ARCHIVE" "$OUTPUT_CHUNKS/chunk-"
+          mapfile -d '' chunks < <(find "$OUTPUT_CHUNKS" -maxdepth 1 -type f -name 'chunk-*' -print0 | sort -z)
+          chunk_count="${#chunks[@]}"
+          test "$chunk_count" -ge 1
+          test "$chunk_count" -le 512
+          for index in "${!chunks[@]}"; do
+            chunk="${chunks[$index]}"
+            chunk_sha="$(sha256sum "$chunk" | awk '{print $1}')"
+            curl --fail-with-body --silent --show-error --output /dev/null \
+              --retry 4 --retry-delay 2 --retry-all-errors --connect-timeout 15 --max-time 120 \
+              -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              -H "X-Pianissimo-Package-Sha256: $PACKAGE_SHA256" \
+              -H "X-Pianissimo-Source-Revision: $SOURCE_REVISION" \
+              -H "X-Pianissimo-Archive-Sha256: ${{ steps.result.outputs.archive_sha }}" \
+              -H "X-Pianissimo-Files-Sha256: ${{ steps.result.outputs.files_sha }}" \
+              -H "X-Pianissimo-Metadata-Sha256: ${{ steps.result.outputs.metadata_sha }}" \
+              -H "X-Pianissimo-Chunk-Count: $chunk_count" \
+              -H "X-Pianissimo-Chunk-Sha256: $chunk_sha" \
+              --data-binary "@$chunk" \
+              "$CMS_URL/api/publisher/v1/previews/$PREVIEW_ID/result/chunks/$index"
+          done
           curl --fail-with-body --silent --show-error --output /dev/null \
+            --retry 2 --retry-delay 3 --retry-all-errors --connect-timeout 15 --max-time 600 \
+            -X POST \
             -H "Authorization: Bearer $PUBLISHER_TOKEN" \
-            -H "Content-Type: application/x-tar" \
             -H "X-Pianissimo-Package-Sha256: $PACKAGE_SHA256" \
+            -H "X-Pianissimo-Source-Revision: $SOURCE_REVISION" \
             -H "X-Pianissimo-Archive-Sha256: ${{ steps.result.outputs.archive_sha }}" \
             -H "X-Pianissimo-Files-Sha256: ${{ steps.result.outputs.files_sha }}" \
             -H "X-Pianissimo-Metadata-Sha256: ${{ steps.result.outputs.metadata_sha }}" \
-            --data-binary "@$OUTPUT_ARCHIVE" \
-            "$CMS_URL/api/publisher/v1/previews/$PREVIEW_ID/result"
+            -H "X-Pianissimo-Chunk-Count: $chunk_count" \
+            "$CMS_URL/api/publisher/v1/previews/$PREVIEW_ID/result/finalize"
 
       - name: Remove preview material
         if: always()
-        run: rm -rf -- "$PACKAGE_ARCHIVE" "$PACKAGE_HEADERS" "$PACKAGE_DIR" "$OUTPUT_DIR" "$OUTPUT_ARCHIVE" "$OUTPUT_LIST"
+        run: rm -rf -- "$PACKAGE_ARCHIVE" "$PACKAGE_HEADERS" "$PACKAGE_DIR" "$OUTPUT_DIR" "$OUTPUT_ARCHIVE" "$OUTPUT_LIST" "$OUTPUT_CHUNKS"

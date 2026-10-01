@@ -19,6 +19,7 @@ final class CmsConfiguration
             'CMS_MEDIA_ROOT' => 'media_root',
             'CMS_MANAGED_MEDIA_ROOT' => 'managed_media_root',
             'CMS_MEDIA_ORIGINALS_ROOT' => 'media_originals_root',
+            'CMS_MEDIA_INCOMING_ROOT' => 'media_incoming_root',
             'CMS_PRIVATE_MEDIA_ROOT' => 'private_media_root',
             'CMS_PUBLICATION_PACKAGE_ROOT' => 'publication_package_root',
             'CMS_FRONTEND_APPLY_STATE' => 'frontend_apply_state',
@@ -31,6 +32,7 @@ final class CmsConfiguration
             'CMS_PUBLIC_SITE_ROOT' => 'public_site_root',
         ];
 
+        $legacyMediaMaxKb = (int) $get('CMS_MEDIA_MAX_KB', 512000);
         $configuration = [
             'export_prefix' => 'exports',
             'manifest' => $manifest,
@@ -40,7 +42,10 @@ final class CmsConfiguration
             'managed_media_root' => $get('CMS_MANAGED_MEDIA_ROOT', base_path('../frontend/public/media/cms')),
             'frontend_apply_state' => $get('CMS_FRONTEND_APPLY_STATE', storage_path('app/private/frontend-apply')),
             'media_originals_root' => $get('CMS_MEDIA_ORIGINALS_ROOT', storage_path('app/private/media/originals')),
-            'media_max_kb' => (int) $get('CMS_MEDIA_MAX_KB', 512000),
+            'media_incoming_root' => $get('CMS_MEDIA_INCOMING_ROOT', storage_path('app/private/media-incoming')),
+            'media_max_kb' => (int) $get('CMS_MEDIA_APPLICATION_MAX_KB', $legacyMediaMaxKb),
+            'media_upload_max_kb' => (int) $get('CMS_MEDIA_UPLOAD_MAX_KB', $legacyMediaMaxKb),
+            'media_import_max_kb' => (int) $get('CMS_MEDIA_IMPORT_MAX_KB', $legacyMediaMaxKb),
             'preview_ttl_minutes' => (int) $get('CMS_PREVIEW_TTL_MINUTES', 15),
             'preview_frontend_url' => $get('CMS_PREVIEW_FRONTEND_URL', 'http://127.0.0.1:4321'),
             'preview_frontend_internal_url' => $get('CMS_PREVIEW_FRONTEND_INTERNAL_URL', 'http://host.docker.internal:4321'),
@@ -67,6 +72,9 @@ final class CmsConfiguration
         $runtimeSiteRoot = dirname($applicationBasePath ?? base_path(), 2);
         foreach ($paths as $variable => $key) {
             $configuration[$key] = self::translateProductionPath($configuration[$key], $runtimeSiteRoot);
+            $configuration['explicit_environment'][$variable] = $get($variable) !== null && trim((string) $get($variable)) !== '';
+        }
+        foreach (['CMS_MEDIA_APPLICATION_MAX_KB', 'CMS_MEDIA_UPLOAD_MAX_KB', 'CMS_MEDIA_IMPORT_MAX_KB'] as $variable) {
             $configuration['explicit_environment'][$variable] = $get($variable) !== null && trim((string) $get($variable)) !== '';
         }
         $configuration['manifest'] = $configuration['active_manifest'];
