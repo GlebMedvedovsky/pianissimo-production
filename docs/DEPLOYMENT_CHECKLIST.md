@@ -85,6 +85,10 @@ This root has no marker file because application cleanup is never recursive: onl
 
 ## 6. GitHub private-preview workflow
 
+The first live preview dispatch reached GitHub and passed repository, workflow, active-state, ref, and permission probes, but GitHub rejected parsing before run creation because `${{ runner.temp }}` was used in job-level `env`. The hardening branch initializes temporary paths at runner step time via `$RUNNER_TEMP` and `$GITHUB_ENV`. The same latent defect was corrected in the production publisher workflow while its disabled-by-default gate remained off; do not enable that workflow to test this correction.
+
+Local real-build validation then found a second pre-run blocker: frontend code synthesized undeclared `-480.webp` media paths, which the strict release reference validator correctly rejects, and preview CSS emitted root-absolute `/_astro/` font URLs outside the authenticated route. The branch uses canonical declared media paths and an authenticated preview-only build base. Verify both behaviors in the next live package preview; do not weaken the archive validator or add a public `/_astro/*` route.
+
 - Verify variable names: `PIANISSIMO_CMS_URL`, `PIANISSIMO_PREVIEW_WORKFLOW_ENABLED`.
 - Verify secret name: `PIANISSIMO_PUBLISHER_API_TOKEN`. Never print its value.
 - Confirm checkout uses the exact `CMS_SOURCE_REVISION`, permissions remain `contents: read`, and the preview gate is `true`.
@@ -98,7 +102,7 @@ Verified on 2026-10-01: Webhosting 2000 is active; WCP webspace is 75 GB with ab
 
 Do not use PHP `disk_total_space()` / `disk_free_space()` values as account capacity: they exposed the shared host filesystem (about 4.1 TiB total / 462 GiB free), not the WCP account quota. The shell also lacks `stat`, `unlink`, and `df`.
 
-A controlled production SFTP import for `pianissimo-sftp-test` verified the incoming-file selection and consumption, canonical private original, and `MediaAsset` database row. Its redirect to the edit page then exposed the Filament local-disk hydration defect addressed by `feature/netcup-production-hardening`: canonical `storage_path` state must not enter a create-upload component on edit, and authenticated managed-media reads must use `MediaStorage`. After reviewed patch deployment, re-open that existing record, save harmless metadata, and verify **Datei ansehen** before deleting the test record.
+A controlled production SFTP import for `pianissimo-sftp-test` verified incoming selection and consumption, the canonical private original, and its `MediaAsset` row. Its initial edit redirect exposed the Filament local-disk hydration defect addressed by patch `3ef1372`: canonical `storage_path` state must not enter a create-upload component on edit, and authenticated managed-media reads must use `MediaStorage`. After that patch, the edit page returned HTTP 200, harmless metadata save and authenticated **Datei ansehen** both succeeded, and no new `production.ERROR` appeared. Usage checking showed the asset was unused; CMS deletion removed the active row and physical canonical original while preserving soft-deleted history. The incoming source was absent.
 
 The following still require live verification after deployment:
 
@@ -107,7 +111,8 @@ The following still require live verification after deployment:
 - successful 4 MiB raw chunk request and finalization duration;
 - absence of an SSH-generated config cache after `optimize:clear`;
 - end-to-end package download, chunk upload/finalization, private serving, expiry, invalidation, and cleanup;
-- the existing `pianissimo-sftp-test` edit/open path after this patch, plus incomplete-transfer rejection, failed-source preservation, and canonical-original cleanup for a controlled failed import.
+- successful preview re-dispatch with an actual GitHub workflow run created after the parser fix;
+- incomplete-transfer rejection, failed-source preservation, and canonical-original cleanup for a controlled failed import.
 
 Stop if any measured environment differs from `NETCUP_RUNBOOK.md`; update the runbook through review before improvising.
 

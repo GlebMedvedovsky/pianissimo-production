@@ -123,7 +123,6 @@ class DraftPreviewService
     {
         if(!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:webp|jpg|png|mp3|wav|ogg|mp4|webm)$/',$file))throw new DomainException('Ungültiges Vorschau-Medium.');
         $entry=collect($preview->media)->first(fn($item)=>($item['file']??null)===$file);
-        if(!$entry&&str_contains($file,'-480.')){$original=str_replace('-480.','.',$file);$entry=collect($preview->media)->first(fn($item)=>($item['file']??null)===$original);}
         if(!$entry)throw new DomainException('Dieses Medium gehört nicht zur aktuellen Vorschau.');
         $path=$this->directory($preview).'/media/'.$entry['file'];
         if(!is_file($path)||!hash_equals($entry['sha256'],hash_file('sha256',$path))||(int)$entry['size']!==filesize($path))throw new DomainException('Das Vorschau-Medium ist ungültig.');
@@ -156,7 +155,10 @@ class DraftPreviewService
 
     private function currentDraftHash(): string
     {
-        return ManifestImporter::hash(app(ManifestExporter::class)->package(ContentValidator::POLICY_DRAFT_PREVIEW));
+        // Freshness is the canonical CMS/DB package identity, including recorded media
+        // path/hash metadata. Media bytes are verified when the snapshot is created
+        // and again at each immutable package/result/media trust boundary, not per poll.
+        return ManifestImporter::hash(app(ManifestExporter::class)->package(ContentValidator::POLICY_DRAFT_PREVIEW,false));
     }
 
     private function copyAsset(array $asset,string $targetDirectory): array

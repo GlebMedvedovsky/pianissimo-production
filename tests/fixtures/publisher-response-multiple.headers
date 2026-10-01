@@ -1,0 +1,9 @@
+HTTP/1.1 302 Found
+X-Pianissimo-Package-Sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+X-Pianissimo-Transport-Sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+location: https://example.test/final
+
+HTTP/2 200
+x-PIANISSIMO-package-SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+X-pianissimo-TRANSPORT-sha256: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+

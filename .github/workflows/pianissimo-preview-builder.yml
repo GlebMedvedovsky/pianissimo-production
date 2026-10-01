@@ -32,13 +32,6 @@ jobs:
       PREVIEW_ID: ${{ inputs.preview_identifier }}
       PACKAGE_SHA256: ${{ inputs.package_sha256 }}
       SOURCE_REVISION: ${{ inputs.source_revision }}
-      PACKAGE_ARCHIVE: ${{ runner.temp }}/pianissimo-preview.tar
-      PACKAGE_HEADERS: ${{ runner.temp }}/pianissimo-preview.headers
-      PACKAGE_DIR: ${{ runner.temp }}/pianissimo-preview-package
-      OUTPUT_DIR: ${{ runner.temp }}/pianissimo-preview-output
-      OUTPUT_ARCHIVE: ${{ runner.temp }}/pianissimo-preview-result.tar
-      OUTPUT_LIST: ${{ runner.temp }}/pianissimo-preview-result.files
-      OUTPUT_CHUNKS: ${{ runner.temp }}/pianissimo-preview-result-chunks
       PREVIEW_CHUNK_BYTES: "4194304"
     steps:
       - name: Enforce preview workflow gate and validate inputs
@@ -53,6 +46,22 @@ jobs:
           [[ "$SOURCE_REVISION" =~ ^[a-f0-9]{40}$ ]]
           [[ "$CMS_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]
           test -n "$PUBLISHER_TOKEN"
+
+      - name: Initialize runner-local temporary paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          {
+            printf '%s\n' \
+              "PACKAGE_ARCHIVE=$RUNNER_TEMP/pianissimo-preview.tar" \
+              "PACKAGE_HEADERS=$RUNNER_TEMP/pianissimo-preview.headers" \
+              "PACKAGE_DIR=$RUNNER_TEMP/pianissimo-preview-package" \
+              "OUTPUT_DIR=$RUNNER_TEMP/pianissimo-preview-output" \
+              "OUTPUT_ARCHIVE=$RUNNER_TEMP/pianissimo-preview-result.tar" \
+              "OUTPUT_LIST=$RUNNER_TEMP/pianissimo-preview-result.files" \
+              "OUTPUT_CHUNKS=$RUNNER_TEMP/pianissimo-preview-result-chunks"
+          } >> "$GITHUB_ENV"
 
       - name: Checkout exact source revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -77,8 +86,10 @@ jobs:
           curl --fail-with-body --silent --show-error -D "$PACKAGE_HEADERS" \
             -H "Authorization: Bearer $PUBLISHER_TOKEN" \
             -o "$PACKAGE_ARCHIVE" "$CMS_URL/api/publisher/v1/previews/$PREVIEW_ID/package"
-          transport_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Transport-Sha256:/ {gsub("\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
-          logical_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Package-Sha256:/ {gsub("\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
+          transport_sha="$(node scripts/read-publisher-digest.mjs "$PACKAGE_HEADERS" X-Pianissimo-Transport-Sha256)"
+          logical_sha="$(node scripts/read-publisher-digest.mjs "$PACKAGE_HEADERS" X-Pianissimo-Package-Sha256)"
+          [[ "$transport_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$logical_sha" =~ ^[0-9a-f]{64}$ ]]
           test "$logical_sha" = "$PACKAGE_SHA256"
           test "$(sha256sum "$PACKAGE_ARCHIVE" | awk '{print $1}')" = "$transport_sha"
           node scripts/extract-preview-transport.mjs "$PACKAGE_ARCHIVE" "$PACKAGE_DIR" "$PREVIEW_ID" "$PACKAGE_SHA256" "$SOURCE_REVISION"

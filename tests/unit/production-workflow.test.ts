@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { parse } from "yaml";
 import { canonicalJson, sha256 } from "../../scripts/publication-package";
 
 const workflowPath = resolve(".github/workflows/pianissimo-production-publisher.yml");
@@ -41,8 +42,16 @@ function runExtractor(args: readonly string[]) {
   return spawnSync(process.execPath, [extractorPath, ...args], { encoding: "utf8" });
 }
 
+function workflowJob(workflow: string) {
+  const document = parse(workflow) as { on: { workflow_dispatch: { inputs: Record<string, unknown> } }; jobs: { build: { env: Record<string, unknown>; steps: Array<Record<string, unknown>> } } };
+  assert.ok(document.jobs?.build?.env && Array.isArray(document.jobs.build.steps));
+  return { document, job: document.jobs.build };
+}
+
 test("production workflow is gated, pinned, read-only, isolated, and transfers through strict SSH", async () => {
   const workflow = await readFile(workflowPath, "utf8");
+  const { document } = workflowJob(workflow);
+  assert.deepEqual(Object.keys(document.on.workflow_dispatch.inputs), ["publication_id", "sequence", "package_sha256", "source_revision"]);
   for (const input of ["publication_id", "sequence", "package_sha256", "source_revision"])
     assert.match(workflow, new RegExp(`^      ${input}:`, "m"));
   assert.match(workflow, /PIANISSIMO_PRODUCTION_WORKFLOW_ENABLED/);
@@ -150,6 +159,30 @@ test("production workflow pins host identity, confines partial cleanup, and uses
   assert.doesNotMatch(workflow, /echo\s+[^\n]*(?:SSH_PRIVATE_KEY_MATERIAL|SSH_KNOWN_HOSTS_MATERIAL)/);
 });
 
+test("production temporary paths are initialized only at runner step time", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+  const { job } = workflowJob(workflow);
+  assert.doesNotMatch(JSON.stringify(job.env), /runner\.temp|RUNNER_TEMP/);
+  assert.doesNotMatch(workflow, /\$\{\{\s*runner\.temp\s*\}\}/);
+
+  const initIndex = job.steps.findIndex((step) => step.name === "Initialize runner-local temporary paths");
+  const gateIndex = job.steps.findIndex((step) => step.name === "Enforce disabled-by-default workflow gate");
+  assert.ok(initIndex > gateIndex);
+  const initStep = String(job.steps[initIndex]?.run);
+  for (const variable of [
+    "PACKAGE_ARCHIVE", "PACKAGE_HEADERS", "PACKAGE_DIR", "OUTPUT_DIR", "RELEASE_ARCHIVE",
+    "RELEASE_FILE_LIST", "SSH_DIR", "SSH_KEY_FILE", "SSH_KNOWN_HOSTS_FILE",
+  ]) {
+    assert.equal(Object.hasOwn(job.env, variable), false);
+    assert.match(initStep, new RegExp(`"${variable}=\\$RUNNER_TEMP\\/[^"\\r\\n]+"`));
+    assert.ok(job.steps.findIndex((step, index) => index > initIndex && JSON.stringify(step).includes(`$${variable}`)) > initIndex);
+  }
+  assert.match(initStep, /"SSH_DIR=\$RUNNER_TEMP\/pianissimo-ssh"/);
+  assert.match(initStep, /"SSH_KEY_FILE=\$RUNNER_TEMP\/pianissimo-ssh\/id_ed25519"/);
+  assert.match(initStep, /"SSH_KNOWN_HOSTS_FILE=\$RUNNER_TEMP\/pianissimo-ssh\/known_hosts"/);
+  assert.match(initStep, /\}\s*>> "\$GITHUB_ENV"/);
+});
+
 test("extractor rejects invalid identities, package mismatch, traversal, and symlink entries", async () => {
   await mkdir(buildRoot, { recursive: true });
   const root = await mkdtemp(resolve(buildRoot, "workflow-transport-"));
@@ -217,5 +250,8 @@ test("workflow input validation contains strict UUID, sequence, SHA-256 and revi
   assert.match(workflow, /PUBLICATION_SEQUENCE.*\^\[1-9\]\[0-9\]\*\$/);
   assert.match(workflow, /PACKAGE_SHA256.*\^\[0-9a-f\]\{64\}\$/);
   assert.match(workflow, /SOURCE_REVISION.*\^\[0-9a-f\]\{40\}\$/);
+  assert.doesNotMatch(workflow, /IGNORECASE/);
+  assert.match(workflow, /read-publisher-digest\.mjs/);
+  assert.match(workflow, /logical_sha.*\^\[0-9a-f\]\{64\}\$/);
   assert.equal(createHash("sha256").update("transport").digest("hex").length, 64);
 });

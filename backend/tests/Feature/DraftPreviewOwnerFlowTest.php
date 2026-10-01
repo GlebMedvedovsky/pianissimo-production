@@ -207,6 +207,17 @@ class DraftPreviewOwnerFlowTest extends TestCase
         $this->withSession(['draft_preview_token'=>$created['token']])->get(route('draft-preview.media',$media['file']))->assertForbidden();
     }
 
+    public function test_preview_freshness_uses_recorded_media_identity_without_rehashing_source_bytes(): void
+    {
+        $asset=$this->jpg('qa-preview-freshness','test','unconfirmed');$about=Setting::read('about');Setting::put('about',[...$about,'media'=>[...$about['media'],'image'=>$asset->id]]);
+        $created=app(DraftPreviewService::class)->create($this->admin->id);
+        Storage::disk('local')->put($asset->storage_path,'tampered canonical source');
+
+        $this->assertSame($created['preview']->id,app(DraftPreviewService::class)->resolve($created['token'])->id,'Ordinary freshness polling must use the recorded CMS media identity.');
+        try{app(DraftPreviewService::class)->create($this->admin->id);$this->fail('Preview creation must still verify canonical media bytes.');}
+        catch(\DomainException $e){$this->assertStringContainsString('Prüfsumme',$e->getMessage());}
+    }
+
     public function test_new_saved_draft_invalidates_old_snapshot_and_new_preview_contains_new_value(): void
     {
         $about=Setting::read('about');Setting::put('about',[...$about,'biography'=>['Draft A']]);$a=app(DraftPreviewService::class)->create($this->admin->id);

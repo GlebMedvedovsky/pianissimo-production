@@ -17,6 +17,8 @@ import {
   sha256,
   validatePublicationPackage,
 } from "../../scripts/publication-package";
+import { createReleaseIntegrity } from "../../scripts/create-release-integrity.mjs";
+import { validateReleaseTextReferences } from "../../scripts/release-reference-contract";
 
 const localBuildRoot = resolve(".local-builds");
 const mediaBytes = Buffer.from("deterministic-public-release-image");
@@ -24,15 +26,17 @@ const mediaBytes = Buffer.from("deterministic-public-release-image");
 async function createPackage(testRoot: string) {
   const packageRoot = resolve(testRoot, "package");
   await mkdir(resolve(packageRoot, "media"), { recursive: true });
-  const manifest = structuredClone(releaseFixture);
+  const manifest = structuredClone(releaseFixture) as any;
   const mediaSha = sha256(mediaBytes);
+  manifest.assets[0]!.path = "media/release-image.webp";
   manifest.assets[0]!.sha256 = mediaSha;
+  manifest.site.mediaSlots.hero.image = "release-image";
   const manifestBytes = `${canonicalJson(manifest)}\n`;
   const manifestSha256 = sha256(manifestBytes);
   const media = [
     {
       assetId: "release-image",
-      publicPath: "media/release-image.jpg",
+      publicPath: "media/release-image.webp",
       sha256: mediaSha,
       size: mediaBytes.length,
       type: "image" as const,
@@ -64,7 +68,7 @@ async function createPackage(testRoot: string) {
     resolve(packageRoot, "publication.json"),
     `${canonicalJson(publication)}\n`,
   );
-  await writeFile(resolve(packageRoot, "media", "release-image.jpg"), mediaBytes);
+  await writeFile(resolve(packageRoot, "media", "release-image.webp"), mediaBytes);
   return { packageRoot, publication, manifest };
 }
 
@@ -108,17 +112,17 @@ test("publication package rejects media SHA, size, missing, and extra file misma
   await withRoot(async (root) => {
     const checksum = await createPackage(resolve(root, "checksum"));
     await writeFile(
-      resolve(checksum.packageRoot, "media", "release-image.jpg"),
+      resolve(checksum.packageRoot, "media", "release-image.webp"),
       Buffer.from("deterministic-public-release-imagf"),
     );
     await assert.rejects(validatePublicationPackage(checksum.packageRoot), /SHA-256 mismatch/);
 
     const size = await createPackage(resolve(root, "size"));
-    await writeFile(resolve(size.packageRoot, "media", "release-image.jpg"), "too short");
+    await writeFile(resolve(size.packageRoot, "media", "release-image.webp"), "too short");
     await assert.rejects(validatePublicationPackage(size.packageRoot), /size mismatch/);
 
     const missing = await createPackage(resolve(root, "missing"));
-    await unlink(resolve(missing.packageRoot, "media", "release-image.jpg"));
+    await unlink(resolve(missing.packageRoot, "media", "release-image.webp"));
     await assert.rejects(validatePublicationPackage(missing.packageRoot), /regular non-symlink file/);
 
     const extra = await createPackage(resolve(root, "extra"));
@@ -160,7 +164,7 @@ test("publication build injects the package manifest and emits only allowlisted 
     const after = sha256(await readFile(trackedManifest));
     assert.equal(after, before, "production build must not mutate tracked content");
     assert.equal(
-      sha256(await readFile(resolve(output, "media", "release-image.jpg"))),
+      sha256(await readFile(resolve(output, "media", "release-image.webp"))),
       fixture.publication.media[0]!.sha256,
     );
     await assert.rejects(readFile(resolve(output, "media", "abszission.webp")));
@@ -184,5 +188,9 @@ test("publication build injects the package manifest and emits only allowlisted 
       )
     ).join("\n");
     assert.match(html, /Pianissimo release fixture/);
+    assert.doesNotMatch(html, /release-image-480\.webp/);
+    await createReleaseIntegrity(output, resolve(fixture.packageRoot, "publication.json"));
+    const inventory = JSON.parse(await readFile(resolve(output, ".pianissimo-release-files.json"), "utf8"));
+    await validateReleaseTextReferences(output, inventory);
   });
 });

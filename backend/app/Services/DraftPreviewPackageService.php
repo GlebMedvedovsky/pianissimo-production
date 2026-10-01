@@ -78,7 +78,7 @@ final class DraftPreviewPackageService
                     throw new DomainException('Ein Vorschau-Medium konnte nicht sicher paketiert werden.');
                 }
             }
-            $this->verify($pending, $preview);
+            $this->verifyDirectory($pending, $preview, true);
             if (! rename($pending, $final)) {
                 throw new DomainException('Das Vorschau-Paket konnte nicht atomar bereitgestellt werden.');
             }
@@ -90,16 +90,23 @@ final class DraftPreviewPackageService
         }
     }
 
+    /** Validate immutable package identity and declared media metadata without reading media bytes. */
     public function metadata(DraftPreview $preview): array
     {
-        return $this->verify($this->directory($preview), $preview);
+        return $this->verifyDirectory($this->directory($preview), $preview, false);
+    }
+
+    /** Validate immutable package identity, complete file inventory, and every media byte digest. */
+    public function verify(DraftPreview $preview): array
+    {
+        return $this->verifyDirectory($this->directory($preview), $preview, true);
     }
 
     /** @return array{path:string,sha256:string,filename:string} */
     public function transport(DraftPreview $preview): array
     {
         $directory = $this->directory($preview);
-        $this->verify($directory, $preview);
+        $this->verifyDirectory($directory, $preview, true);
         $files = [];
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::LEAVES_ONLY);
         foreach ($iterator as $entry) {
@@ -164,7 +171,7 @@ final class DraftPreviewPackageService
         if(is_link($path))@unlink($path);elseif(is_dir($path))File::deleteDirectory($path);
     }
 
-    private function verify(string $directory, DraftPreview $preview): array
+    private function verifyDirectory(string $directory, DraftPreview $preview, bool $verifyMediaBytes): array
     {
         $metadataBytes = $this->regularBytes($directory.DIRECTORY_SEPARATOR.'preview.json');
         $manifestBytes = $this->regularBytes($directory.DIRECTORY_SEPARATOR.'manifest.json');
@@ -203,13 +210,16 @@ final class DraftPreviewPackageService
                 || ! in_array($entry['type'] ?? null, ['image', 'audio', 'video'], true)) {
                 throw new DomainException('Das Vorschau-Paket enthält ungültige Medien-Metadaten.');
             }
-            $file = $directory.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $path);
-            if (is_link($file) || ! is_file($file) || filesize($file) !== $entry['size'] || ! hash_equals($entry['sha256'], (string) hash_file('sha256', $file))) {
-                throw new DomainException('Ein Medium des Vorschau-Pakets wurde verändert.');
+            if ($verifyMediaBytes) {
+                $file = $directory.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $path);
+                if (is_link($file) || ! is_file($file) || filesize($file) !== $entry['size'] || ! hash_equals($entry['sha256'], (string) hash_file('sha256', $file))) {
+                    throw new DomainException('Ein Medium des Vorschau-Pakets wurde verändert.');
+                }
             }
             $expected[$path] = true;
             $previous = $path;
         }
+        if (! $verifyMediaBytes) return $metadata;
         $actual = [];
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::LEAVES_ONLY);
         foreach ($iterator as $entry) {

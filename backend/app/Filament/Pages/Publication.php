@@ -50,7 +50,7 @@ class Publication extends \Filament\Pages\Page
     {
         $candidate=\App\Models\Publication::whereIn('status',['candidate','stale'])->latest('id')->first();if(!$candidate)return ['kind'=>'empty'];
         if($candidate->status==='stale')return ['kind'=>'stale'];
-        try{$current=\App\Services\ManifestImporter::hash(app(ManifestExporter::class)->package());}catch(\Throwable){$current=null;}
+        try{$current=\App\Services\ManifestImporter::hash(app(ManifestExporter::class)->package(checkFiles:false));}catch(\Throwable){$current=null;}
         if($current!==$candidate->hash){app(DraftStateSnapshot::class)->markCandidatesStale([$candidate->hash]);return ['kind'=>'stale'];}
         return ['kind'=>'current','createdAt'=>$candidate->created_at];
     }

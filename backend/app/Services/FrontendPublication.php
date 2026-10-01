@@ -182,7 +182,7 @@ class FrontendPublication
         if(!preg_match('/^[a-f0-9]{64}$/',$candidateHash))return ['kind'=>'stale'];
         $candidate=\App\Models\Publication::where('hash',$candidateHash)->latest('id')->first();
         if(!$candidate||$candidate->status==='stale')return ['kind'=>'stale'];
-        try{$draftHash=ManifestImporter::hash(app(ManifestExporter::class)->package());$activeHash=hash_file('sha256',config('cms.manifest'));}
+        try{$draftHash=ManifestImporter::hash(app(ManifestExporter::class)->package(checkFiles:false));$activeHash=hash_file('sha256',config('cms.manifest'));}
         catch(\Throwable){return ['kind'=>'stale'];}
         if($activeHash===($plan['resultingManifestHash']??null))return ['kind'=>'applied'];
         if($draftHash!==$candidateHash||$activeHash!==($plan['previousManifestHash']??null)){

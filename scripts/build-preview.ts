@@ -50,7 +50,7 @@ async function validatePackage(packagePath: string) {
   const walk = async (directory: string) => { for (const entry of await readdir(directory, { withFileTypes: true })) { const path = resolve(directory, entry.name); const stat = await lstat(path); if (stat.isSymbolicLink()) throw new Error("Preview package contains a symlink."); if (stat.isDirectory()) await walk(path); else if (stat.isFile()) actual.push(relative(root, path).split(sep).join("/")); else throw new Error("Preview package contains a special file."); } };
   await walk(root);
   if (actual.length !== expected.size || actual.some((path) => !expected.has(path))) throw new Error("Preview package file inventory mismatch.");
-  return { root, manifestBytes, media };
+  return { root, manifestBytes, media, previewId: Number(metadata.previewId) };
 }
 
 export async function buildPreview(packagePath: string, outputPath: string) {
@@ -68,7 +68,7 @@ export async function buildPreview(packagePath: string, outputPath: string) {
     await mkdir(publicDir); await writeFile(manifestPath, preview.manifestBytes, { flag: "wx" });
     for (const name of ["favicon.svg", "robots.txt"]) { const source = resolve(frontendRoot, "public", name); const stat = await lstat(source); if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Static preview asset is unsafe."); await copyFile(source, resolve(publicDir, name)); }
     for (const item of preview.media) { const target = resolve(publicDir, ...item.publicPath.split("/")); await mkdir(dirname(target), { recursive: true }); await copyFile(resolve(preview.root, ...item.publicPath.split("/")), target); }
-    const build = spawnSync(process.execPath, [resolve(repositoryRoot, "scripts", "astro.mjs"), "build"], { cwd: frontendRoot, env: { ...process.env, PIANISSIMO_PUBLICATION_BUILD: "1", PIANISSIMO_PREVIEW_BUILD: "1", PIANISSIMO_MANIFEST_PATH: manifestPath, PIANISSIMO_PUBLIC_DIR: publicDir, PIANISSIMO_OUT_DIR: outDir }, stdio: "inherit" });
+    const build = spawnSync(process.execPath, [resolve(repositoryRoot, "scripts", "astro.mjs"), "build"], { cwd: frontendRoot, env: { ...process.env, PIANISSIMO_PUBLICATION_BUILD: "1", PIANISSIMO_PREVIEW_BUILD: "1", PIANISSIMO_PREVIEW_ASSET_BASE: `/draft-preview/assets/${preview.previewId}/`, PIANISSIMO_MANIFEST_PATH: manifestPath, PIANISSIMO_PUBLIC_DIR: publicDir, PIANISSIMO_OUT_DIR: outDir }, stdio: "inherit" });
     if (build.status !== 0) throw new Error("Astro preview build failed.");
     const isolation = spawnSync(process.execPath, [resolve(repositoryRoot, "scripts", "check-dist.mjs"), outDir], { cwd: repositoryRoot, stdio: "inherit" });
     if (isolation.status !== 0) throw new Error("Preview build isolation validation failed.");

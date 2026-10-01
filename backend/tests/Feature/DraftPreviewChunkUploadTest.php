@@ -13,6 +13,8 @@ class DraftPreviewChunkUploadTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const PACKAGE_MEDIA_BYTES = 'deterministic-preview-package-media';
+
     private string $fixtureRoot;
     private DraftPreview $preview;
     private array $package;
@@ -108,6 +110,44 @@ class DraftPreviewChunkUploadTest extends TestCase
         $this->assertFalse($this->upload(0, $chunk)['stored']);
         $altered = substr_replace($chunk, $chunk[0] === 'x' ? 'y' : 'x', 0, 1);
         $this->assertDomain(fn () => $this->upload(0, $altered), 'andere Daten');
+    }
+
+    public function test_waiting_readiness_uses_package_identity_without_rehashing_media_bytes(): void
+    {
+        $this->tamperPackageMedia();
+
+        $this->assertFalse(app(DraftPreviewResultService::class)->ready($this->preview));
+        $this->assertDomain(fn () => app(DraftPreviewPackageService::class)->verify($this->preview), 'Medium des Vorschau-Pakets wurde verändert');
+    }
+
+    public function test_chunk_upload_uses_package_identity_without_rehashing_media_bytes(): void
+    {
+        $this->tamperPackageMedia();
+        $chunk = substr($this->archive, 0, DraftPreviewResultService::CHUNK_BYTES);
+
+        $this->assertTrue($this->upload(0, $chunk)['stored']);
+        $this->assertDomain(fn () => app(DraftPreviewPackageService::class)->verify($this->preview), 'Medium des Vorschau-Pakets wurde verändert');
+    }
+
+    public function test_installed_asset_serving_does_not_rehash_package_media_bytes(): void
+    {
+        foreach (str_split($this->archive, DraftPreviewResultService::CHUNK_BYTES) as $index => $chunk) $this->upload($index, $chunk);
+        $this->assertTrue(app(DraftPreviewResultService::class)->finalize($this->preview, $this->upload));
+        $this->tamperPackageMedia();
+
+        $this->assertTrue(app(DraftPreviewResultService::class)->ready($this->preview));
+        $asset = app(DraftPreviewResultService::class)->file($this->preview, '_astro/app.css');
+        $this->assertSame('body{color:#111}', file_get_contents($asset['path']));
+        $this->assertDomain(fn () => app(DraftPreviewPackageService::class)->verify($this->preview), 'Medium des Vorschau-Pakets wurde verändert');
+    }
+
+    public function test_finalization_still_rehashes_and_rejects_tampered_package_media(): void
+    {
+        foreach (str_split($this->archive, DraftPreviewResultService::CHUNK_BYTES) as $index => $chunk) $this->upload($index, $chunk);
+        $this->tamperPackageMedia();
+
+        $this->assertDomain(fn () => app(DraftPreviewResultService::class)->finalize($this->preview, $this->upload), 'Medium des Vorschau-Pakets wurde verändert');
+        $this->assertFalse(app(DraftPreviewResultService::class)->ready($this->preview));
     }
 
     public function test_out_of_range_index_is_rejected(): void
@@ -246,13 +286,20 @@ class DraftPreviewChunkUploadTest extends TestCase
     private function writePackage(string $identifier): array
     {
         $directory = $this->fixtureRoot.'/packages/'.$identifier;
-        File::ensureDirectoryExists($directory, 0750);
+        File::ensureDirectoryExists($directory.'/media/preview', 0750);
         $manifestBytes = "{}\n";
+        $media = [[
+            'assetId' => 'package-test-image',
+            'publicPath' => 'media/preview/package-test-image.webp',
+            'sha256' => hash('sha256', self::PACKAGE_MEDIA_BYTES),
+            'size' => strlen(self::PACKAGE_MEDIA_BYTES),
+            'type' => 'image',
+        ]];
         $digest = [
             'contractVersion' => DraftPreviewPackageService::CONTRACT_VERSION,
             'draftHash' => $this->preview->draft_hash,
             'manifestSha256' => hash('sha256', $manifestBytes),
-            'media' => [],
+            'media' => $media,
             'sourceRevision' => (string) config('cms.source_revision'),
         ];
         $metadata = [
@@ -264,7 +311,8 @@ class DraftPreviewChunkUploadTest extends TestCase
         ];
         file_put_contents($directory.'/manifest.json', $manifestBytes);
         file_put_contents($directory.'/preview.json', $this->canonicalJson($metadata)."\n");
-        return app(DraftPreviewPackageService::class)->metadata($this->preview);
+        file_put_contents($directory.'/media/preview/package-test-image.webp', self::PACKAGE_MEDIA_BYTES);
+        return app(DraftPreviewPackageService::class)->verify($this->preview);
     }
 
     private function resultArchive(string $identifier): array
@@ -274,6 +322,7 @@ class DraftPreviewChunkUploadTest extends TestCase
             ['_astro/app.css', 'body{color:#111}'],
             ['_astro/app.js', 'console.log("preview")'],
             ['favicon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>'],
+            ['media/preview/package-test-image.webp', self::PACKAGE_MEDIA_BYTES],
             ['robots.txt', "User-agent: *\nDisallow: /\n"],
         ];
         $inventory = array_map(static fn (array $entry): array => ['path' => $entry[0], 'sha256' => hash('sha256', $entry[1]), 'size' => strlen($entry[1])], $public);
@@ -287,7 +336,12 @@ class DraftPreviewChunkUploadTest extends TestCase
             'packageSha256' => $this->package['packageSha256'],
             'manifestSha256' => $this->package['manifestSha256'],
             'releaseFilesSha256' => hash('sha256', $inventoryBytes),
-            'media' => [],
+            'media' => [[
+                'publicPath' => 'media/preview/package-test-image.webp',
+                'sha256' => hash('sha256', self::PACKAGE_MEDIA_BYTES),
+                'size' => strlen(self::PACKAGE_MEDIA_BYTES),
+                'type' => 'image',
+            ]],
         ];
         $metadataBytes = json_encode($metadata, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n";
         $entries = [...$public, [StaticReleaseArchive::FILES_FILE, $inventoryBytes], [StaticReleaseArchive::METADATA_FILE, $metadataBytes]];
@@ -332,6 +386,12 @@ class DraftPreviewChunkUploadTest extends TestCase
         if (! is_array($value)) return $value;
         if (array_is_list($value)) return array_map(fn (mixed $item): mixed => $this->canonicalize($item), $value);
         ksort($value, SORT_STRING); foreach ($value as $key => $item) $value[$key] = $this->canonicalize($item); return $value;
+    }
+
+    private function tamperPackageMedia(): void
+    {
+        $path = $this->fixtureRoot.'/packages/'.basename($this->preview->snapshot_path).'/media/preview/package-test-image.webp';
+        file_put_contents($path, str_repeat('x', strlen(self::PACKAGE_MEDIA_BYTES)));
     }
 
     private function assertDomain(callable $callback, string $message): void

@@ -10,6 +10,7 @@ const localPath = (relative) =>
 
 const publicationBuild = process.env.PIANISSIMO_PUBLICATION_BUILD === "1";
 const previewBuild = process.env.PIANISSIMO_PREVIEW_BUILD === "1";
+const previewAssetBase = process.env.PIANISSIMO_PREVIEW_ASSET_BASE;
 const publicationManifestPath = process.env.PIANISSIMO_MANIFEST_PATH;
 const publicationPublicDir = process.env.PIANISSIMO_PUBLIC_DIR;
 const publicationOutDir = process.env.PIANISSIMO_OUT_DIR;
@@ -26,6 +27,12 @@ if (
   ))
 ) {
   throw new Error("Publication build paths must be explicit absolute paths.");
+}
+if (previewAssetBase && (!previewBuild || !/^\/draft-preview\/assets\/[1-9][0-9]*\/$/.test(previewAssetBase))) {
+  throw new Error("Preview asset base must identify the authenticated preview asset route.");
+}
+if (previewBuild && !previewAssetBase) {
+  throw new Error("Package preview builds require an authenticated preview asset base.");
 }
 
 const manifestModule = {
@@ -117,6 +124,7 @@ const privateLocalMaterials = {
 
 export default defineConfig({
   output: "static",
+  ...(previewBuild ? { base: previewAssetBase } : {}),
   ...(publicationBuild
     ? {
         publicDir: publicationPublicDir,

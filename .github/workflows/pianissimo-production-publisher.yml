@@ -39,15 +39,6 @@ jobs:
       SOURCE_REVISION: ${{ inputs.source_revision }}
       CLAIM_RUNNER_ID: github-${{ github.run_id }}
       ATTEMPT_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
-      PACKAGE_ARCHIVE: ${{ runner.temp }}/pianissimo-publication.tar
-      PACKAGE_HEADERS: ${{ runner.temp }}/pianissimo-publication.headers
-      PACKAGE_DIR: ${{ runner.temp }}/pianissimo-publication
-      OUTPUT_DIR: ${{ runner.temp }}/pianissimo-static
-      RELEASE_ARCHIVE: ${{ runner.temp }}/pianissimo-static-release.tar
-      RELEASE_FILE_LIST: ${{ runner.temp }}/pianissimo-static-release.files
-      SSH_DIR: ${{ runner.temp }}/pianissimo-ssh
-      SSH_KEY_FILE: ${{ runner.temp }}/pianissimo-ssh/id_ed25519
-      SSH_KNOWN_HOSTS_FILE: ${{ runner.temp }}/pianissimo-ssh/known_hosts
       SSH_HOST: ${{ vars.NETCUP_SSH_HOST }}
       SSH_USER: ${{ vars.NETCUP_SSH_USER }}
       SSH_PORT: ${{ vars.NETCUP_SSH_PORT }}
@@ -61,6 +52,24 @@ jobs:
         run: |
           set -euo pipefail
           test "$WORKFLOW_ENABLED" = "true" || { echo "Production publisher workflow is disabled."; exit 1; }
+
+      - name: Initialize runner-local temporary paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          {
+            printf '%s\n' \
+              "PACKAGE_ARCHIVE=$RUNNER_TEMP/pianissimo-publication.tar" \
+              "PACKAGE_HEADERS=$RUNNER_TEMP/pianissimo-publication.headers" \
+              "PACKAGE_DIR=$RUNNER_TEMP/pianissimo-publication" \
+              "OUTPUT_DIR=$RUNNER_TEMP/pianissimo-static" \
+              "RELEASE_ARCHIVE=$RUNNER_TEMP/pianissimo-static-release.tar" \
+              "RELEASE_FILE_LIST=$RUNNER_TEMP/pianissimo-static-release.files" \
+              "SSH_DIR=$RUNNER_TEMP/pianissimo-ssh" \
+              "SSH_KEY_FILE=$RUNNER_TEMP/pianissimo-ssh/id_ed25519" \
+              "SSH_KNOWN_HOSTS_FILE=$RUNNER_TEMP/pianissimo-ssh/known_hosts"
+          } >> "$GITHUB_ENV"
 
       - name: Validate inputs and non-secret configuration
         env:
@@ -140,9 +149,10 @@ jobs:
             -H "X-Pianissimo-Runner-Id: $CLAIM_RUNNER_ID" \
             -o "$PACKAGE_ARCHIVE" \
             "$CMS_URL/api/publisher/v1/publications/$PUBLICATION_ID/package"
-          transport_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Transport-Sha256:/ {gsub("\\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
-          logical_sha="$(awk 'BEGIN{IGNORECASE=1} /^X-Pianissimo-Package-Sha256:/ {gsub("\\r", "", $2); print $2}' "$PACKAGE_HEADERS" | tail -n1)"
+          transport_sha="$(node scripts/read-publisher-digest.mjs "$PACKAGE_HEADERS" X-Pianissimo-Transport-Sha256)"
+          logical_sha="$(node scripts/read-publisher-digest.mjs "$PACKAGE_HEADERS" X-Pianissimo-Package-Sha256)"
           [[ "$transport_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$logical_sha" =~ ^[0-9a-f]{64}$ ]]
           test "$logical_sha" = "$PACKAGE_SHA256"
           test "$(sha256sum "$PACKAGE_ARCHIVE" | awk '{print $1}')" = "$transport_sha"
 

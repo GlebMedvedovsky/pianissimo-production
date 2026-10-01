@@ -12,7 +12,7 @@ class ManifestExporter
     private function profileLinks(?array $a): object { return (object) array_filter(Arr::only($a??[],['imdb','crewUnited','musicHub']),fn($v)=>$v!==null && $v!==''); }
     private function optional(array $a): array { return array_filter($a,fn($v)=>$v!==null && $v!==''); }
     private function media(string $key): array { return MediaSlotPolicy::project($key,Setting::read($key)['media']??[]); }
-    public function package(string $validationPolicy=ContentValidator::POLICY_PUBLICATION): array
+    public function package(string $validationPolicy=ContentValidator::POLICY_PUBLICATION, bool $checkFiles=true): array
     {
         $trackIds=Track::where('status','published')->where('library_visible',true)->pluck('id')->all(); $assetIds=[]; $projects=[];
         foreach (Project::where('status','published')->orderBy('sort_order')->orderBy('id')->with(['memberships','mediaAssignments','soundtrack'])->get() as $p) {
@@ -88,7 +88,7 @@ class ManifestExporter
                 ...(!empty($about['collective']['name']) && !empty($about['collective']['url']) && !empty($about['collective']['membershipText'])?['collective'=>[
                     'name'=>$about['collective']['name'],'url'=>$about['collective']['url'],'logoAssetId'=>$about['collective']['logoAssetId']??null,'membershipText'=>$about['collective']['membershipText'],
                 ]]:[]),'mediaSlots'=>$slots]];
-        app(ContentValidator::class)->validate($manifest,false,true,$validationPolicy);
+        app(ContentValidator::class)->validate($manifest,false,$checkFiles,$validationPolicy);
         $extension=app(SettingsExporter::class)->export();
         return ['manifest'=>$manifest,'settings'=>$extension];
     }

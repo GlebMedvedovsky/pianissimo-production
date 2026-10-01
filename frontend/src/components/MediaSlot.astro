@@ -16,8 +16,6 @@ const video = assetFrom(content, slot.video);
 <div class:list={['media-slot', className]} data-slot={name}>
   {picture && <img
     src={'/' + picture.path}
-    srcset={`/${picture.path.replace('.webp', '-480.webp')} 480w, /${picture.path} ${picture.width}w`}
-    sizes={name === 'about' || name.endsWith('Menu') ? '(max-width: 800px) 1600px, 100vw' : '100vw'}
     width={picture.width}
     height={picture.height}
     alt={name === 'about' ? picture.alt : ''}

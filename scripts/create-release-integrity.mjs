@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, readdir, readFile, writeFile } from "node:fs/promises";
-import { relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, relative, resolve, sep } from "node:path";
 
 export const RELEASE_METADATA_FILE = ".pianissimo-release.json";
 export const RELEASE_FILES_FILE = ".pianissimo-release-files.json";
@@ -67,7 +66,7 @@ export async function createReleaseIntegrity(outputDirectory, publicationPath) {
   return releaseFilesSha256;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+if (process.argv[1] && basename(process.argv[1]) === "create-release-integrity.mjs") {
   const [outputDirectory, publicationPath] = process.argv.slice(2);
   if (!outputDirectory || !publicationPath) {
     throw new Error("Usage: node scripts/create-release-integrity.mjs <static-output> <publication.json>");

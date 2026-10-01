@@ -26,7 +26,7 @@ class OwnerDashboard
         if(($consent['status']??'draft')!=='published')$hints[]=$this->hint('consent','Cookie-Einstellungen noch nicht freigegeben','Die Einstellungen sind noch als Entwurf oder Prüfung markiert.',Consent::getUrl());
         if(($analytics['provider']??'none')==='none' || !($analytics['enabled']??false))$hints[]=$this->hint('analytics','Analytics ist nicht eingerichtet','Derzeit werden keine Besucherstatistiken erhoben.',Analytics::getUrl());
         if($review['kind']==='stale')$hints[]=$this->hint('review-stale','Geprüfte Änderungen sind nicht mehr aktuell','Der Entwurf wurde nach der Prüfung geändert. Bitte prüfen Sie die Änderungen erneut.',Publication::getUrl());
-        try{$packageMedia=(int)app(ManifestExporter::class)->export(true,false)['assets'];}catch(\Throwable){$packageMedia=null;}
+        try{$packageMedia=count(app(ManifestExporter::class)->package(checkFiles:false)['manifest']['assets']);}catch(\Throwable){$packageMedia=null;}
         return [
             'status'=>['hasDraftChanges'=>$hasDraftChanges,'lastApply'=>$lastApply?->created_at,'review'=>$review['kind'],'productionConnected'=>false],
             'counts'=>['projects'=>Project::count(),'tracks'=>Track::count(),'media'=>MediaAsset::count(),'packageMedia'=>$packageMedia,'cv'=>CvEntry::count()],

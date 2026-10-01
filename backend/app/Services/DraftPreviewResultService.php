@@ -171,7 +171,7 @@ final class DraftPreviewResultService
         $root=$this->privateRoot('preview_result_root');
         $receipt=$root.DIRECTORY_SEPARATOR.$package['previewIdentifier'].'.json';
         if(!file_exists($receipt)&&!is_link($receipt))return false;
-        $this->receipt($preview);
+        $this->receipt($preview, $package);
         return true;
     }
 
@@ -179,7 +179,7 @@ final class DraftPreviewResultService
     private function installArchive(DraftPreview $preview, $archive, array $upload): void
     {
         $this->assertUsable($preview);
-        $package = app(DraftPreviewPackageService::class)->metadata($preview);
+        $package = app(DraftPreviewPackageService::class)->verify($preview);
         $identifier = $package['previewIdentifier'];
         $resultRoot = $this->privateRoot('preview_result_root');
         $final = $resultRoot.DIRECTORY_SEPARATOR.$identifier;
@@ -372,9 +372,9 @@ final class DraftPreviewResultService
     }
 
     /** @return array{string,array} */
-    private function receipt(DraftPreview $preview): array
+    private function receipt(DraftPreview $preview, ?array $package = null): array
     {
-        $package = app(DraftPreviewPackageService::class)->metadata($preview);
+        $package ??= app(DraftPreviewPackageService::class)->metadata($preview);
         $resultRoot = $this->privateRoot('preview_result_root');
         $identifier = $package['previewIdentifier'];
         $receiptPath = $resultRoot.DIRECTORY_SEPARATOR.$identifier.'.json';

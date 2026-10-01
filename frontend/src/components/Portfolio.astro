@@ -75,12 +75,6 @@ const defaultFilter = isMusic ? 'All' : siteConfig.directing.defaultFilter;
             <div class="card-image">
               <img
                 src={'/' + cover.path}
-                srcset={`/${cover.path.replace('.webp', '-480.webp')} 480w, /${cover.path} ${cover.width}w`}
-                sizes={
-                  isMusic
-                    ? '(max-width: 600px) 90vw, (max-width: 1000px) 43vw, 28vw'
-                    : '(max-width: 700px) 90vw, 43vw'
-                }
                 width={cover.width}
                 height={cover.height}
                 loading={index < 3 ? 'eager' : 'lazy'}

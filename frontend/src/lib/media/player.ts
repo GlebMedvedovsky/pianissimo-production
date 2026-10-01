@@ -46,7 +46,7 @@ export function renderPlayer() {
   const coverAsset = asset(project?.memberships.music?.coverAssetId);
   cover.hidden = !coverAsset;
   if (coverAsset) {
-    const src = "/" + coverAsset.path.replace(".webp", "-480.webp");
+    const src = "/" + coverAsset.path;
     if (cover.getAttribute("src") !== src) cover.src = src;
   }
   root.querySelector<HTMLElement>("[data-play-icon]")!.hidden = s.playing;

@@ -168,8 +168,8 @@ class StaticReleaseActivatorTest extends TestCase
                 }
             }
             return $entries;
-        });
-        $this->expectFailure(fn () => $this->activate($publication, $archive, $sha), 'digest');
+        }, trustMutatedMetadata: true, resignMutatedFiles: true);
+        $this->expectFailure(fn () => $this->activate($publication, $archive, $sha), 'missing media');
     }
 
     public function test_first_activation_and_idempotent_retry_work_and_only_one_publication_is_active(): void
@@ -397,6 +397,7 @@ class StaticReleaseActivatorTest extends TestCase
         ?callable $mutator = null,
         ?string $declaredSha = null,
         bool $trustMutatedMetadata = false,
+        bool $resignMutatedFiles = false,
     ): array
     {
         $publicationId = (string) Str::uuid();
@@ -458,6 +459,18 @@ class StaticReleaseActivatorTest extends TestCase
         ];
         if ($mutator !== null) {
             $entries = $mutator($entries);
+        }
+        if ($resignMutatedFiles) {
+            $publicEntries = array_values(array_filter($entries, static fn (array $entry): bool => ! in_array($entry[0], [StaticReleaseArchive::FILES_FILE, StaticReleaseArchive::METADATA_FILE], true)));
+            $inventory = array_map(static fn (array $entry): array => ['path'=>$entry[0],'sha256'=>hash('sha256',$entry[1]),'size'=>strlen($entry[1])],$publicEntries);
+            usort($inventory, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
+            $inventoryBytes=json_encode($inventory,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES)."\n";
+            $releaseFilesSha=hash('sha256',$inventoryBytes);
+            foreach($entries as &$entry){
+                if($entry[0]===StaticReleaseArchive::FILES_FILE)$entry[1]=$inventoryBytes;
+                if($entry[0]===StaticReleaseArchive::METADATA_FILE){$resigned=json_decode($entry[1],true,flags:JSON_THROW_ON_ERROR);$resigned['releaseFilesSha256']=$releaseFilesSha;$entry[1]=json_encode($resigned,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES)."\n";}
+            }
+            unset($entry);
         }
         $recordedMetadataBytes = $metadataBytes;
         if ($trustMutatedMetadata) {
