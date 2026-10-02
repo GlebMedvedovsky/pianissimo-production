@@ -1,18 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { buildPreview } from "../../scripts/build-preview";
 import { createReleaseIntegrity } from "../../scripts/create-release-integrity.mjs";
-import { validateReleaseTextReferences } from "../../scripts/release-reference-contract";
 
 const canonicalize = (value: unknown): unknown => Array.isArray(value) ? value.map(canonicalize) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize((value as Record<string, unknown>)[key])])) : value;
 const canonicalJson = (value: unknown) => JSON.stringify(canonicalize(value));
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 const mediaBytes = Buffer.from("deterministic-preview-webp");
 
-async function assertAuthenticatedPreviewAssets(output: string, previewId: number) {
+async function assertAuthenticatedPreviewAssets(output: string) {
   const files: string[] = [];
   const walk = async (directory: string) => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -23,18 +22,18 @@ async function assertAuthenticatedPreviewAssets(output: string, previewId: numbe
   };
   await walk(output);
   const known = new Set(files.map((path) => path.slice(output.length + 1).replaceAll("\\", "/")));
-  const prefix = `/draft-preview/assets/${previewId}/`;
+  const prefix = "/draft-preview/assets/";
   for (const path of files.filter((file) => /\.(?:html|css|m?js)$/i.test(file))) {
     const bytes = await readFile(path, "utf8");
     assert.doesNotMatch(bytes, /(?:["'(])\/_astro\//, `${path} bypasses the authenticated preview route`);
-    for (const match of bytes.matchAll(/\/draft-preview\/assets\/[1-9][0-9]*\/([A-Za-z0-9._~!$&*+,;=:@%/-]+)/g)) {
+    for (const match of bytes.matchAll(/\/draft-preview\/assets\/([A-Za-z0-9._~!$&*+,;=:@%/-]+)/g)) {
       assert.ok(known.has(match[1]!.split(/[?#]/, 1)[0]!), `preview asset is absent from result inventory: ${match[1]}`);
-      assert.ok(match[0].startsWith(prefix), `preview asset uses the wrong preview identity: ${match[0]}`);
+      assert.ok(match[0].startsWith(prefix), `preview asset bypasses the session-authenticated route: ${match[0]}`);
     }
   }
 }
 
-test("package preview builds real Astro routes with the private preview shell", async () => {
+test("package preview builds real Astro routes with the private preview shell", async (t) => {
   const root = await mkdtemp(resolve(".local-builds", "preview-test-"));
   try {
     const packageRoot = resolve(root, "package");
@@ -50,11 +49,11 @@ test("package preview builds real Astro routes with the private preview shell", 
       assetId: "release-image",
       publicPath: "media/preview/release-image.webp",
       sha256: mediaSha,
-      size: mediaBytes.length,
+      size: 480 * 1024 * 1024,
       type: "image",
     }];
     const base = {
-      contractVersion: 1,
+      contractVersion: 2,
       draftHash: "b".repeat(64),
       manifestSha256: sha256(manifestBytes),
       media,
@@ -67,21 +66,29 @@ test("package preview builds real Astro routes with the private preview shell", 
       previewId: 1,
       previewIdentifier: "c".repeat(32),
     };
-    await mkdir(resolve(packageRoot, "media", "preview"), { recursive: true });
+    await mkdir(packageRoot, { recursive: true });
     await writeFile(resolve(packageRoot, "manifest.json"), manifestBytes);
     await writeFile(resolve(packageRoot, "preview.json"), `${canonicalJson(metadata)}\n`);
-    await writeFile(resolve(packageRoot, "media", "preview", "release-image.webp"), mediaBytes);
     await buildPreview(packageRoot, output);
     await createReleaseIntegrity(output, resolve(packageRoot, "preview.json"));
     const inventory = JSON.parse(await readFile(resolve(output, ".pianissimo-release-files.json"), "utf8"));
-    await validateReleaseTextReferences(output, inventory);
-    await assertAuthenticatedPreviewAssets(output, metadata.previewId);
+    await assertAuthenticatedPreviewAssets(output);
+    assert.equal(await lstat(resolve(output, "media", "preview")).catch(() => null), null);
+    assert.equal(inventory.some((entry: { path: string }) => entry.path.startsWith("media/preview/")), false);
+    const resultBytes = inventory.reduce((sum: number, entry: { size: number }) => sum + entry.size, 0);
+    assert.ok(resultBytes < 10 * 1024 * 1024,
+      "thin result must not scale with the declared 480 MiB original medium");
+    t.diagnostic(`declared media: ${media[0]!.size} bytes; generated result inventory: ${resultBytes} bytes`);
+    const declared = new Set(media.map((entry) => entry.publicPath));
     for (const route of ["index.html", "film-music/index.html", "directing/index.html", "legal/index.html", "privacy/index.html"]) {
       const html = await readFile(resolve(output, route), "utf8");
       assert.match(html, /data-draft-preview="true"/);
       assert.match(html, /Entwurfs-Vorschau/);
       assert.match(html, /noindex, nofollow/);
       assert.doesNotMatch(html, /release-image-480\.webp/);
+      for (const match of html.matchAll(/\/(media\/preview\/[A-Za-z0-9._~!$&*+,;=:@%/-]+)/g)) {
+        assert.ok(declared.has(match[1]!.split(/[?#]/, 1)[0]!), `preview references undeclared media: ${match[1]}`);
+      }
     }
   } finally {
     await rm(root, { recursive: true, force: true });

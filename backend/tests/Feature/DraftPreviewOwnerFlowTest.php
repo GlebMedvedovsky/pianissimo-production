@@ -3,7 +3,7 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\Publication as PublicationPage;
 use App\Models\{AuditEvent,DraftPreview,MediaAsset,Publication,Setting,User};
-use App\Services\{ContentValidator,DraftPreviewService,DraftStateSnapshot,FrontendPublication,ManifestExporter,ManifestImporter,MediaStorage};
+use App\Services\{ContentValidator,DraftPreviewPackageService,DraftPreviewService,DraftStateSnapshot,FrontendPublication,ManifestExporter,ManifestImporter,MediaStorage};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\{File,Http,Storage};
 use Livewire\Livewire;
@@ -162,7 +162,9 @@ class DraftPreviewOwnerFlowTest extends TestCase
 
         $open=$this->get(route('draft-preview.open'))->assertRedirect();
         $location=(string)$open->headers->get('Location');
-        $this->get($location)->assertStatus(202)->assertHeader('X-Robots-Tag','noindex, nofollow, noarchive');
+        $waiting=$this->get($location)->assertStatus(202)->assertHeader('X-Robots-Tag','noindex, nofollow, noarchive');
+        $waiting->assertSee('Website-Vorschau wird erstellt')->assertSee('fetch(statusUrl',false);
+        $this->assertStringNotContainsString('http-equiv="refresh"',$waiting->getContent());
 
         Http::assertSentCount(1);
         Http::assertSent(fn($request)=>$request->url()==='https://api.github.com/repos/pianissimo/production/actions/workflows/pianissimo-preview-builder.yml/dispatches'
@@ -193,6 +195,11 @@ class DraftPreviewOwnerFlowTest extends TestCase
         $response=$this->withHeader('Authorization','Bearer '.$publisherToken)->get($url)->assertOk()->assertHeader('Content-Type','application/x-tar');
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/',(string)$response->headers->get('X-Pianissimo-Transport-Sha256'));
         $this->assertSame($created['package']['packageSha256'],$response->headers->get('X-Pianissimo-Package-Sha256'));
+        $transport=app(DraftPreviewPackageService::class)->transport($created['preview']);
+        try{
+            $this->assertSame(['manifest.json','preview.json'],$this->tarFiles(file_get_contents($transport['path'])));
+            $this->assertLessThan(1048576,filesize($transport['path']),'Preview transport must contain metadata, not original media bytes.');
+        }finally{@unlink($transport['path']);}
 
         $created['preview']->update(['expires_at'=>now()->subSecond()]);
         $this->withHeader('Authorization','Bearer '.$publisherToken)->get($url)->assertServerError();
@@ -227,15 +234,52 @@ class DraftPreviewOwnerFlowTest extends TestCase
         $b=app(DraftPreviewService::class)->create($this->admin->id);$this->assertSame(['Draft B'],app(DraftPreviewService::class)->manifest($b['preview'])['site']['biography']);
     }
 
+    public function test_logical_package_identity_tracks_text_media_selection_and_media_bytes(): void
+    {
+        config(['cms.preview_driver'=>'package','cms.source_revision'=>str_repeat('a',40)]);
+        $image=$this->jpg('qa-preview-identity-image','test','unconfirmed');
+        $videoA=$this->video('qa-preview-identity-video-a');
+        $videoB=$this->video('qa-preview-identity-video-b',"\0\0\0\x1cftypisom\0\0\x02\0isomiso2mp41");
+        $home=Setting::read('home');
+
+        Setting::put('home',[...$home,'media'=>[...$home['media'],'mode'=>'image','image'=>$image->id]]);
+        $imagePreview=app(DraftPreviewService::class)->create($this->admin->id);
+        $unchangedPreview=app(DraftPreviewService::class)->create($this->admin->id);
+        $this->assertSame($imagePreview['package']['packageSha256'],$unchangedPreview['package']['packageSha256'],'Unchanged saved drafts must have one logical package identity.');
+
+        Setting::put('home',[...$home,'media'=>[...$home['media'],'mode'=>'video','video'=>$videoA->id,'poster'=>null]]);
+        $videoPreviewA=app(DraftPreviewService::class)->create($this->admin->id);
+        $this->assertNotSame($unchangedPreview['package']['packageSha256'],$videoPreviewA['package']['packageSha256'],'Image to video must change package identity.');
+        Setting::put('home',[...$home,'media'=>[...$home['media'],'mode'=>'video','video'=>$videoB->id,'poster'=>null]]);
+        $videoPreviewB=app(DraftPreviewService::class)->create($this->admin->id);
+        $this->assertNotSame($videoPreviewA['package']['packageSha256'],$videoPreviewB['package']['packageSha256'],'Replacing the homepage video must change package identity.');
+
+        Setting::put('home',[...$home,'media'=>[...$home['media'],'mode'=>'image','image'=>$image->id]]);
+        $beforeReplacement=app(DraftPreviewService::class)->create($this->admin->id);
+        $beforeMedia=collect($beforeReplacement['package']['media'])->firstWhere('assetId',$image->id);
+        $replacement='media/originals/'.$image->id.'/replacement.jpg';
+        Storage::disk('local')->put($replacement,Storage::disk('local')->get($image->storage_path)."\n");
+        app(MediaStorage::class)->replace($image,$replacement,'replacement.jpg');
+        $afterReplacement=app(DraftPreviewService::class)->create($this->admin->id);
+        $afterMedia=collect($afterReplacement['package']['media'])->firstWhere('assetId',$image->id);
+        $this->assertSame($beforeMedia['publicPath'],$afterMedia['publicPath']);
+        $this->assertNotSame($beforeMedia['sha256'],$afterMedia['sha256']);
+        $this->assertNotSame($beforeReplacement['package']['packageSha256'],$afterReplacement['package']['packageSha256'],'Changed bytes behind a stable preview path must change package identity.');
+
+        $about=Setting::read('about');Setting::put('about',[...$about,'biography'=>['Identity-changing text']]);
+        $textPreview=app(DraftPreviewService::class)->create($this->admin->id);
+        $this->assertNotSame($afterReplacement['package']['packageSha256'],$textPreview['package']['packageSha256'],'Ordinary CMS text must change package identity.');
+    }
+
     public function test_preview_status_binds_each_tab_to_its_snapshot_and_revalidates_saved_draft(): void
     {
         $about=Setting::read('about');Setting::put('about',[...$about,'biography'=>['Draft A']]);$a=app(DraftPreviewService::class)->create($this->admin->id);
-        $status=$this->withSession(['draft_preview_token'=>$a['token']])->get(route('draft-preview.status',['preview'=>$a['preview']->id]))->assertNoContent();
+        $status=$this->withSession(['draft_preview_token'=>$a['token']])->get(route('draft-preview.status',['preview'=>$a['preview']->id]))->assertOk()->assertJson(['state'=>'building']);
         $this->assertStringContainsString('no-store',(string)$status->headers->get('Cache-Control'));
 
         $b=app(DraftPreviewService::class)->create($this->admin->id);
         $this->withSession(['draft_preview_token'=>$b['token']])->get(route('draft-preview.status',['preview'=>$a['preview']->id]))->assertForbidden();
-        $this->withSession(['draft_preview_token'=>$b['token']])->get(route('draft-preview.status',['preview'=>$b['preview']->id]))->assertNoContent();
+        $this->withSession(['draft_preview_token'=>$b['token']])->get(route('draft-preview.status',['preview'=>$b['preview']->id]))->assertOk()->assertJson(['state'=>'building']);
 
         Setting::put('about',[...$about,'biography'=>['Draft B']]);
         $this->assertNotNull($b['preview']->fresh()->invalidated_at);
@@ -283,6 +327,24 @@ class DraftPreviewOwnerFlowTest extends TestCase
         $this->privateMediaIds[]=$id;$relative='media/originals/'.$id.'/upload.jpg';Storage::disk('local')->put($relative,$bytes);
         $metadata=app(MediaStorage::class)->inspectStored($relative,$id,'preview.jpg');
         return MediaAsset::create([...$metadata,'id'=>$id,'purpose'=>'about','alt'=>'Draft preview image','state'=>$state,'rights_scope'=>$rightsScope,'crop'=>['x'=>50,'y'=>50]]);
+    }
+
+    private function video(string $id,string $bytes="\0\0\0\x18ftypisom\0\0\x02\0isomiso2"): MediaAsset
+    {
+        $this->privateMediaIds[]=$id;$relative='media/originals/'.$id.'/upload.mp4';Storage::disk('local')->put($relative,$bytes);
+        $metadata=app(MediaStorage::class)->inspectStored($relative,$id,'preview.mp4');
+        return MediaAsset::create([...$metadata,'id'=>$id,'purpose'=>'hero','alt'=>'Draft preview video','state'=>'test','rights_scope'=>'unconfirmed','crop'=>['x'=>50,'y'=>50]]);
+    }
+
+    private function tarFiles(string $archive): array
+    {
+        $files=[];$offset=0;
+        while($offset+512<=strlen($archive)){
+            $header=substr($archive,$offset,512);$offset+=512;if($header===str_repeat("\0",512))break;
+            $files[]=rtrim(substr($header,0,100),"\0");$size=octdec(trim(substr($header,124,12),"\0 "));
+            $offset+=(int)(ceil($size/512)*512);
+        }
+        return $files;
     }
 
     private function tree(string $root): array

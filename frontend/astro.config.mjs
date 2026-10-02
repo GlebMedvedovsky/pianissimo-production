@@ -28,7 +28,7 @@ if (
 ) {
   throw new Error("Publication build paths must be explicit absolute paths.");
 }
-if (previewAssetBase && (!previewBuild || !/^\/draft-preview\/assets\/[1-9][0-9]*\/$/.test(previewAssetBase))) {
+if (previewAssetBase && (!previewBuild || previewAssetBase !== "/draft-preview/assets/")) {
   throw new Error("Preview asset base must identify the authenticated preview asset route.");
 }
 if (previewBuild && !previewAssetBase) {

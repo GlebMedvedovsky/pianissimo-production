@@ -190,7 +190,10 @@ final class DraftPreviewResultService
             $archiveService = app(StaticReleaseArchive::class);
             $entries = $archiveService->inspect($archive);
             $archiveService->extract($archive, $entries, $stage);
-            $metadata = $archiveService->validateExtracted($stage, [
+            $expectedMedia = array_map(static fn (array $entry): array => [
+                'publicPath' => $entry['publicPath'], 'sha256' => $entry['sha256'], 'size' => $entry['size'], 'type' => $entry['type'],
+            ], $package['media']);
+            app(PreviewResultArchive::class)->validateExtracted($stage, [
                 'publicationId' => $identifier,
                 'sequence' => $preview->id,
                 'sourceRevision' => $package['sourceRevision'],
@@ -198,11 +201,7 @@ final class DraftPreviewResultService
                 'manifestSha256' => $package['manifestSha256'],
                 'releaseFilesSha256' => $upload['releaseFilesSha256'],
                 'releaseMetadataSha256' => $upload['releaseMetadataSha256'],
-            ]);
-            $expectedMedia = array_map(static fn (array $entry): array => [
-                'publicPath' => $entry['publicPath'], 'sha256' => $entry['sha256'], 'size' => $entry['size'], 'type' => $entry['type'],
-            ], $package['media']);
-            if ($metadata['media'] !== $expectedMedia) throw new DomainException('Das Vorschau-Ergebnis enthält nicht exakt die freigegebenen Vorschau-Medien.');
+            ], $expectedMedia);
             $this->assertUsable($preview);
             if (is_link($final) || (file_exists($final) && ! is_dir($final))) throw new DomainException('Der Vorschau-Ergebnisordner ist unsicher.');
             if (is_dir($final)) File::deleteDirectory($final);

@@ -8,6 +8,7 @@ import { parse } from "yaml";
 import { canonicalJson, sha256 } from "../../scripts/publication-package";
 
 const workflowPath = resolve(".github/workflows/pianissimo-production-publisher.yml");
+const readWorkflow = async () => (await readFile(workflowPath, "utf8")).replaceAll("\r\n", "\n");
 const extractorPath = resolve("scripts/extract-publication-transport.mjs");
 const releaseIntegrityPath = resolve("scripts/create-release-integrity.mjs");
 const buildRoot = resolve(".local-builds");
@@ -49,7 +50,7 @@ function workflowJob(workflow: string) {
 }
 
 test("production workflow is gated, pinned, read-only, isolated, and transfers through strict SSH", async () => {
-  const workflow = await readFile(workflowPath, "utf8");
+  const workflow = await readWorkflow();
   const { document } = workflowJob(workflow);
   assert.deepEqual(Object.keys(document.on.workflow_dispatch.inputs), ["publication_id", "sequence", "package_sha256", "source_revision"]);
   for (const input of ["publication_id", "sequence", "package_sha256", "source_revision"])
@@ -133,7 +134,7 @@ test("release integrity inventory is deterministic and covers every public file"
 });
 
 test("production workflow pins host identity, confines partial cleanup, and uses repository configuration", async () => {
-  const workflow = await readFile(workflowPath, "utf8");
+  const workflow = await readWorkflow();
   for (const secret of [
     "PIANISSIMO_PUBLISHER_API_TOKEN",
     "NETCUP_PRODUCTION_SSH_PRIVATE_KEY",
@@ -160,7 +161,7 @@ test("production workflow pins host identity, confines partial cleanup, and uses
 });
 
 test("production temporary paths are initialized only at runner step time", async () => {
-  const workflow = await readFile(workflowPath, "utf8");
+  const workflow = await readWorkflow();
   const { job } = workflowJob(workflow);
   assert.doesNotMatch(JSON.stringify(job.env), /runner\.temp|RUNNER_TEMP/);
   assert.doesNotMatch(workflow, /\$\{\{\s*runner\.temp\s*\}\}/);
@@ -245,7 +246,7 @@ test("extractor rejects invalid identities, package mismatch, traversal, and sym
 });
 
 test("workflow input validation contains strict UUID, sequence, SHA-256 and revision checks", async () => {
-  const workflow = await readFile(workflowPath, "utf8");
+  const workflow = await readWorkflow();
   assert.match(workflow, /PUBLICATION_ID.*\^\[0-9a-f\]\{8\}/);
   assert.match(workflow, /PUBLICATION_SEQUENCE.*\^\[1-9\]\[0-9\]\*\$/);
   assert.match(workflow, /PACKAGE_SHA256.*\^\[0-9a-f\]\{64\}\$/);

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\File;
 
 final class DraftPreviewPackageService
 {
-    public const CONTRACT_VERSION = 1;
+    public const CONTRACT_VERSION = 2;
 
     public function prepare(DraftPreview $preview, array $manifest): array
     {
@@ -106,17 +106,14 @@ final class DraftPreviewPackageService
     public function transport(DraftPreview $preview): array
     {
         $directory = $this->directory($preview);
+        // The immutable server-side package remains byte-verified, but the remote
+        // builder only needs the manifest and the cryptographically bound media
+        // inventory. Draft media itself is served by the authenticated CMS route.
         $this->verifyDirectory($directory, $preview, true);
-        $files = [];
-        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::LEAVES_ONLY);
-        foreach ($iterator as $entry) {
-            if ($entry->isLink() || ! $entry->isFile()) {
-                throw new DomainException('Das Vorschau-Paket enthält einen Link oder eine Spezialdatei.');
-            }
-            $relative = str_replace('\\', '/', substr($entry->getPathname(), strlen($directory) + 1));
-            $files[$relative] = $entry->getPathname();
-        }
-        ksort($files, SORT_STRING);
+        $files = [
+            'manifest.json' => $directory.DIRECTORY_SEPARATOR.'manifest.json',
+            'preview.json' => $directory.DIRECTORY_SEPARATOR.'preview.json',
+        ];
         $temporaryRoot = storage_path('framework/cache/preview-transports');
         File::ensureDirectoryExists($temporaryRoot, 0750);
         $temporary = tempnam($temporaryRoot, 'preview-');
@@ -299,7 +296,7 @@ final class DraftPreviewPackageService
 
     private function tarHeader(string $path, int $size): string
     {
-        if (! preg_match('#^(?:manifest\.json|preview\.json|media/preview/[a-z0-9-]+\.(?:webp|jpg|png|mp3|wav|ogg|mp4|webm))$#D', $path) || strlen($path) > 100) throw new DomainException('Ungültiger Vorschau-Transportpfad.');
+        if (! in_array($path, ['manifest.json', 'preview.json'], true) || strlen($path) > 100) throw new DomainException('Ungültiger Vorschau-Transportpfad.');
         $octal = static fn (int $value, int $length): string => sprintf('%0'.($length - 1).'o', $value)."\0";
         $header = str_pad($path, 100, "\0").$octal(0644, 8).$octal(0, 8).$octal(0, 8).$octal($size, 12).$octal(0, 12).str_repeat(' ', 8).'0'.str_repeat("\0", 100).'ustar'."\0".'00'.str_repeat("\0", 32).str_repeat("\0", 32).$octal(0, 8).$octal(0, 8).str_repeat("\0", 155).str_repeat("\0", 12);
         if (strlen($header) !== 512) throw new DomainException('Ungültiger Vorschau-Transportheader.');

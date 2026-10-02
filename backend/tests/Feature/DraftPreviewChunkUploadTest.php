@@ -19,6 +19,7 @@ class DraftPreviewChunkUploadTest extends TestCase
     private DraftPreview $preview;
     private array $package;
     private string $archive;
+    private string $token;
     private array $upload;
 
     protected function setUp(): void
@@ -31,13 +32,16 @@ class DraftPreviewChunkUploadTest extends TestCase
             'cms.preview_package_root' => $this->fixtureRoot.'/packages',
             'cms.preview_incoming_root' => $this->fixtureRoot.'/incoming',
             'cms.preview_result_root' => $this->fixtureRoot.'/results',
+            'cms.preview_driver' => 'package',
             'publisher.api_token' => str_repeat('p', 48),
         ]);
         $user = User::create(['name' => 'Chunk QA', 'email' => bin2hex(random_bytes(4)).'@example.test', 'password' => bin2hex(random_bytes(20))]);
+        $this->actingAs($user);
+        $this->token=bin2hex(random_bytes(32));
         $identifier = bin2hex(random_bytes(16));
         $this->preview = DraftPreview::create([
             'user_id' => $user->id,
-            'token_hash' => hash('sha256', random_bytes(32)),
+            'token_hash' => hash('sha256', $this->token),
             'draft_hash' => str_repeat('b', 64),
             'snapshot_path' => 'draft-previews/'.$identifier,
             'media' => [],
@@ -68,6 +72,7 @@ class DraftPreviewChunkUploadTest extends TestCase
         $preview = $this->preview;
         app()->instance(DraftPreviewService::class, new class($preview) extends DraftPreviewService {
             public function __construct(private readonly DraftPreview $preview) {}
+            public function resolve(string $token): DraftPreview { return $this->preview->fresh(); }
             public function resolveForPublisher(string $identifier): DraftPreview { return $this->preview->fresh(); }
         });
         $results = app(DraftPreviewResultService::class);
@@ -91,7 +96,12 @@ class DraftPreviewChunkUploadTest extends TestCase
             ->assertCreated()->assertJson(['ready' => true]);
 
         $this->assertTrue($results->ready($preview));
-        $this->assertSame('<!doctype html><script src="/_astro/app.js"></script><link rel="stylesheet" href="/_astro/app.css">', file_get_contents($results->page($preview, '/')['path']));
+        $this->assertStringContainsString('/media/preview/package-test-image.webp',file_get_contents($results->page($preview, '/')['path']));
+        $this->assertDirectoryDoesNotExist($this->fixtureRoot.'/results/'.basename($preview->snapshot_path).'/media/preview');
+        $this->withSession(['draft_preview_token'=>$this->token])->get(route('draft-preview.status',['preview'=>$preview->id]))->assertOk()->assertJson(['state'=>'ready']);
+        $assetUrl=route('draft-preview.asset',['path'=>'_astro/app.css']);
+        $this->assertStringNotContainsString('/'.$preview->id.'/',$assetUrl);
+        $this->withSession(['draft_preview_token'=>$this->token])->get($assetUrl)->assertOk()->assertHeader('Content-Type','text/css; charset=UTF-8');
         $this->assertDirectoryDoesNotExist($this->fixtureRoot.'/incoming/'.basename($preview->snapshot_path));
 
         $this->withHeaders($this->headers())
@@ -148,6 +158,30 @@ class DraftPreviewChunkUploadTest extends TestCase
 
         $this->assertDomain(fn () => app(DraftPreviewResultService::class)->finalize($this->preview, $this->upload), 'Medium des Vorschau-Pakets wurde verändert');
         $this->assertFalse(app(DraftPreviewResultService::class)->ready($this->preview));
+    }
+
+    public function test_thin_result_rejects_physical_original_media_copies(): void
+    {
+        $this->replaceResultArchive(includeMedia:true);
+        foreach(str_split($this->archive,DraftPreviewResultService::CHUNK_BYTES) as $index=>$chunk)$this->upload($index,$chunk);
+        $this->assertDomain(fn()=>app(DraftPreviewResultService::class)->finalize($this->preview,$this->upload),'keine Kopien privater Originalmedien');
+    }
+
+    public function test_thin_result_rejects_undeclared_private_media_references(): void
+    {
+        $this->replaceResultArchive('<!doctype html><script src="/_astro/app.js"></script><img src="/media/preview/not-declared.mp4">');
+        foreach(str_split($this->archive,DraftPreviewResultService::CHUNK_BYTES) as $index=>$chunk)$this->upload($index,$chunk);
+        $this->assertDomain(fn()=>app(DraftPreviewResultService::class)->finalize($this->preview,$this->upload),'nicht freigegebenes Medium');
+    }
+
+    public function test_validated_result_is_never_reused_for_a_changed_package_identity(): void
+    {
+        foreach(str_split($this->archive,DraftPreviewResultService::CHUNK_BYTES) as $index=>$chunk)$this->upload($index,$chunk);
+        $this->assertTrue(app(DraftPreviewResultService::class)->finalize($this->preview,$this->upload));
+        $oldIdentity=$this->package['packageSha256'];
+        $newIdentity=$this->rewritePackageManifest("{\"changed\":true}\n")['packageSha256'];
+        $this->assertNotSame($oldIdentity,$newIdentity);
+        $this->assertDomain(fn()=>app(DraftPreviewResultService::class)->ready($this->preview),'aktuellen Entwurf');
     }
 
     public function test_out_of_range_index_is_rejected(): void
@@ -315,16 +349,16 @@ class DraftPreviewChunkUploadTest extends TestCase
         return app(DraftPreviewPackageService::class)->verify($this->preview);
     }
 
-    private function resultArchive(string $identifier): array
+    private function resultArchive(string $identifier,?string $indexHtml=null,bool $includeMedia=false): array
     {
         $public = [
-            ['index.html', '<!doctype html><script src="/_astro/app.js"></script><link rel="stylesheet" href="/_astro/app.css">'],
+            ['index.html', $indexHtml??'<!doctype html><script src="/_astro/app.js"></script><link rel="stylesheet" href="/_astro/app.css"><img src="/media/preview/package-test-image.webp">'],
             ['_astro/app.css', 'body{color:#111}'],
             ['_astro/app.js', 'console.log("preview")'],
             ['favicon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>'],
-            ['media/preview/package-test-image.webp', self::PACKAGE_MEDIA_BYTES],
             ['robots.txt', "User-agent: *\nDisallow: /\n"],
         ];
+        if($includeMedia)$public[]=['media/preview/package-test-image.webp',self::PACKAGE_MEDIA_BYTES];
         $inventory = array_map(static fn (array $entry): array => ['path' => $entry[0], 'sha256' => hash('sha256', $entry[1]), 'size' => strlen($entry[1])], $public);
         usort($inventory, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
         $inventoryBytes = json_encode($inventory, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n";
@@ -346,6 +380,14 @@ class DraftPreviewChunkUploadTest extends TestCase
         $metadataBytes = json_encode($metadata, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n";
         $entries = [...$public, [StaticReleaseArchive::FILES_FILE, $inventoryBytes], [StaticReleaseArchive::METADATA_FILE, $metadataBytes]];
         return [$this->tar($entries), ['releaseFilesSha256' => $metadata['releaseFilesSha256'], 'releaseMetadataSha256' => hash('sha256', $metadataBytes)]];
+    }
+
+    private function replaceResultArchive(?string $indexHtml=null,bool $includeMedia=false): void
+    {
+        [$archive,$digests]=$this->resultArchive(basename($this->preview->snapshot_path),$indexHtml,$includeMedia);
+        $minimum=DraftPreviewResultService::CHUNK_BYTES+1024;
+        $this->archive=$archive.str_repeat("\0",max(0,$minimum-strlen($archive)));
+        $this->upload=[...$digests,'archiveSha256'=>hash('sha256',$this->archive),'chunkCount'=>(int)ceil(strlen($this->archive)/DraftPreviewResultService::CHUNK_BYTES),'packageSha256'=>$this->package['packageSha256'],'sourceRevision'=>$this->package['sourceRevision']];
     }
 
     private function tar(array $entries): string
@@ -392,6 +434,18 @@ class DraftPreviewChunkUploadTest extends TestCase
     {
         $path = $this->fixtureRoot.'/packages/'.basename($this->preview->snapshot_path).'/media/preview/package-test-image.webp';
         file_put_contents($path, str_repeat('x', strlen(self::PACKAGE_MEDIA_BYTES)));
+    }
+
+    private function rewritePackageManifest(string $manifestBytes): array
+    {
+        $directory=$this->fixtureRoot.'/packages/'.basename($this->preview->snapshot_path);
+        $metadata=json_decode(file_get_contents($directory.'/preview.json'),true,flags:JSON_THROW_ON_ERROR);
+        $metadata['manifestSha256']=hash('sha256',$manifestBytes);
+        $digest=['contractVersion'=>$metadata['contractVersion'],'draftHash'=>$metadata['draftHash'],'manifestSha256'=>$metadata['manifestSha256'],'media'=>$metadata['media'],'sourceRevision'=>$metadata['sourceRevision']];
+        $metadata['packageSha256']=hash('sha256',$this->canonicalJson($digest));
+        file_put_contents($directory.'/manifest.json',$manifestBytes);
+        file_put_contents($directory.'/preview.json',$this->canonicalJson($metadata)."\n");
+        return app(DraftPreviewPackageService::class)->metadata($this->preview);
     }
 
     private function assertDomain(callable $callback, string $message): void
