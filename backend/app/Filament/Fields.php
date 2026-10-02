@@ -18,6 +18,13 @@ class Fields
         if (!is_array($values)) throw new \LogicException('Taxonomy missing from the shared content schema: '.$field);
         return self::options($values);
     }
+    public static function directingRoles(): array
+    {
+        $schema=json_decode(file_get_contents(config('cms.schema')),true,512,JSON_THROW_ON_ERROR);
+        $values=data_get($schema,'properties.projects.items.properties.memberships.properties.directing.properties.role.enum');
+        if (!is_array($values)) throw new \LogicException('Directing roles missing from the shared content schema.');
+        return $values;
+    }
     public static function options(array $values): array { return array_combine($values,$values); }
     public static function id() { return TextInput::make('id')->label('Stabile ID')->required()->maxLength(100)->unique(ignoreRecord:true)->regex('/^[a-z0-9]+(?:-[a-z0-9]+)*$/')->disabledOn('edit')->dehydrated()->helperText('Einmalig vergeben, z. B. mein-projekt. Nach dem Anlegen unveränderlich.'); }
     public static function status() { return Select::make('status')->label('Auswahl für das nächste Paket')->options(['draft'=>'Entwurf','published'=>'Im nächsten Paket zeigen','hidden'=>'Ausgeblendet','needs-confirmation'=>'Bestätigung offen'])->default('draft')->required()->helperText('Speichern ändert nur den CMS-Entwurf. Die Website bleibt unverändert.'); }
@@ -50,7 +57,7 @@ class Fields
             Tab::make('Richtungen & Bilder')->schema([
                 Repeater::make('memberships')->label('Richtungen – eine gemeinsame Projektidentität')->relationship()->schema([
                     Select::make('direction')->label('Richtung')->options(['music'=>'Film Music','directing'=>'Directing'])->required()->distinct()->disableOptionsWhenSelectedInSiblingRepeaterItems(),
-                    Select::make('role')->label('Rolle')->options(self::options(['Composer','Co-composer','Songwriter','Director','Assistant Director']))->required(),
+                    Select::make('role')->label('Rolle')->options(self::options(['Composer','Co-composer','Songwriter',...self::directingRoles()]))->required(),
                     TextInput::make('sort_order')->label('Reihenfolge in dieser Richtung')->integer()->default(0)->required(),self::media('cover_asset_id','Projekt-Cover','image')->required()->helperText('Eigenständiges Bild für die Projektkarte in dieser Richtung.'),self::media('hover_asset_id','Hover-Video','video')->helperText('Optionale, vom Cover unabhängige Video-Erweiterung der Projektkarte.'),...self::crop(),Select::make('fit')->label('Bildanpassung')->options(['cover'=>'Füllen','contain'=>'Vollständig']),
                 ])->columns(2)->defaultItems(0)->maxItems(2),
                 Repeater::make('mediaAssignments')->label('Galerie, Trailer & weitere Medien')->relationship()->orderColumn('sort_order')->schema([

@@ -4,6 +4,7 @@ use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Models\{Project,Track,MediaAsset,Setting,CvEntry,User,ExternalService,Publication};
 use App\Services\{ManifestImporter,ManifestExporter,ContentValidator};
+use App\Filament\Fields;
 use Livewire\Livewire;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\File;
@@ -28,6 +29,10 @@ class CmsTest extends TestCase
         parent::tearDown();
     }
     private function admin(): User { $u=User::create(['name'=>'Synthetic QA','email'=>'qa@example.test','password'=>bin2hex(random_bytes(20))]); $this->actingAs($u); return $u; }
+    public function test_directing_roles_come_from_the_shared_schema(): void
+    {
+        $this->assertSame(['Director','Assistant Director','Corporate Video'],Fields::directingRoles());
+    }
     public function test_import_is_idempotent_and_shared_projects_are_not_duplicated(): void
     {
         $report=app(ManifestImporter::class)->import($this->input);

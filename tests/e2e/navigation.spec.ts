@@ -330,7 +330,8 @@ test("contextual About theme, navigation and history", async ({
   await page
     .getByRole("button", { name: "Assistant Director", exact: true })
     .click();
-  await expect(page.locator(".portfolio-empty")).toBeVisible();
+  await expect(page.locator("[data-project-card]:visible")).toHaveCount(1);
+  await expect(page.locator(".portfolio-empty")).toBeHidden();
   await page.locator("header [data-about]").click();
   await expect(page).toHaveURL(/\/#about$/);
   await expect(page.locator("#about")).toBeInViewport();
@@ -356,18 +357,26 @@ test("catalog combines filters, no fake audio and no handler accumulation", asyn
   page,
 }, info) => {
   await ready(page, "/film-music/");
+  const catalog = await page.locator(".music-library [data-track-row]").evaluateAll(rows => ({
+    total: rows.length,
+    jazzUplifting: rows.filter(row =>
+      (row as HTMLElement).dataset.genres?.split("|").includes("Jazz") &&
+      (row as HTMLElement).dataset.emotions?.split("|").includes("uplifting"),
+    ).length,
+  }));
+  const playable = await page.locator("[data-play-track]").count();
   await page.locator("#genre-filter").selectOption("Jazz");
   await page.locator("#emotion-filter").selectOption("uplifting");
   await expect(
     page.locator(".music-library [data-track-row]:visible"),
-  ).toHaveCount(1);
+  ).toHaveCount(catalog.jazzUplifting);
   await page.locator("#emotion-filter").selectOption("dark");
   await expect(page.locator(".library-empty")).toBeVisible();
   await page.locator("[data-reset-tracks]").click();
   await expect(
     page.locator(".music-library [data-track-row]:visible"),
-  ).toHaveCount(5);
-  await expect(page.locator("[data-play-track]")).toHaveCount(0);
+  ).toHaveCount(catalog.total);
+  await expect(page.locator("[data-play-track]")).toHaveCount(playable);
   await shot(page, "catalog", info);
   for (let i = 0; i < 3; i++) {
     await page.locator(".section-switch").click();

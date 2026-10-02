@@ -87,8 +87,12 @@
 /* Clear the permanent bottom dock on portrait tablets as well as phones. */
 @media (min-width: 601px) and (max-width: 800px) {
 
-  .hero-scene .scroll-cue,
   .hero-scene .menu-about {
     bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+
+  .hero-scene .scroll-cue {
+    right: calc(var(--page-gutter) + env(safe-area-inset-right));
+    bottom: calc(46px + env(safe-area-inset-bottom));
   }
 }

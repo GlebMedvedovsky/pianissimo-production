@@ -1,4 +1,9 @@
-import type { Manifest, Project, Track } from "../../../../contracts/content";
+import {
+  directingRoles,
+  type Manifest,
+  type Project,
+  type Track,
+} from "../../../../contracts/content";
 export function selectProjects(
   data: Manifest,
   section: "music" | "directing",
@@ -17,6 +22,13 @@ export function selectProjects(
     .sort(
       (a, b) => a.memberships[section]!.order - b.memberships[section]!.order,
     );
+}
+export function selectDirectingFilters(data: Manifest) {
+  return directingRoles.filter(
+    role =>
+      role !== "Corporate Video" ||
+      selectProjects(data, "directing", role).length > 0,
+  );
 }
 export function selectTracks(data: Manifest, genre = "", emotion = "") {
   const ids = [

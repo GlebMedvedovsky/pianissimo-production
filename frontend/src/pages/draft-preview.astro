@@ -28,8 +28,8 @@ else if(project){section='project';title=project.title;}
 ---
 <Base title={title} section={section} theme={theme} description={project?.synopsis} content={content}>
  {route==='/'&&<Hero content={content}/>}
- {route==='/film-music/'&&<><Portfolio section="music" content={content}/><MusicLibrary content={content}/><div class="about-invitation"><p class="eyebrow">BEHIND EVERY NOTE, A STORY</p><a href="/#about" data-about>Meet Sebastian <span class="about-invitation-icon"><Icon name="arrowUpRight" size={40}/></span></a></div></>}
- {route==='/directing/'&&<><Portfolio section="directing" content={content}/><div class="about-invitation"><p class="eyebrow">THE PERSON BEHIND THE PICTURE</p><a href="/#about" data-about>Meet Sebastian <span class="about-invitation-icon"><Icon name="arrowUpRight" size={40}/></span></a></div></>}
+ {route==='/film-music/'&&<><Portfolio section="music" content={content}/><MusicLibrary content={content}/><div class="about-invitation"><p class="eyebrow">THE PERSON BEHIND THE WORK</p><a href="/#about" data-about>Meet Sebastian <span class="about-invitation-icon"><Icon name="arrowUpRight" size={40}/></span></a></div></>}
+ {route==='/directing/'&&<><Portfolio section="directing" content={content}/><div class="about-invitation"><p class="eyebrow">THE PERSON BEHIND THE WORK</p><a href="/#about" data-about>Meet Sebastian <span class="about-invitation-icon"><Icon name="arrowUpRight" size={40}/></span></a></div></>}
  {route==='/legal/'&&<article class="legal-page"><p class="eyebrow">LEGAL INFORMATION</p><h1>Legal <em>notice.</em></h1><PlainText text={content.site.legal.notice}/></article>}
  {route==='/privacy/'&&<article class="legal-page"><p class="eyebrow">PRIVACY INFORMATION</p><h1>Your <em>privacy.</em></h1><PlainText text={content.site.legal.privacy}/><button class="text-link" data-consent-settings>Open media settings ↗</button></article>}
  {project&&<div class="direct-project"><a class="text-link" href="/film-music/">← Film Music</a>{project.memberships.directing&&<a class="text-link" href="/directing/">Directing →</a>}<ProjectDetail project={project} content={content}/></div>}

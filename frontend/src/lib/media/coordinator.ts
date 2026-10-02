@@ -8,6 +8,14 @@ export interface Playable {
   projectId?: string;
   duration?: number | null;
   peaks?: number[] | null;
+  genres?: readonly string[];
+  emotions?: readonly string[];
+}
+
+interface PlaybackHistoryEntry {
+  track: Playable;
+  queue: Playable[];
+  autoplay: boolean;
 }
 
 export interface MediaPort {
@@ -67,6 +75,34 @@ export function adjacentIndex(
   return index < 0 ? 0 : index >= length ? -1 : index;
 }
 
+const overlaps = (left: readonly string[] = [], right: readonly string[] = []) =>
+  left.some(value => right.includes(value));
+
+export function rankAutoplayCandidates(
+  current: Playable,
+  candidates: Playable[],
+  played: ReadonlySet<string> = new Set(),
+) {
+  const playable = candidates.filter(
+    candidate => !!candidate.url && candidate.id !== current.id,
+  );
+  const unplayed = playable.filter(candidate => !played.has(candidate.id));
+  const pool = unplayed.length ? unplayed : playable;
+  return pool
+    .map((candidate, order) => ({
+      candidate,
+      order,
+      score:
+        (overlaps(current.emotions, candidate.emotions) ? 2 : 0) +
+        (overlaps(current.emotions, candidate.emotions) &&
+        overlaps(current.genres, candidate.genres)
+          ? 1
+          : 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .map(entry => entry.candidate);
+}
+
 export class MediaCoordinator {
   state: PlayerState = {
     track: null,
@@ -86,7 +122,13 @@ export class MediaCoordinator {
   private generation = 0;
   private active: MediaPort;
   private otherSources = new Set<() => void>();
-  private played: number[] = [];
+  private history: PlaybackHistoryEntry[] = [];
+  private forwardHistory: PlaybackHistoryEntry[] = [];
+  private library: Playable[] = [];
+  private sourceQueue: Playable[] = [];
+  private sessionPlayed = new Set<string>();
+  private shuffleRemaining = new Set<string>();
+  private autoplay = false;
   private observed = new WeakSet<MediaPort>();
   private dismissed = false;
   private fading:
@@ -105,10 +147,15 @@ export class MediaCoordinator {
   constructor(
     private audio: MediaPort,
     private fadeClock: FadeClock = browserFadeClock,
+    private random: () => number = Math.random,
   ) {
     this.active = audio;
     this.observe(audio);
     audio.volume = siteConfig.media.volume;
+  }
+
+  setAutoplayCandidates(candidates: Playable[]) {
+    this.library = candidates.filter(candidate => !!candidate.url);
   }
 
   subscribe(fn: () => void) {
@@ -267,6 +314,24 @@ export class MediaCoordinator {
   }
 
   async select(track: Playable, queue: Playable[]) {
+    this.history = [];
+    this.forwardHistory = [];
+    this.sourceQueue = queue.filter(item => !!item.url);
+    this.sessionPlayed = new Set(track.url ? [track.id] : []);
+    this.shuffleRemaining = new Set(
+      this.sourceQueue
+        .filter(item => item.id !== track.id)
+        .map(item => item.id),
+    );
+    this.autoplay = false;
+    await this.activateTrack(track, this.sourceQueue, false);
+  }
+
+  private async activateTrack(
+    track: Playable,
+    queue: Playable[],
+    autoplay: boolean,
+  ) {
     this.pause('source');
     const generation = ++this.generation;
     this.dismissed = false;
@@ -281,7 +346,7 @@ export class MediaCoordinator {
     this.state.error = null;
     this.state.time = 0;
     this.state.duration = track.duration || null;
-    this.played = [];
+    this.autoplay = autoplay;
     if (!track.url) {
       this.audio.removeAttribute('src');
       this.state.error = 'Audio is not available yet.';
@@ -338,19 +403,58 @@ export class MediaCoordinator {
   }
 
   async next() {
-    const next = adjacentIndex(
-      this.state.queue.length,
-      this.state.index,
-      1,
-      this.state.shuffle,
-    );
-    if (next === -1) {
+    if (this.state.kind !== 'track' || !this.state.track) return;
+    const forward = this.forwardHistory.pop();
+    if (forward) {
+      this.history.push({
+        track: this.state.track,
+        queue: this.state.queue,
+        autoplay: this.autoplay,
+      });
+      this.sessionPlayed.add(forward.track.id);
+      await this.activateTrack(
+        forward.track,
+        forward.queue,
+        forward.autoplay,
+      );
+      return;
+    }
+    this.forwardHistory = [];
+    let track: Playable | undefined;
+    let queue = this.sourceQueue;
+    let autoplay = this.autoplay;
+    if (!this.autoplay && this.state.shuffle) {
+      const remaining = this.sourceQueue.filter(item =>
+        this.shuffleRemaining.has(item.id),
+      );
+      if (remaining.length) {
+        track = remaining[Math.floor(this.random() * remaining.length)];
+        if (track) this.shuffleRemaining.delete(track.id);
+      }
+    } else if (!this.autoplay) {
+      track = this.sourceQueue[this.state.index + 1];
+    }
+    if (!track) {
+      const ranked = rankAutoplayCandidates(
+        this.state.track,
+        this.library,
+        this.sessionPlayed,
+      );
+      track = ranked[0];
+      queue = this.library;
+      autoplay = true;
+    }
+    if (!track) {
       this.pause();
       return;
     }
-    const history = [...this.played, this.state.index];
-    await this.select(this.state.queue[next]!, this.state.queue);
-    this.played = history;
+    this.history.push({
+      track: this.state.track,
+      queue: this.state.queue,
+      autoplay: this.autoplay,
+    });
+    this.sessionPlayed.add(track.id);
+    await this.activateTrack(track, queue, autoplay);
   }
 
   async previous() {
@@ -358,18 +462,28 @@ export class MediaCoordinator {
       this.seek(0);
       return;
     }
-    const previous =
-      this.played.pop() ??
-      adjacentIndex(this.state.queue.length, this.state.index, -1, false);
-    if (previous >= 0) {
-      const history = [...this.played];
-      await this.select(this.state.queue[previous]!, this.state.queue);
-      this.played = history;
+    const previous = this.history.pop();
+    if (previous) {
+      if (this.state.kind === 'track' && this.state.track) {
+        this.forwardHistory.push({
+          track: this.state.track,
+          queue: this.state.queue,
+          autoplay: this.autoplay,
+        });
+      }
+      await this.activateTrack(previous.track, previous.queue, previous.autoplay);
     }
   }
 
   toggleShuffle() {
     this.state.shuffle = !this.state.shuffle;
+    if (this.state.shuffle && !this.autoplay) {
+      this.shuffleRemaining = new Set(
+        this.sourceQueue
+          .filter(item => !this.sessionPlayed.has(item.id))
+          .map(item => item.id),
+      );
+    }
     this.emit();
   }
 

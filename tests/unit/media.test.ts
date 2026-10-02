@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   MediaCoordinator,
   adjacentIndex,
+  rankAutoplayCandidates,
   type FadeClock,
   type MediaPort,
   type Playable,
@@ -143,6 +144,145 @@ test("shuffle cannot repeat current when another track exists", () => {
     );
   assert.equal(adjacentIndex(1, 0, 1, true), -1);
   assert.equal(adjacentIndex(0, 0, 1, false), -1);
+});
+test("single-track Next continues into playable public-library autoplay", async () => {
+  const media = new FakeMedia();
+  const c = new MediaCoordinator(media);
+  const single = [{ ...queue[0]!, emotions: ["calm"], genres: ["Ambient"] }];
+  const related = { ...queue[1]!, emotions: ["calm"], genres: ["Ambient"] };
+  c.setAutoplayCandidates([single[0]!, related]);
+  await c.select(single[0]!, single);
+  await c.next();
+  assert.equal(c.state.track?.id, "two");
+  assert.equal(c.state.playing, true);
+});
+test("natural track end continues into library autoplay", async () => {
+  const media = new FakeMedia();
+  const c = new MediaCoordinator(media);
+  c.setAutoplayCandidates(queue);
+  await c.select(queue[0]!, [queue[0]!]);
+  media.dispatchEvent(new Event("ended"));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(c.state.track?.id, "two");
+  assert.equal(c.state.playing, true);
+});
+test("album shuffle consumes every track once before autoplay", async () => {
+  const media = new FakeMedia();
+  const album = [
+    queue[0]!,
+    queue[1]!,
+    { id: "three", title: "Test three", url: "/three.wav" },
+  ];
+  const libraryTrack = { id: "four", title: "Test four", url: "/four.wav" };
+  const c = new MediaCoordinator(media, undefined, () => 0);
+  c.setAutoplayCandidates([...album, libraryTrack]);
+  await c.select(album[0]!, album);
+  c.toggleShuffle();
+  const played = [c.state.track?.id];
+  await c.next(); played.push(c.state.track?.id);
+  await c.next(); played.push(c.state.track?.id);
+  assert.deepEqual(new Set(played), new Set(["one", "two", "three"]));
+  await c.next();
+  assert.equal(c.state.track?.id, "four");
+});
+test("shuffle Previous and Next traverse forward history before autoplay", async () => {
+  const media = new FakeMedia();
+  const album = [
+    queue[0]!,
+    queue[1]!,
+    { id: "three", title: "Test three", url: "/three.wav" },
+  ];
+  const libraryTrack = { id: "four", title: "Test four", url: "/four.wav" };
+  const c = new MediaCoordinator(media, undefined, () => 0);
+  c.setAutoplayCandidates([...album, libraryTrack]);
+  await c.select(album[0]!, album);
+  c.toggleShuffle();
+  await c.next();
+  await c.next();
+  assert.equal(c.state.track?.id, "three");
+  await c.previous();
+  assert.equal(c.state.track?.id, "two");
+  await c.next();
+  assert.equal(c.state.track?.id, "three");
+  await c.next();
+  assert.equal(c.state.track?.id, "four");
+});
+test("shuffle supports multiple Previous and Next history traversals", async () => {
+  const media = new FakeMedia();
+  const album = [
+    queue[0]!,
+    queue[1]!,
+    { id: "three", title: "Test three", url: "/three.wav" },
+  ];
+  const libraryTrack = { id: "four", title: "Test four", url: "/four.wav" };
+  const c = new MediaCoordinator(media, undefined, () => 0);
+  c.setAutoplayCandidates([...album, libraryTrack]);
+  await c.select(album[0]!, album);
+  c.toggleShuffle();
+  await c.next();
+  await c.next();
+  await c.previous();
+  await c.previous();
+  assert.equal(c.state.track?.id, "one");
+  await c.next();
+  assert.equal(c.state.track?.id, "two");
+  await c.next();
+  assert.equal(c.state.track?.id, "three");
+  await c.next();
+  assert.equal(c.state.track?.id, "four");
+});
+test("a fresh manual selection clears stale forward shuffle history", async () => {
+  const media = new FakeMedia();
+  const album = [
+    queue[0]!,
+    queue[1]!,
+    { id: "three", title: "Test three", url: "/three.wav" },
+  ];
+  const c = new MediaCoordinator(media, undefined, () => 0);
+  c.setAutoplayCandidates(album);
+  await c.select(album[0]!, album);
+  c.toggleShuffle();
+  await c.next();
+  await c.next();
+  await c.previous();
+  await c.select(album[0]!, album);
+  await c.next();
+  assert.equal(c.state.track?.id, "two");
+});
+test("autoplay ranks shared emotion first and shared genre as its secondary preference", () => {
+  const current: Playable = {
+    id: "current", title: "Current", url: "/current.wav",
+    emotions: ["calm"], genres: ["Ambient"],
+  };
+  const ranked = rankAutoplayCandidates(current, [
+    { id: "other", title: "Other", url: "/other.wav", emotions: ["dark"], genres: ["Ambient"] },
+    { id: "emotion", title: "Emotion", url: "/emotion.wav", emotions: ["calm"], genres: ["Jazz"] },
+    { id: "both", title: "Both", url: "/both.wav", emotions: ["calm"], genres: ["Ambient"] },
+  ]);
+  assert.deepEqual(ranked.map(track => track.id), ["both", "emotion", "other"]);
+});
+test("autoplay excludes unplayable tracks and cannot loop on one playable global track", async () => {
+  const c = new MediaCoordinator(new FakeMedia());
+  const only = queue[0]!;
+  c.setAutoplayCandidates([
+    only,
+    { id: "missing", title: "Missing", url: null, emotions: ["calm"] },
+  ]);
+  await c.select(only, [only]);
+  await c.next();
+  assert.equal(c.state.track?.id, "one");
+  assert.equal(c.state.playing, false);
+});
+test("Previous returns coherently from autoplay to the album track", async () => {
+  const media = new FakeMedia();
+  const c = new MediaCoordinator(media);
+  c.setAutoplayCandidates(queue);
+  await c.select(queue[0]!, [queue[0]!]);
+  await c.next();
+  assert.equal(c.state.track?.id, "two");
+  await c.previous();
+  assert.equal(c.state.track?.id, "one");
+  assert.equal(c.state.playing, true);
 });
 test("pause-on-section saves position; return never autoplays; close resets", async () => {
   const media = new FakeMedia(),

@@ -1,7 +1,7 @@
 ---
 import { musicCategories, type Manifest } from '../../../contracts/content';
 import { content as activeContent, assetFrom } from '../lib/content/data';
-import { selectProjects } from '../lib/content/selectors';
+import { selectDirectingFilters, selectProjects } from '../lib/content/selectors';
 import { siteConfig } from '../config/site.config';
 import Icon from './Icon.astro';
 
@@ -15,7 +15,7 @@ const isMusic = section === 'music';
 const projects = selectProjects(content, section, 'All');
 const filters = isMusic
   ? ['All', ...musicCategories]
-  : ['Director', 'Assistant Director'];
+  : selectDirectingFilters(content);
 const defaultFilter = isMusic ? 'All' : siteConfig.directing.defaultFilter;
 
 ---

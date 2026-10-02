@@ -4,6 +4,7 @@ import raw from "../../content/manifest.json";
 import releasePolicyFixture from "../../backend/tests/Fixtures/kinnhakenhank-release-manifest.json";
 import { validateManifest } from "../../contracts/content";
 import {
+  selectDirectingFilters,
   selectProjects,
   selectTracks,
   platformLinks,
@@ -168,6 +169,22 @@ test("independent membership order, shared project identity, category empty stat
     "abszission",
   );
   assert.equal(selectProjects(altered, "music", "All")[0]!.id, "kinnhakenhank");
+});
+test("Corporate Video is valid and its public filter only appears when published content uses it", () => {
+  const data = validateManifest(raw);
+  assert.equal(selectDirectingFilters(data).includes("Corporate Video"), false);
+  const altered = structuredClone(data);
+  const project = altered.projects.find(item => item.memberships.directing)!;
+  project.memberships.directing = {
+    ...project.memberships.directing!,
+    role: "Corporate Video",
+  };
+  const validated = validateManifest(altered);
+  assert.equal(selectDirectingFilters(validated).includes("Corporate Video"), true);
+  assert.equal(
+    selectProjects(validated, "directing", "Corporate Video")[0]?.id,
+    project.id,
+  );
 });
 test("catalog shares IDs and combines genre and emotion", () => {
   const data = validateManifest(raw);

@@ -284,7 +284,8 @@
                     "type": "string",
                     "enum": [
                       "Director",
-                      "Assistant Director"
+                      "Assistant Director",
+                      "Corporate Video"
                     ]
                   },
                   "coverAssetId": {

@@ -3,7 +3,7 @@ type TransitionBeforeSwapEvent = DocumentEventMap["astro:before-swap"];
 type TransitionBeforePreparationEvent =
   DocumentEventMap["astro:before-preparation"];
 import { aboutTheme, siteConfig, type Section } from "../config/site.config";
-import { initScene, scrollToSceneAbout } from "./navigation/scene";
+import { initScene, scrollToPosition, scrollToSceneAbout } from "./navigation/scene";
 import { initFilters } from "./navigation/filters";
 import { initProjectModal } from "./navigation/modals";
 import { coordinator, playable, renderPlayer } from "./media/player";
@@ -292,12 +292,35 @@ document.addEventListener(
           : section === "music"
             ? "music"
             : null;
+      if (location.pathname === "/") {
+        history.pushState({ ...history.state, aboutContext: context }, "", "/#about");
+        scrollToSceneAbout(true);
+        return;
+      }
       void navigate("/#about", {
         state: { aboutContext: context },
         info: { aboutContext: context },
       }).then(() => {
         requestAnimationFrame(() => scrollToSceneAbout());
       });
+      return;
+    }
+    const menu = el.closest<HTMLAnchorElement>(
+      'a[href="#main-menu"],a[href="/#main-menu"]',
+    );
+    if (
+      menu &&
+      location.pathname === "/" &&
+      event.button === 0 &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      history.pushState(history.state, "", "/#main-menu");
+      const target = document.getElementById("main-menu");
+      if (target) scrollToPosition(target.offsetTop);
       return;
     }
     const link = el.closest<HTMLElement>("[data-direction]");

@@ -5,12 +5,30 @@ import {logoFocus} from './logo-geometry';
 
 gsap.registerPlugin(ScrollTrigger);
 
+let scrollFrame = 0;
+export function scrollToPosition(top: number, smooth = true) {
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ cancelAnimationFrame(scrollFrame);
+ if(!smooth||reduced){window.scrollTo({top,behavior:'instant'});return;}
+ const from=scrollY;
+ const distance=top-from;
+ const started=performance.now();
+ const duration=siteConfig.motion.transitionDuration;
+ const step=(now:number)=>{
+  const progress=Math.min(1,(now-started)/duration);
+  const eased=progress<.5?4*progress**3:1-(-2*progress+2)**3/2;
+  window.scrollTo({top:from+distance*eased,behavior:'instant'});
+  if(progress<1)scrollFrame=requestAnimationFrame(step);
+ };
+ scrollFrame=requestAnimationFrame(step);
+}
+
 // The real About is inside the sticky scene: target the end of its reveal.
-export function scrollToSceneAbout(){
+export function scrollToSceneAbout(smooth=false){
  const scene=document.querySelector<HTMLElement>('.hero-scene');
  const sticky=scene?.querySelector<HTMLElement>('.scene-sticky');
- if(!scene||!sticky||matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
- window.scrollTo({top:scene.offsetTop+scene.offsetHeight-sticky.offsetHeight,behavior:'instant'});
+ if(!scene||!sticky)return false;
+ scrollToPosition(scene.offsetTop+scene.offsetHeight-sticky.offsetHeight,smooth);
  return true;
 }
 
@@ -140,5 +158,5 @@ export function initScene(){
   });
  }
  document.documentElement.style.setProperty('--transition-duration',`${siteConfig.motion.transitionDuration}ms`);
- return()=>{match.revert();listeners.forEach(fn=>fn());};
+ return()=>{cancelAnimationFrame(scrollFrame);match.revert();listeners.forEach(fn=>fn());};
 }

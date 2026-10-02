@@ -1,5 +1,5 @@
 import { content, asset } from "../content/client-data";
-import { projectForTrack, platformLinks } from "../content/selectors";
+import { projectForTrack, platformLinks, selectTracks } from "../content/selectors";
 import { MediaCoordinator, type Playable } from "./coordinator";
 export const coordinator = new MediaCoordinator(
   document.querySelector<HTMLAudioElement>("#shared-audio")!,
@@ -13,8 +13,11 @@ export const playable = (id: string): Playable => {
     projectId: projectForTrack(content, id)?.id,
     duration: track.duration,
     peaks: track.peaks,
+    genres: track.genres,
+    emotions: track.emotions,
   };
 };
+coordinator.setAutoplayCandidates(selectTracks(content).map(track => playable(track.id)));
 const format = (time: number | null) =>
   time === null || !Number.isFinite(time)
     ? "—"

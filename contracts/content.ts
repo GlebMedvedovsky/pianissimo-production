@@ -25,6 +25,11 @@ export const emotions = [
   "gritty",
   "calm",
 ] as const;
+export const directingRoles = [
+  "Director",
+  "Assistant Director",
+  "Corporate Video",
+] as const;
 const id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const url = z
   .url()
@@ -148,7 +153,7 @@ export const projectSchema = z.object({
   memberships: z.object({
     music: membership.optional(),
     directing: membership
-      .extend({ role: z.enum(["Director", "Assistant Director"]) })
+      .extend({ role: z.enum(directingRoles) })
       .optional(),
   }),
   awards: z.array(z.string()),

@@ -359,9 +359,14 @@ test("fixture error, rapid selection, natural ending and normal-build isolation"
   });
   await expect
     .poll(() =>
+      page.evaluate(() => window.__mediaTest.coordinator.state.track?.id),
+    )
+    .not.toBe(fixtures[1]!.id);
+  await expect
+    .poll(() =>
       page.evaluate(() => window.__mediaTest.coordinator.state.playing),
     )
-    .toBe(false);
+    .toBe(true);
   await page.evaluate(async () => {
     await window.__mediaTest.coordinator.select(
       {

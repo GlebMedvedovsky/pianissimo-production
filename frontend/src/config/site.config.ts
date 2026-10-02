@@ -14,10 +14,15 @@ export const siteConfig = {
   },
   motion: {
     respectReducedMotion: true,
-    transitionDuration: 800,
+    transitionDuration: 900,
     scrollDistance: 1.25,
   },
-  directing: { defaultFilter: "Director" as "Director" | "Assistant Director" },
+  directing: {
+    defaultFilter: "Director" as
+      | "Director"
+      | "Assistant Director"
+      | "Corporate Video",
+  },
   navigation: {
     music: "Film Music",
     directing: "Directing",
