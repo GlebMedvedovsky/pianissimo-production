@@ -80,7 +80,11 @@ Netcup runs PHP/MySQL/private storage/private serving. GitHub Actions runs Node 
 
 Contract-v2 runner transport contains only `manifest.json` and `preview.json`. The media inventory in `preview.json` is cryptographically bound into `packageSha256`; original draft media remains in the immutable private snapshot and is served only through the authenticated CMS media route. The runner builds a thin deterministic result containing generated HTML/CSS/JS/fonts/static assets and no `media/preview/*` payload files, then uploads fixed **4 MiB (4,194,304-byte)** chunks over the authenticated publisher API. Limits remain 512 chunks and 2 GiB total. The server serializes writes/finalization, re-verifies package media bytes at the final trust boundary, assembles and hashes by streaming, and applies the dedicated preview-result validator. Production `StaticReleaseArchive` semantics remain unchanged and self-contained.
 
-The successful production preview run #9 proved authenticated package download, raw chunk upload/finalization, and end-to-end serving. Its roughly three-minute wait was dominated by about 148 seconds of duplicate media result upload/finalization; package download was about 14 seconds and Astro about 7 seconds. The contract-v2 patch removes both media-byte network transfers. After deployment, record the new transport/result sizes and timings rather than assuming the 20–45 second target has been achieved.
+Private-preview contract v2 was deployed on 2026-10-02 at source revision `0f2d1982deacf34b615a66ae9e9bff8b0b9e1514`. Production preflight afterward reported 0 failures and one warning only: `Laravel paths (web user) — requires FastCGI verification`. All five deployed runtime files matched the reviewed staging files byte-for-byte. The temporary deployment archive and staging directory were removed; rollback backup `/pianissimo-production.de/private/backups/backend-before-preview-v2-20261002.tar.gz` was retained.
+
+Run #9 used the prior media-heavy contract and took roughly 191 seconds: about 14 seconds to download the package, about 7 seconds for Astro, and about 148 seconds to upload/finalize the media-heavy result. Run #10 was the first successful live contract-v2 verification and completed successfully at the deployed revision. The user-visible wait was approximately 45.78 seconds; the workflow took about 43 seconds, including about 3 seconds for metadata-only package download, about 5 seconds for `npm ci`, 1.21 seconds for Astro's 21-page build, below 0.2 seconds for validation/archive creation, and about 7 seconds for result upload/finalization. This proves that removing duplicate original-media transfer in both directions removed the dominant live bottleneck.
+
+The status/spinner waiting screen rendered without the old three-second full-page blinking and navigated automatically when ready. Homepage, Film Music, Directing, project routes, CSS, fonts, authenticated media, navigation, and the private-preview banner were verified. After saving **“Kinnhakenhank TEST”**, a new preview displayed that value, proving changed package identity produces current output rather than reusing the old result.
 
 ## GitHub configuration names (values are secret or environment-specific)
 
@@ -102,13 +106,12 @@ Never log or share secret values, `.env`, `APP_KEY`, database credentials, beare
 
 ## Remaining live verification after the completed Webhosting 2000 upgrade
 
-The product, WCP quota, PHP/SAPI limits, document root, dual filesystem namespace, and CLI binary/settings listed above were verified on 2026-10-01. The following remain genuinely unverified:
+The product, WCP quota, PHP/SAPI limits, document root, dual filesystem namespace, CLI binary/settings, and contract-v2 private-preview pipeline listed above were verified by 2026-10-02. The following remain genuinely unverified:
 
-- request/proxy body and timeout behavior with a real authenticated 4 MiB preview chunk and finalization;
 - SFTP/SSH and FastCGI access to `/private/incoming/media`, including effective ownership and permissions;
 - streamed import duration for representative large media, FastCGI timeout behavior, account-quota headroom during staging, and an agreed `CMS_MEDIA_APPLICATION_MAX_KB`/`CMS_MEDIA_IMPORT_MAX_KB` pair;
 - CMS listing/import of a completed SFTP test file, source consumption after success, and source preservation after a controlled failure;
 - deployed incoming-media canonical cleanup and retry behavior;
 - config cache remains absent after `optimize:clear`;
-- end-to-end package preview after deployment: package download, multi-chunk upload, finalization timing, authenticated browser serving, expiry, and cleanup.
+- preview expiry and cleanup remain lifecycle checks for a future controlled verification; package download, upload/finalization timing, authenticated browser serving, and changed-draft correctness are now verified.
 
