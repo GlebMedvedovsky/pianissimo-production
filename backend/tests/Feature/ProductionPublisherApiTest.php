@@ -12,6 +12,8 @@ use App\Services\ProductionWorkflowDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use Tests\TestCase;
 
 class ProductionPublisherApiTest extends TestCase
@@ -120,6 +122,38 @@ class ProductionPublisherApiTest extends TestCase
         $headers = json_encode($response->headers->all());
         $this->assertStringNotContainsString($this->root, (string) $headers);
         @unlink($response->baseResponse->getFile()->getPathname());
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function test_package_transport_respects_open_basedir_and_still_rejects_symlink_components_below_runtime_root(): void
+    {
+        $runtimeRoot = dirname(base_path(), 2);
+        $openBasedir = $runtimeRoot.PATH_SEPARATOR.sys_get_temp_dir();
+        $this->assertNotFalse(ini_set('open_basedir', $openBasedir));
+        $this->assertSame($openBasedir, ini_get('open_basedir'));
+
+        $publication = $this->publication('open-basedir');
+        $transport = app(ProductionPublicationTransport::class);
+        $first = $transport->create($publication);
+        $second = $transport->create($publication);
+
+        $this->assertSame($first['sha256'], $second['sha256']);
+        $this->assertSame(['manifest.json', 'media/release-image.jpg', 'publication.json'], $this->tarEntries($first['path']));
+        @unlink($first['path']);
+        @unlink($second['path']);
+
+        $symlinkTarget = $this->root.DIRECTORY_SEPARATOR.'symlink-target';
+        $symlinkRoot = $this->root.DIRECTORY_SEPARATOR.'symlinked-packages';
+        File::ensureDirectoryExists($symlinkTarget);
+        if (! @symlink($symlinkTarget, $symlinkRoot)) {
+            $this->markTestSkipped('Symlink creation is unavailable on this test host.');
+        }
+        config(['cms.publication_package_root' => $symlinkRoot]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('unavailable');
+        $transport->create($publication);
     }
 
     public function test_package_tampering_and_unrelated_files_block_download(): void

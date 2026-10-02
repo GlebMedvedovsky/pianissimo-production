@@ -65,21 +65,21 @@ class ProductionPublicationPackager
         $publicationBytes = $this->canonicalJson($this->publicationMetadata($publication, $inventory))."\n";
 
         if ($publication->status !== ProductionPublicationStatus::Preparing) {
-            $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory);
+            $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory, $root);
             return $publication->refresh();
         }
 
         $pending = $root.DIRECTORY_SEPARATOR.'.pending'.DIRECTORY_SEPARATOR.$publication->publication_id.'-'.bin2hex(random_bytes(8));
         $createdFinal = false;
         try {
-            $this->buildPending($pending, $manifestBytes, $publicationBytes, $inventory, $sources);
-            $createdFinal = $this->publishPending($pending, $final, $manifestBytes, $publicationBytes, $inventory);
+            $this->buildPending($pending, $manifestBytes, $publicationBytes, $inventory, $sources, $root);
+            $createdFinal = $this->publishPending($pending, $final, $manifestBytes, $publicationBytes, $inventory, $root);
             $publication = $this->lifecycle->markPrepared($publication);
         } catch (Throwable $exception) {
             $this->removeDirectory($pending);
             $publication->refresh();
             if ($publication->status === ProductionPublicationStatus::Prepared) {
-                $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory);
+                $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory, $root);
                 return $publication;
             }
             if ($createdFinal) {
@@ -219,7 +219,19 @@ class ProductionPublicationPackager
         if (! is_string($path) || ! $this->isAbsolute($path) || $this->hasTraversal($path)) {
             throw new DomainException("Invalid production media source path: {$publicPath}.");
         }
-        if ($this->containsSymlinkComponent($path) || is_dir($path) || ! is_file($path)) {
+
+        $normalizedPath = $this->comparablePath($path);
+        $allowedRoot = null;
+        foreach ($roots as $root) {
+            if ($this->inside($normalizedPath, $root)) {
+                $allowedRoot = $root;
+                break;
+            }
+        }
+        if ($allowedRoot === null) {
+            throw new DomainException("Production media source is outside allowed media roots: {$publicPath}.");
+        }
+        if ($this->containsSymlinkComponent($path, $allowedRoot) || is_dir($path) || ! is_file($path)) {
             throw new DomainException("Production media source must be a regular non-symlink file: {$publicPath}.");
         }
         $real = realpath($path);
@@ -227,33 +239,32 @@ class ProductionPublicationPackager
             throw new DomainException("Production media source is missing: {$publicPath}.");
         }
         $normalized = $this->comparablePath($real);
-        foreach ($roots as $root) {
-            if ($this->inside($normalized, $root)) {
-                $probe = $normalized;
-                while ($probe !== $root) {
-                    if (is_link($probe)) {
-                        throw new DomainException("Symlinked production media sources are forbidden: {$publicPath}.");
-                    }
-                    $parent = $this->comparablePath(dirname($probe));
-                    if ($parent === $probe || ! $this->inside($parent, $root)) {
-                        break;
-                    }
-                    $probe = $parent;
-                }
-                return $real;
-            }
+        if (! $this->inside($normalized, $allowedRoot)) {
+            throw new DomainException("Production media source is outside allowed media roots: {$publicPath}.");
         }
 
-        throw new DomainException("Production media source is outside allowed media roots: {$publicPath}.");
+        return $real;
     }
 
     private function allowedMediaRoots(): array
     {
         $roots = [];
+        $runtimeRoot = $this->runtimeSiteRoot();
+        $runtimeReal = realpath($runtimeRoot);
+        if ($runtimeReal === false || $this->containsSymlinkComponent($runtimeRoot, $runtimeRoot)) {
+            throw new DomainException('Production runtime site root is unavailable.');
+        }
+        $runtimeReal = $this->comparablePath($runtimeReal);
         foreach (['media_root', 'managed_media_root'] as $key) {
             $configured = config("cms.{$key}");
-            $real = is_string($configured) ? realpath($configured) : false;
-            if ($real !== false && is_dir($real) && ! is_link($configured)) {
+            if (! is_string($configured) || ! $this->isAbsolute($configured) || $this->hasTraversal($configured)
+                || ! $this->inside($this->comparablePath($configured), $this->comparablePath($runtimeRoot))
+                || $this->containsSymlinkComponent($configured, $runtimeRoot)) {
+                continue;
+            }
+            $real = realpath($configured);
+            if ($real !== false && is_dir($real) && ! is_link($configured)
+                && $this->inside($this->comparablePath($real), $runtimeReal)) {
                 $roots[$this->comparablePath($real)] = true;
             }
         }
@@ -264,7 +275,7 @@ class ProductionPublicationPackager
         return array_keys($roots);
     }
 
-    private function buildPending(string $pending, string $manifestBytes, string $publicationBytes, array $inventory, array $sources): void
+    private function buildPending(string $pending, string $manifestBytes, string $publicationBytes, array $inventory, array $sources, string $root): void
     {
         $this->makeDirectory($pending);
         $this->writeFile($pending.DIRECTORY_SEPARATOR.'manifest.json', $manifestBytes);
@@ -282,27 +293,27 @@ class ProductionPublicationPackager
                 throw new DomainException("Copied production media failed verification: {$entry['publicPath']}.");
             }
         }
-        $this->verifyPackage($pending, $manifestBytes, $publicationBytes, $inventory);
+        $this->verifyPackage($pending, $manifestBytes, $publicationBytes, $inventory, $root);
     }
 
-    private function publishPending(string $pending, string $final, string $manifestBytes, string $publicationBytes, array $inventory): bool
+    private function publishPending(string $pending, string $final, string $manifestBytes, string $publicationBytes, array $inventory, string $root): bool
     {
         $this->makeDirectory(dirname($final));
         if (file_exists($final)) {
-            $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory);
+            $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory, $root);
             $this->removeDirectory($pending);
             return false;
         }
         if (! @rename($pending, $final)) {
             if (is_dir($final)) {
-                $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory);
+                $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory, $root);
                 $this->removeDirectory($pending);
                 return false;
             }
             throw new DomainException('Production package could not be published atomically.');
         }
         try {
-            $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory);
+            $this->verifyPackage($final, $manifestBytes, $publicationBytes, $inventory, $root);
         } catch (Throwable $exception) {
             $this->removeDirectory($final);
             throw $exception;
@@ -311,9 +322,10 @@ class ProductionPublicationPackager
         return true;
     }
 
-    private function verifyPackage(string $directory, string $manifestBytes, string $publicationBytes, array $inventory): void
+    private function verifyPackage(string $directory, string $manifestBytes, string $publicationBytes, array $inventory, string $root): void
     {
-        if ($this->containsSymlinkComponent($directory) || ! is_dir($directory)) {
+        if (! $this->inside($this->comparablePath($directory), $this->comparablePath($root))
+            || $this->containsSymlinkComponent($directory, $root) || ! is_dir($directory)) {
             throw new DomainException('Immutable production package is missing or is not a regular directory.');
         }
         $expected = [
@@ -370,10 +382,13 @@ class ProductionPublicationPackager
     private function safePackageRoot(): string
     {
         $configured = config('cms.publication_package_root');
-        if (! is_string($configured) || ! $this->isAbsolute($configured) || $this->hasTraversal($configured) || $this->containsSymlinkComponent($configured)) {
+        $runtimeRoot = $this->runtimeSiteRoot();
+        if (! is_string($configured) || ! $this->isAbsolute($configured) || $this->hasTraversal($configured)
+            || ! $this->inside($this->comparablePath($configured), $this->comparablePath($runtimeRoot))
+            || $this->containsSymlinkComponent($configured, $runtimeRoot)) {
             throw new DomainException('Production publication package root must be an absolute traversal-free path.');
         }
-        $root = $this->resolvedPath($configured);
+        $root = $this->resolvedPath($configured, $runtimeRoot);
         $staticReleaseRoot = config('cms.static_release_root');
         $forbidden = [public_path(), config('cms.public_site_root')];
         if (is_string($staticReleaseRoot) && $staticReleaseRoot !== '') {
@@ -381,7 +396,7 @@ class ProductionPublicationPackager
             $forbidden[] = $staticReleaseRoot.DIRECTORY_SEPARATOR.'current';
         }
         foreach ($forbidden as $path) {
-            if (is_string($path) && $path !== '' && $this->inside($root, $this->resolvedPath($path))) {
+            if (is_string($path) && $path !== '' && $this->inside($root, $this->resolvedPath($path, $runtimeRoot))) {
                 throw new DomainException('Production publication package root must remain private and outside live/static public paths.');
             }
         }
@@ -462,31 +477,46 @@ class ProductionPublicationPackager
         return (bool) preg_match('#(^|[\\\\/])\.\.([\\\\/]|$)#', $path);
     }
 
-    private function containsSymlinkComponent(string $path): bool
+    private function containsSymlinkComponent(string $path, string $boundary): bool
     {
-        $probe = rtrim(str_replace('\\', '/', $path), '/');
-        while ($probe !== '' && $probe !== '.' && $probe !== '/') {
+        $path = rtrim(str_replace('\\', '/', $path), '/');
+        $boundary = rtrim(str_replace('\\', '/', $boundary), '/');
+        if (! $this->inside($this->comparablePath($path), $this->comparablePath($boundary))) {
+            throw new DomainException('Configured production path is outside its trusted boundary.');
+        }
+
+        $probe = $boundary;
+        if (is_link($probe)) {
+            return true;
+        }
+        $relative = ltrim(substr($path, strlen($boundary)), '/');
+        $parts = array_values(array_filter(explode('/', $relative), static fn (string $part): bool => $part !== ''));
+        foreach ($parts as $part) {
+            $probe .= '/'.$part;
             if (is_link($probe)) {
                 return true;
             }
-            $parent = str_replace('\\', '/', dirname($probe));
-            if ($parent === $probe) {
-                break;
-            }
-            $probe = $parent;
         }
 
         return false;
     }
 
-    private function resolvedPath(string $path): string
+    private function resolvedPath(string $path, string $boundary): string
     {
         $path = str_replace('\\', '/', $path);
+        $boundary = rtrim(str_replace('\\', '/', $boundary), '/');
+        if (! $this->inside($this->comparablePath($path), $this->comparablePath($boundary))) {
+            throw new DomainException('Configured production path is outside its trusted boundary.');
+        }
         $probe = $path;
         $suffix = [];
         while (! file_exists($probe)) {
+            if ($this->comparablePath($probe) === $this->comparablePath($boundary)) {
+                throw new DomainException('Configured production path cannot be resolved safely.');
+            }
             $parent = str_replace('\\', '/', dirname($probe));
-            if ($parent === $probe || $parent === '.') {
+            if ($parent === $probe || $parent === '.'
+                || ! $this->inside($this->comparablePath($parent), $this->comparablePath($boundary))) {
                 throw new DomainException('Configured production path cannot be resolved safely.');
             }
             array_unshift($suffix, basename($probe));
@@ -494,6 +524,10 @@ class ProductionPublicationPackager
         }
         $real = realpath($probe);
         if ($real === false) {
+            throw new DomainException('Configured production path cannot be resolved safely.');
+        }
+        $boundaryReal = realpath($boundary);
+        if ($boundaryReal === false || ! $this->inside($this->comparablePath($real), $this->comparablePath($boundaryReal))) {
             throw new DomainException('Configured production path cannot be resolved safely.');
         }
         $resolved = rtrim($this->comparablePath($real), '/');
@@ -514,6 +548,11 @@ class ProductionPublicationPackager
     {
         $root = rtrim($root, '/');
         return $candidate === $root || str_starts_with($candidate, $root.'/');
+    }
+
+    private function runtimeSiteRoot(): string
+    {
+        return rtrim(str_replace('\\', '/', dirname(base_path(), 2)), '/');
     }
 
     private function makeDirectory(string $path): void

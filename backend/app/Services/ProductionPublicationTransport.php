@@ -76,16 +76,28 @@ class ProductionPublicationTransport
     /** @return array{string,array<string,string>} */
     private function verifyPackage(ProductionPublication $publication): array
     {
-        $configuredRoot = (string) config('cms.publication_package_root');
+        $configuredRoot = config('cms.publication_package_root');
+        $runtimeRoot = $this->runtimeSiteRoot();
+        if (! is_string($configuredRoot) || ! $this->isAbsolute($configuredRoot) || $this->hasTraversal($configuredRoot)
+            || ! $this->inside($this->comparablePath($configuredRoot), $this->comparablePath($runtimeRoot))
+            || $this->containsSymlinkComponent($configuredRoot, $runtimeRoot)) {
+            throw new DomainException('Immutable publication package is unavailable.');
+        }
         $root = realpath($configuredRoot);
-        if ($root === false || $this->containsSymlinkComponent($configuredRoot) || is_link($root) || ! is_dir($root)) {
+        $runtimeReal = realpath($runtimeRoot);
+        if ($root === false || $runtimeReal === false || is_link($root) || ! is_dir($root)
+            || ! $this->inside($this->comparablePath($root), $this->comparablePath($runtimeReal))) {
             throw new DomainException('Immutable publication package is unavailable.');
         }
         $expectedRelative = 'production/'.str_pad((string) $publication->sequence, 12, '0', STR_PAD_LEFT).'-'.$publication->publication_id;
         if (! hash_equals($expectedRelative, (string) $publication->package_path)) {
             throw new DomainException('Immutable publication package identity is invalid.');
         }
-        $directory = realpath($root.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $expectedRelative));
+        $expectedDirectory = $root.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $expectedRelative);
+        if ($this->containsSymlinkComponent($expectedDirectory, $root)) {
+            throw new DomainException('Immutable publication package is unavailable.');
+        }
+        $directory = realpath($expectedDirectory);
         if ($directory === false || ! is_dir($directory) || is_link($directory) || ! $this->inside($directory, $root)) {
             throw new DomainException('Immutable publication package is unavailable.');
         }
@@ -144,6 +156,9 @@ class ProductionPublicationTransport
                 throw new DomainException('Immutable publication media inventory is invalid.');
             }
             $path = $directory.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relative);
+            if ($this->containsSymlinkComponent($path, $directory)) {
+                throw new DomainException('Immutable publication package media changed.');
+            }
             $real = realpath($path);
             if ($real === false || ! $this->inside($real, $directory) || is_link($path) || ! is_file($path)
                 || filesize($path) !== $entry['size'] || ! hash_equals($entry['sha256'], (string) hash_file('sha256', $path))) {
@@ -291,24 +306,57 @@ class ProductionPublicationTransport
 
     private function inside(string $candidate, string $root): bool
     {
-        $candidate = str_replace('\\', '/', $candidate);
-        $root = rtrim(str_replace('\\', '/', $root), '/');
+        $candidate = $this->comparablePath($candidate);
+        $root = $this->comparablePath($root);
 
         return $candidate === $root || str_starts_with($candidate, $root.'/');
     }
 
-    private function containsSymlinkComponent(string $path): bool
+    private function containsSymlinkComponent(string $path, string $boundary): bool
     {
-        $path = str_replace('\\', '/', $path);
-        $prefix = str_starts_with($path, '/') ? '/' : '';
-        $parts = array_values(array_filter(explode('/', $path), static fn (string $part): bool => $part !== ''));
+        $path = rtrim(str_replace('\\', '/', $path), '/');
+        $boundary = rtrim(str_replace('\\', '/', $boundary), '/');
+        if (! $this->inside($path, $boundary)) {
+            throw new DomainException('Publication package path is outside its trusted boundary.');
+        }
+
+        $probe = $boundary;
+        if (is_link($probe)) {
+            return true;
+        }
+        $relative = ltrim(substr($path, strlen($boundary)), '/');
+        $parts = array_values(array_filter(explode('/', $relative), static fn (string $part): bool => $part !== ''));
         foreach ($parts as $part) {
-            $prefix = $prefix === '' || str_ends_with($prefix, '/') ? $prefix.$part : $prefix.'/'.$part;
-            if (is_link($prefix)) {
+            $probe .= '/'.$part;
+            if (is_link($probe)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function runtimeSiteRoot(): string
+    {
+        return rtrim(str_replace('\\', '/', dirname(base_path(), 2)), '/');
+    }
+
+    private function comparablePath(string $path): string
+    {
+        $normalized = rtrim(str_replace('\\', '/', $path), '/');
+
+        return PHP_OS_FAMILY === 'Windows' ? strtolower($normalized) : $normalized;
+    }
+
+    private function isAbsolute(string $path): bool
+    {
+        $path = str_replace('\\', '/', $path);
+
+        return str_starts_with($path, '/') || (bool) preg_match('#^[A-Za-z]:/#', $path);
+    }
+
+    private function hasTraversal(string $path): bool
+    {
+        return (bool) preg_match('#(^|[\\\\/])\.\.([\\\\/]|$)#', $path);
     }
 }
