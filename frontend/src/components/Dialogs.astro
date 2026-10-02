@@ -8,6 +8,7 @@ interface Props {
 }
 const { content = activeContent } = Astro.props;
 const email = siteConfig.contacts.email || content.site.contacts.email;
+const contactApiUrl = import.meta.env.PIANISSIMO_CONTACT_API_URL;
 const consent = content.site.consent ?? {
   version: 1,
   necessary: true,
@@ -30,19 +31,21 @@ const analytics = content.site.analytics ?? {
   <div id="project-dialog-player-slot"></div>
 </dialog>
 <dialog id="contact-dialog" class="small-dialog" aria-labelledby="contact-title">
-  <button class="dialog-close" data-close-dialog aria-label="Close contact form"><Icon name="close" /></button>
+  <button class="dialog-close" data-close-dialog aria-label="Close contact dialog"><Icon name="close" /></button>
   <p class="eyebrow">LET’S MAKE SOMETHING MEANINGFUL</p>
   <h2 id="contact-title">Get in <em>touch.</em></h2>
-  <p>Tell me a little about your story.</p>
-  <p class="prototype-note">Local prototype: this form does not send messages.</p>
-  <form id="contact-form">
-    <label>Your name<input name="name" autocomplete="name" required maxlength="120" /></label>
-    <label>Email address<input type="email" name="email" autocomplete="email" required maxlength="254" /></label>
-    <label>Your message<textarea name="message" rows="4" required minlength="10" maxlength="5000"></textarea></label>
-    <button type="submit" class="outline-button">Check message <Icon name="arrow" /></button>
-    <p class="form-status" role="status"></p>
+  <p>Tell me about your film, scene, musical direction, collaboration idea, or another detailed question.</p>
+  <form id="contact-form" data-contact-endpoint={contactApiUrl}>
+    <label>Name<input name="name" autocomplete="name" required maxlength="120" /></label>
+    <label>Email<input type="email" name="email" autocomplete="email" required maxlength="254" /></label>
+    <label>Message<textarea name="message" rows="8" required minlength="10" maxlength="15000"></textarea></label>
+    <div class="contact-honeypot" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off" /></label></div>
+    <input type="hidden" name="started_at" value="" />
+    <p class="contact-privacy">By sending this message, your details will be used only to respond to your inquiry. <a href={consent.privacyLink}>Read the privacy information.</a></p>
+    <button type="submit" class="outline-button">Send message <Icon name="arrow" /></button>
+    <p class="form-status" role="status" aria-live="polite"></p>
   </form>
-  {email && <a class="text-link" href={`mailto:${email}`}>Use your email app ↗</a>}
+  {email && <a class="text-link contact-email-fallback" href={`mailto:${email}`}>Email Sebastian directly ↗</a>}
 </dialog>
 <div data-consent-root data-consent-config={JSON.stringify(consent)} data-analytics-config={JSON.stringify(analytics)}>
   <dialog id="consent-dialog" class="small-dialog consent-dialog" aria-labelledby="consent-title">

@@ -1,4 +1,6 @@
 ---
-import Base from '../layouts/Base.astro';import {content} from '../lib/content/data';
+import Base from '../layouts/Base.astro';
+import PlainText from '../components/PlainText.astro';
+import {content} from '../lib/content/data';
 ---
-<Base title="Legal notice" section="legal"><article class="legal-page"><p class="eyebrow">LOCAL PROTOTYPE · PENDING REVIEW</p><h1>Legal <em>notice.</em></h1><p>{content.site.legal.notice}</p><a class="text-link" href="/">Return home ↗</a></article></Base>
+<Base title="Legal notice" section="legal"><article class="legal-page"><p class="eyebrow">LEGAL INFORMATION</p><h1>Legal <em>notice.</em></h1><PlainText text={content.site.legal.notice} /><a class="text-link" href="/">Return home ↗</a></article></Base>

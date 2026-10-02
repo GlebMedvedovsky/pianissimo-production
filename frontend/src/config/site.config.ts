@@ -25,7 +25,6 @@ export const siteConfig = {
     contact: "Contact",
   },
   contacts: { email: "sebastian@pianissimo-production.de" as string | null },
-  prototype: true,
 };
 export function aboutTheme(
   context: Section | null,

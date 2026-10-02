@@ -1048,7 +1048,7 @@ select {
     padding: 0;
 }
 
-.prototype-label {
+.portfolio-label {
     margin-left: auto;
     font-size: 8px;
     letter-spacing: .1em
@@ -1258,7 +1258,7 @@ html:has(dialog[open]) {
     font-size: 12px
 }
 
-.prototype-note {
+.project-note {
     padding: 12px 15px;
     border-left: 2px solid var(--focus);
     background: var(--surface)
@@ -1282,12 +1282,30 @@ textarea {
 }
 
 textarea {
+    min-height: 190px;
     resize: vertical
 }
 
 form .form-status {
     margin: 15px 0 0;
     color: var(--text)
+}
+
+.contact-honeypot {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden
+}
+
+.contact-privacy {
+    line-height: 1.6
+}
+
+.contact-email-fallback {
+    display: inline-block;
+    margin-top: 18px
 }
 
 .consent-actions {
@@ -1407,10 +1425,15 @@ body:has(.player[hidden]) .cookie-notice {
     max-width: 1000px
 }
 
-.legal-page>p {
+.legal-copy {
     max-width: 700px;
+}
+
+.legal-copy p {
     font-size: 15px;
-    line-height: 2
+    line-height: 2;
+    margin: 0 0 1.5em;
+    white-space: pre-line
 }
 
 .player {
@@ -2221,7 +2244,7 @@ html[data-direction=right] {
         font-size: 61px
     }
 
-    .legal-page>p {
+    .legal-copy p {
         font-size: 13px
     }
 
@@ -2229,7 +2252,7 @@ html[data-direction=right] {
         gap: 15px
     }
 
-    .prototype-label {
+    .portfolio-label {
         margin-left: 0
     }
 

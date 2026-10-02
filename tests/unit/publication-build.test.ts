@@ -31,6 +31,8 @@ async function createPackage(testRoot: string) {
   manifest.assets[0]!.path = "media/release-image.webp";
   manifest.assets[0]!.sha256 = mediaSha;
   manifest.site.mediaSlots.hero.image = "release-image";
+  manifest.site.legal.notice = "First legal line\ncontinued legal line\n\nSecond legal <strong>section</strong>.";
+  manifest.site.legal.privacy = "First privacy paragraph.\n\nSecond privacy line\nwith a meaningful break.";
   const manifestBytes = `${canonicalJson(manifest)}\n`;
   const manifestSha256 = sha256(manifestBytes);
   const media = [
@@ -182,13 +184,50 @@ test("publication build injects the package manifest and emits only allowlisted 
       files.some((file) => /(?:\.env|\.php|fixtures|tests|private)/i.test(file)),
       false,
     );
-    const html = (
-      await Promise.all(
-        files.filter((file) => file.endsWith(".html")).map((file) => readFile(file, "utf8")),
-      )
-    ).join("\n");
+    const htmlFiles = await Promise.all(
+      files.filter((file) => file.endsWith(".html")).map(async (file) => ({
+        file,
+        path: file.slice(output.length + 1).replaceAll("\\", "/"),
+        html: await readFile(file, "utf8"),
+      })),
+    );
+    const html = htmlFiles.map(({ html }) => html).join("\n");
     assert.match(html, /Pianissimo release fixture/);
     assert.doesNotMatch(html, /release-image-480\.webp/);
+    assert.doesNotMatch(html, /LOCAL PROTOTYPE|PENDING REVIEW|Local prototype|delivery is disabled/i);
+    assert.doesNotMatch(html, /localhost|host\.docker\.internal/i);
+    assert.match(html, /id="contact-form"/);
+    assert.match(html, /name="name"[^>]+maxlength="120"/);
+    assert.match(html, /name="email"[^>]+maxlength="254"/);
+    assert.match(html, /name="message"[^>]+minlength="10"[^>]+maxlength="15000"/);
+    assert.match(html, />Send message /);
+    assert.match(html, /data-contact-endpoint="https:\/\/admin\.pianissimo-production\.de\/api\/contact"/);
+    assert.match(html, /href="mailto:sebastian@pianissimo-production\.de"/);
+    const unavailablePreview = htmlFiles.find(({ path }) => path === "draft-preview/index.html");
+    assert.ok(unavailablePreview, "publication output must contain the unavailable draft-preview shell");
+    for (const { file, html: page } of htmlFiles.filter(({ path }) => path !== "draft-preview/index.html")) {
+      assert.match(page, /<meta name="robots" content="index, follow">/, file);
+      assert.doesNotMatch(page, /noindex, nofollow/, file);
+    }
+    assert.match(unavailablePreview.html, /content="noindex,nofollow"/);
+    assert.doesNotMatch(unavailablePreview.html, /127\.0\.0\.1|localhost|host\.docker\.internal/i);
+    assert.equal(await readFile(resolve(output, "robots.txt"), "utf8"), "User-agent: *\nAllow: /\n");
+
+    const legalHtml = await readFile(resolve(output, "legal", "index.html"), "utf8");
+    assert.match(legalHtml, /<div class="legal-copy">\s*<p>First legal line\ncontinued legal line<\/p>\s*<p>Second legal &lt;strong&gt;section&lt;\/strong&gt;\.<\/p>/);
+    assert.doesNotMatch(legalHtml, /<strong>section<\/strong>/);
+    const privacyHtml = await readFile(resolve(output, "privacy", "index.html"), "utf8");
+    assert.match(privacyHtml, /<p>First privacy paragraph\.<\/p>\s*<p>Second privacy line\nwith a meaningful break\.<\/p>/);
+
+    const homeHtml = await readFile(resolve(output, "index.html"), "utf8");
+    assert.match(homeHtml, /href="\/privacy\/">Read the privacy information/);
+    assert.match(homeHtml, /href="\/privacy\/">Privacy<\/a>/);
+    const dialogsSource = await readFile(resolve("frontend", "src", "components", "Dialogs.astro"), "utf8");
+    assert.equal(dialogsSource.match(/href=\{consent\.privacyLink\}/g)?.length, 3);
+    const plainTextSource = await readFile(resolve("frontend", "src", "components", "PlainText.astro"), "utf8");
+    assert.doesNotMatch(plainTextSource, /set:html/);
+    const siteConfigSource = await readFile(resolve("frontend", "src", "config", "site.config.ts"), "utf8");
+    assert.doesNotMatch(siteConfigSource, /\bprototype\s*:/);
     await createReleaseIntegrity(output, resolve(fixture.packageRoot, "publication.json"));
     const inventory = JSON.parse(await readFile(resolve(output, ".pianissimo-release-files.json"), "utf8"));
     await validateReleaseTextReferences(output, inventory);

@@ -297,7 +297,10 @@ class ProductionReadinessTest extends TestCase
     {
         $this->configurePreflight();
         $secret = 'never-print-this-database-secret';
-        config(['database.connections.mysql.password' => $secret]);
+        config([
+            'database.connections.mysql.password' => $secret,
+            'mail.mailers.smtp.password' => $secret,
+        ]);
         $before = $this->treeHash($this->fixtureRoot);
         $queries = 0;
         DB::listen(static function () use (&$queries): void {
@@ -319,6 +322,66 @@ class ProductionReadinessTest extends TestCase
             config(['cms.source_revision' => $invalid]);
             $check = $this->check(app(ProductionPreflight::class)->run(), 'CMS_SOURCE_REVISION');
             $this->assertSame('FAIL', $check['status']);
+        }
+    }
+
+    public function test_preflight_requires_real_contact_mail_and_exact_public_origin(): void
+    {
+        $this->configurePreflight();
+        config(['mail.default' => 'log']);
+        $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'MAIL_MAILER')['status']);
+
+        config([
+            'mail.default' => 'smtp',
+            'mail.from.address' => null,
+            'contact.recipient' => 'invalid',
+            'contact.allowed_origin' => 'https://example.test',
+        ]);
+        $checks = app(ProductionPreflight::class)->run();
+        $this->assertSame('FAIL', $this->check($checks, 'MAIL_FROM_ADDRESS')['status']);
+        $this->assertSame('FAIL', $this->check($checks, 'CONTACT_RECIPIENT')['status']);
+        $this->assertSame('FAIL', $this->check($checks, 'CONTACT_ALLOWED_ORIGIN')['status']);
+
+        config([
+            'mail.from.address' => 'website@pianissimo-production.de',
+            'contact.recipient' => 'sebastian@pianissimo-production.de',
+            'contact.allowed_origin' => 'https://pianissimo-production.de',
+        ]);
+        $checks = app(ProductionPreflight::class)->run();
+        foreach (['MAIL_MAILER', 'MAIL_FROM_ADDRESS', 'CONTACT_RECIPIENT', 'CONTACT_ALLOWED_ORIGIN'] as $label) {
+            $this->assertSame('PASS', $this->check($checks, $label)['status']);
+        }
+    }
+
+    public function test_preflight_requires_complete_smtp_configuration(): void
+    {
+        $this->configurePreflight();
+
+        config(['mail.mailers.smtp.host' => '']);
+        $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'MAIL_HOST')['status']);
+        config(['mail.mailers.smtp.host' => 'smtp.example.test']);
+
+        foreach ([null, 0, 65_536, 'not-a-port'] as $invalidPort) {
+            config(['mail.mailers.smtp.port' => $invalidPort]);
+            $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'MAIL_PORT')['status']);
+        }
+        config(['mail.mailers.smtp.port' => 587]);
+
+        config(['mail.mailers.smtp.username' => '']);
+        $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'MAIL_USERNAME')['status']);
+        config(['mail.mailers.smtp.username' => 'website-user']);
+
+        config(['mail.mailers.smtp.password' => '']);
+        $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'MAIL_PASSWORD')['status']);
+        config(['mail.mailers.smtp.password' => 'test-password-not-a-real-secret']);
+
+        config(['mail.mailers.smtp.scheme' => 'tls']);
+        $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'MAIL_SCHEME')['status']);
+        config(['mail.mailers.smtp.scheme' => 'smtp']);
+
+        $checks = app(ProductionPreflight::class)->run();
+        foreach (['MAIL_HOST', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD', 'MAIL_SCHEME', 'MAIL_FROM_ADDRESS'] as $label) {
+            $this->assertSame('PASS', $this->check($checks, $label)['status']);
         }
     }
 
@@ -368,7 +431,15 @@ class ProductionReadinessTest extends TestCase
                 ...array_keys(config('cms.production_path_variables')),
                 'CMS_MEDIA_APPLICATION_MAX_KB', 'CMS_MEDIA_UPLOAD_MAX_KB', 'CMS_MEDIA_IMPORT_MAX_KB',
             ], true),
-            'mail.default' => 'log',
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.host' => 'smtp.example.test',
+            'mail.mailers.smtp.port' => 587,
+            'mail.mailers.smtp.username' => 'website-user',
+            'mail.mailers.smtp.password' => 'test-password-not-a-real-secret',
+            'mail.mailers.smtp.scheme' => 'smtp',
+            'mail.from.address' => 'website@pianissimo-production.de',
+            'contact.recipient' => 'sebastian@pianissimo-production.de',
+            'contact.allowed_origin' => 'https://pianissimo-production.de',
         ]);
     }
 

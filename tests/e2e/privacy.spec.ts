@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { ready } from "./helpers";
-test("contact validates locally; media consent gates and unloads embeds", async ({
+test("contact sends or exposes the email fallback; media consent gates embeds", async ({
   page,
 }) => {
   await page.addInitScript(() => {if(!sessionStorage.getItem('qa-consent-start')){localStorage.clear();sessionStorage.setItem('qa-consent-start','1')}});
@@ -20,6 +20,25 @@ test("contact validates locally; media consent gates and unloads embeds", async 
     }
     return route.continue();
   });
+  let contactShouldFail = false;
+  let contactRequests = 0;
+  await page.route("**/api/contact", async (route) => {
+    contactRequests++;
+    expect(route.request().url()).toBe("http://127.0.0.1:8080/api/contact");
+    const payload = route.request().postDataJSON() as Record<string, string>;
+    expect(payload.name).toBe("Local QA");
+    expect(payload.email).toBe("qa@example.invalid");
+    expect(payload.message.length).toBeGreaterThanOrEqual(10);
+    expect(payload.website).toBe("");
+    expect(Number(payload.started_at)).toBeGreaterThan(0);
+    await route.fulfill({
+      status: contactShouldFail ? 503 : 200,
+      contentType: "application/json",
+      body: JSON.stringify(contactShouldFail
+        ? { ok: false, message: "Your message could not be sent." }
+        : { ok: true, message: "Your message has been sent." }),
+    });
+  });
   await page.goto("/directing/");
   await page.locator("html.js").waitFor();
   await page.evaluate(() => document.fonts.ready);
@@ -31,19 +50,30 @@ test("contact validates locally; media consent gates and unloads embeds", async 
   await page.reload();
   await expect(page.getByText("Your privacy choices")).toBeHidden();
   await page.locator("header [data-contact]").click();
-  await page.locator("#contact-form button[type=submit]").click();
-  await expect(page.locator("#contact-form .form-status")).toBeEmpty();
-  await page.getByLabel("Your name", { exact: true }).fill("Local QA");
-  await page
-    .getByLabel("Email address", { exact: true })
-    .fill("qa@example.invalid");
-  await page
-    .getByLabel("Your message", { exact: true })
-    .fill("A local validation test. Do not send.");
-  await page.getByRole("button", { name: "Check message" }).click();
-  await expect(page.locator(".form-status")).toContainText(
-    "Nothing has been sent",
+  await expect(page.getByLabel("Name", { exact: true })).toHaveAttribute("maxlength", "120");
+  await expect(page.getByLabel("Email", { exact: true })).toHaveAttribute("maxlength", "254");
+  await expect(page.getByLabel("Message", { exact: true })).toHaveAttribute("maxlength", "15000");
+  await expect(page.locator("#contact-form .contact-privacy a")).toHaveAttribute("href", "/privacy/");
+  const fallback = page.getByRole("link", { name: "Email Sebastian directly" });
+  await expect(fallback).toHaveAttribute(
+    "href",
+    "mailto:sebastian@pianissimo-production.de",
   );
+  await page.getByLabel("Name", { exact: true }).fill("Local QA");
+  await page.getByLabel("Email", { exact: true }).fill("qa@example.invalid");
+  await page.getByLabel("Message", { exact: true }).fill("A detailed project inquiry for the contact API.");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.locator("#contact-form .form-status")).toHaveText("Thank you. Your message has been sent.");
+  await page.keyboard.press("Escape");
+  contactShouldFail = true;
+  await page.locator("header [data-contact]").click();
+  await page.getByLabel("Name", { exact: true }).fill("Local QA");
+  await page.getByLabel("Email", { exact: true }).fill("qa@example.invalid");
+  await page.getByLabel("Message", { exact: true }).fill("A second detailed inquiry that must fail safely.");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.locator("#contact-form .form-status")).toContainText("could not be sent");
+  await expect(fallback).toBeVisible();
+  expect(contactRequests).toBe(2);
   await page.keyboard.press("Escape");
   await page.locator('[data-project-card][data-project="leaving-earth"]').click();
   await page.locator("#project-dialog [data-activate-film]").click();

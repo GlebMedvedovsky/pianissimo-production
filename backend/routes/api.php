@@ -2,7 +2,11 @@
 
 use App\Http\Controllers\ProductionPublisherController;
 use App\Http\Controllers\DraftPreviewPublisherController;
+use App\Http\Controllers\ContactController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/contact', [ContactController::class, 'store'])
+    ->middleware('throttle:contact');
 
 Route::prefix('publisher/v1')
     ->middleware(['publisher.auth', 'throttle:publisher'])

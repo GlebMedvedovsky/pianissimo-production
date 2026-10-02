@@ -1,13 +1,13 @@
 <?php
 
 return [
-    // Publisher endpoints are server-to-server only. No browser origin is
-    // authorized and no wildcard CORS response may be emitted.
-    'paths' => [],
-    'allowed_methods' => [],
-    'allowed_origins' => [],
+    // Only the public contact endpoint accepts a browser origin. Publisher
+    // endpoints remain server-to-server and never receive CORS headers.
+    'paths' => ['api/contact'],
+    'allowed_methods' => ['POST', 'OPTIONS'],
+    'allowed_origins' => [env('CONTACT_ALLOWED_ORIGIN', 'http://127.0.0.1:4321')],
     'allowed_origins_patterns' => [],
-    'allowed_headers' => [],
+    'allowed_headers' => ['Accept', 'Content-Type'],
     'exposed_headers' => [],
     'max_age' => 0,
     'supports_credentials' => false,

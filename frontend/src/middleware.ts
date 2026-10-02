@@ -2,7 +2,8 @@ import {defineMiddleware} from 'astro:middleware';
 import {previewContent} from './lib/content/preview';
 
 const backend=(import.meta.env.CMS_PREVIEW_BACKEND_URL||'http://127.0.0.1:8080').replace(/\/$/,'');
-const blocked=(message:string,status=403)=>new Response(`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Website-Vorschau</title><body><main><h1>Website-Vorschau nicht verfügbar</h1><p>${message.replace(/[&<>"']/g,value=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[value]!))}</p><p><a href="${backend}/admin">Zurück zum CMS</a></p></main></body></html>`,{status,headers:{'content-type':'text/html; charset=UTF-8','cache-control':'private, no-store, max-age=0','x-robots-tag':'noindex, nofollow, noarchive'}});
+const cmsReturn=import.meta.env.PROD?'':`<p><a href="${backend}/admin">Zurück zum CMS</a></p>`;
+const blocked=(message:string,status=403)=>new Response(`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Website-Vorschau</title><body><main><h1>Website-Vorschau nicht verfügbar</h1><p>${message.replace(/[&<>"']/g,value=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[value]!))}</p>${cmsReturn}</main></body></html>`,{status,headers:{'content-type':'text/html; charset=UTF-8','cache-control':'private, no-store, max-age=0','x-robots-tag':'noindex, nofollow, noarchive'}});
 
 export const onRequest=defineMiddleware(async(context,next)=>{
  const pathname=context.url.pathname;

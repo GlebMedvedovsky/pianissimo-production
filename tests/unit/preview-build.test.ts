@@ -85,11 +85,13 @@ test("package preview builds real Astro routes with the private preview shell", 
       assert.match(html, /data-draft-preview="true"/);
       assert.match(html, /Entwurfs-Vorschau/);
       assert.match(html, /noindex, nofollow/);
+      assert.doesNotMatch(html, /LOCAL PROTOTYPE|PENDING REVIEW|Local prototype|delivery is disabled/i);
       assert.doesNotMatch(html, /release-image-480\.webp/);
       for (const match of html.matchAll(/\/(media\/preview\/[A-Za-z0-9._~!$&*+,;=:@%/-]+)/g)) {
         assert.ok(declared.has(match[1]!.split(/[?#]/, 1)[0]!), `preview references undeclared media: ${match[1]}`);
       }
     }
+    assert.equal(await readFile(resolve(output, "robots.txt"), "utf8"), "User-agent: *\nDisallow: /\n");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

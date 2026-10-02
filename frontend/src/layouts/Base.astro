@@ -24,6 +24,8 @@ interface Props {
 }
 const { title, section = 'home', theme = 'dark', content = activeContent, description = content.site.description } = Astro.props;
 const draftPreview = Astro.locals.draftPreview ?? (import.meta.env.PIANISSIMO_PREVIEW_BUILD === '1' ? { cmsUrl: '/admin' } : undefined);
+const publicationBuild = import.meta.env.PIANISSIMO_PUBLICATION_BUILD === '1';
+const robots = publicationBuild && !draftPreview ? 'index, follow' : 'noindex, nofollow';
 ---
 <!doctype html>
 <html
@@ -37,7 +39,7 @@ const draftPreview = Astro.locals.draftPreview ?? (import.meta.env.PIANISSIMO_PR
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="robots" content="noindex, nofollow" />
+    <meta name="robots" content={robots} />
     <meta name="description" content={description} />
     <meta name="theme-color" content={theme === 'light' ? '#F3F0EA' : '#141414'} />
     <meta property="og:title" content={title ? `${title} — Pianissimo Production` : content.site.title} />
@@ -59,7 +61,7 @@ const draftPreview = Astro.locals.draftPreview ?? (import.meta.env.PIANISSIMO_PR
     {section !== 'home' && <div hidden data-hero-parking><MediaSlot name="hero" content={content} /></div>}
     <Header section={section} content={content} />
     <main id="content"><slot /></main>
-    <footer class="site-footer"><div class="footer-wordmark">PIANISSIMO <span>PRODUCTION</span></div><div><span>© {new Date().getFullYear()} Sebastian Greim</span><a href="/legal/">Legal Notice</a><a href="/privacy/">Privacy Policy</a><button data-consent-settings>Cookie Settings</button><span class="prototype-label">Portfolio</span></div></footer>
+    <footer class="site-footer"><div class="footer-wordmark">PIANISSIMO <span>PRODUCTION</span></div><div><span>© {new Date().getFullYear()} Sebastian Greim</span><a href="/legal/">Legal Notice</a><a href="/privacy/">Privacy Policy</a><button data-consent-settings>Cookie Settings</button><span class="portfolio-label">Portfolio</span></div></footer>
     <Dialogs content={content} />
     <Player />
     <ProjectTemplates context={section === 'directing' ? 'directing' : 'music'} content={content} />

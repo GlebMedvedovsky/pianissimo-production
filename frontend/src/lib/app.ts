@@ -309,7 +309,10 @@ document.addEventListener("click", (event) => {
   const el = event.target as Element;
   const contact = el.closest("[data-contact]");
   if (contact) {
-    document.querySelector<HTMLDialogElement>("#contact-dialog")!.showModal();
+    const dialog = document.querySelector<HTMLDialogElement>("#contact-dialog")!;
+    const startedAt = dialog.querySelector<HTMLInputElement>('[name="started_at"]');
+    if (startedAt) startedAt.value = String(Date.now());
+    dialog.showModal();
   }
   const close = el.closest("[data-close-dialog]");
   if (close) close.closest("dialog")?.close();
@@ -326,13 +329,38 @@ document.addEventListener("click", (event) => {
     );
   }
 });
-document.addEventListener("submit", (event) => {
+document.addEventListener("submit", async (event) => {
   const form = event.target as HTMLFormElement;
   if (form.id !== "contact-form") return;
   event.preventDefault();
-  if (form.reportValidity())
-    form.querySelector(".form-status")!.textContent =
-      "Your message is ready. Nothing has been sent: delivery is disabled in this local prototype.";
+  if (!form.reportValidity() || form.dataset.pending === "true") return;
+
+  const status = form.querySelector<HTMLElement>(".form-status")!;
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+  form.dataset.pending = "true";
+  form.setAttribute("aria-busy", "true");
+  submit.disabled = true;
+  status.textContent = "Sending your message…";
+  try {
+    const response = await fetch(form.dataset.contactEndpoint!, {
+      method: "POST",
+      credentials: "omit",
+      cache: "no-store",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(new FormData(form))),
+    });
+    if (!response.ok) throw new Error("Contact request failed");
+    status.textContent = "Thank you. Your message has been sent.";
+    form.reset();
+    const startedAt = form.elements.namedItem("started_at") as HTMLInputElement | null;
+    if (startedAt) startedAt.value = String(Date.now());
+  } catch {
+    status.textContent = "Your message could not be sent. Please use the email link below.";
+  } finally {
+    delete form.dataset.pending;
+    form.removeAttribute("aria-busy");
+    submit.disabled = false;
+  }
 });
 window.addEventListener("pageshow", () =>
   document.documentElement.classList.remove("is-loading"),

@@ -167,8 +167,72 @@ final class ProductionPreflight
             $this->add($checks, preg_match('/^[A-Za-z0-9_.-]+\.ya?ml$/D', $workflow) === 1, 'CMS_PREVIEW_WORKFLOW', 'a workflow filename is required for package previews');
             $this->add($checks, strlen($token) >= 32 && strlen($token) <= 512 && preg_match('/\s/', $token) !== 1, 'CMS_GITHUB_TOKEN', 'an Actions:write token is required for package previews');
         }
-        $this->add($checks, config('mail.default') === 'log', 'MAIL_MAILER', 'must remain log');
-        $this->record($checks, 'PASS', 'External side effects', 'no SMTP, analytics or tracking action is performed');
+        $mailDefault = config('mail.default');
+        $this->add(
+            $checks,
+            ! in_array($mailDefault, ['log', 'array', null, ''], true),
+            'MAIL_MAILER',
+            'must use a real configured delivery transport; log and array mailers are not production-ready',
+        );
+        if ($mailDefault === 'smtp') {
+            $smtpHost = config('mail.mailers.smtp.host');
+            $smtpPort = config('mail.mailers.smtp.port');
+            $smtpUsername = config('mail.mailers.smtp.username');
+            $smtpPassword = config('mail.mailers.smtp.password');
+            $smtpScheme = config('mail.mailers.smtp.scheme');
+
+            $this->add(
+                $checks,
+                is_string($smtpHost) && trim($smtpHost) !== '',
+                'MAIL_HOST',
+                'a non-empty SMTP host is required',
+            );
+            $this->add(
+                $checks,
+                filter_var($smtpPort, FILTER_VALIDATE_INT, [
+                    'options' => ['min_range' => 1, 'max_range' => 65_535],
+                ]) !== false,
+                'MAIL_PORT',
+                'an integer SMTP port from 1 through 65535 is required',
+            );
+            $this->add(
+                $checks,
+                is_string($smtpUsername) && trim($smtpUsername) !== '',
+                'MAIL_USERNAME',
+                'a non-empty SMTP username is required',
+            );
+            $this->add(
+                $checks,
+                is_string($smtpPassword) && trim($smtpPassword) !== '',
+                'MAIL_PASSWORD',
+                'a non-empty SMTP password is required',
+            );
+            $this->add(
+                $checks,
+                in_array($smtpScheme, ['smtp', 'smtps'], true),
+                'MAIL_SCHEME',
+                'must be smtp or smtps for this Laravel mail transport',
+            );
+        }
+        $this->add(
+            $checks,
+            filter_var(config('mail.from.address'), FILTER_VALIDATE_EMAIL) !== false,
+            'MAIL_FROM_ADDRESS',
+            'a valid server-controlled sender address is required',
+        );
+        $this->add(
+            $checks,
+            filter_var(config('contact.recipient'), FILTER_VALIDATE_EMAIL) !== false,
+            'CONTACT_RECIPIENT',
+            'a valid server-controlled recipient address is required',
+        );
+        $this->add(
+            $checks,
+            config('contact.allowed_origin') === 'https://pianissimo-production.de',
+            'CONTACT_ALLOWED_ORIGIN',
+            'must exactly match the HTTPS public Pianissimo origin',
+        );
+        $this->record($checks, 'PASS', 'Preflight side effects', 'no message is sent by this read-only check');
 
         return $checks;
     }

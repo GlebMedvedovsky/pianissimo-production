@@ -1,0 +1,14 @@
+---
+interface Props {
+  text: string;
+}
+
+const { text } = Astro.props;
+const paragraphs = text
+  .replace(/\r\n?/g, '\n')
+  .split(/\n[\t ]*\n+/)
+  .filter((paragraph) => paragraph.trim().length > 0);
+---
+<div class="legal-copy">
+  {paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+</div>

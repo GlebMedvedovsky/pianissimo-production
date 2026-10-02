@@ -21,7 +21,7 @@ const tracks = project.tracks
       {cover && project.id !== 'kinnhakenhank' && <img src={'/' + cover.path} width={cover.width} height={cover.height} alt={cover.alt} />}
       <p class="eyebrow">{project.productionType} {project.year && ` / ${project.year}`}</p>
       <h1>{project.title}</h1>
-      {project.presentationStatus === 'placeholder' && <p class="prototype-note">Temporary cover. Further project material is forthcoming.</p>}
+      {project.presentationStatus === 'placeholder' && <p class="project-note">Temporary cover. Further project material is forthcoming.</p>}
       <dl>{project.credits.toSorted((a, b) => Number(b.role === 'Director') - Number(a.role === 'Director')).map(c => <div><dt>{c.role}</dt><dd>{c.name}</dd></div>)}</dl>
     </div>
     <div class="detail-story">

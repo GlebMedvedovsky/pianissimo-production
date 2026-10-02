@@ -10,6 +10,9 @@ const localPath = (relative) =>
 
 const publicationBuild = process.env.PIANISSIMO_PUBLICATION_BUILD === "1";
 const previewBuild = process.env.PIANISSIMO_PREVIEW_BUILD === "1";
+const contactApiUrl = publicationBuild
+  ? "https://admin.pianissimo-production.de/api/contact"
+  : "http://127.0.0.1:8080/api/contact";
 const previewAssetBase = process.env.PIANISSIMO_PREVIEW_ASSET_BASE;
 const publicationManifestPath = process.env.PIANISSIMO_MANIFEST_PATH;
 const publicationPublicDir = process.env.PIANISSIMO_PUBLIC_DIR;
@@ -139,6 +142,8 @@ export default defineConfig({
   server: { host: "127.0.0.1", port: 4321 },
   vite: {
     define: {
+      "import.meta.env.PIANISSIMO_CONTACT_API_URL": JSON.stringify(contactApiUrl),
+      "import.meta.env.PIANISSIMO_PUBLICATION_BUILD": JSON.stringify(publicationBuild ? "1" : "0"),
       "import.meta.env.PIANISSIMO_PREVIEW_BUILD": JSON.stringify(previewBuild ? "1" : "0"),
     },
     plugins: [manifestModule, privateLocalMaterials, audioFixtures],

@@ -23,7 +23,8 @@ import {
 const repositoryRoot = resolve(process.cwd());
 const frontendRoot = resolve(repositoryRoot, "frontend");
 const localBuildRoot = resolve(repositoryRoot, ".local-builds");
-const staticPublicFiles = ["favicon.svg", "robots.txt"] as const;
+const staticPublicFiles = ["favicon.svg"] as const;
+const publicationRobots = "User-agent: *\nAllow: /\n";
 
 const exists = async (path: string) => Boolean(await lstat(path).catch(() => null));
 
@@ -62,6 +63,7 @@ const copyStaticPublicFiles = async (targetRoot: string) => {
     await mkdir(dirname(target), { recursive: true });
     await copyFile(source, target);
   }
+  await writeFile(resolve(targetRoot, "robots.txt"), publicationRobots, { flag: "wx" });
 };
 
 const copyPackageMedia = async (

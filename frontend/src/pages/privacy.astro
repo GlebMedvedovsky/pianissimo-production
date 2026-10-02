@@ -1,4 +1,6 @@
 ---
-import Base from '../layouts/Base.astro';import {content} from '../lib/content/data';
+import Base from '../layouts/Base.astro';
+import PlainText from '../components/PlainText.astro';
+import {content} from '../lib/content/data';
 ---
-<Base title="Privacy policy" section="legal"><article class="legal-page"><p class="eyebrow">LOCAL PROTOTYPE · PENDING REVIEW</p><h1>Your <em>privacy.</em></h1><p>{content.site.legal.privacy}</p><button class="text-link" data-consent-settings>Open media settings ↗</button></article></Base>
+<Base title="Privacy policy" section="legal"><article class="legal-page"><p class="eyebrow">PRIVACY INFORMATION</p><h1>Your <em>privacy.</em></h1><PlainText text={content.site.legal.privacy} /><button class="text-link" data-consent-settings>Open media settings ↗</button></article></Base>
