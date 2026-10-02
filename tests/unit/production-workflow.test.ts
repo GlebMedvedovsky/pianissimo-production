@@ -49,6 +49,10 @@ function workflowJob(workflow: string) {
   return { document, job: document.jobs.build };
 }
 
+function remoteShellBlocks(workflow: string) {
+  return [...workflow.matchAll(/<<'REMOTE'\n([\s\S]*?)^          REMOTE$/gm)].map((match) => match[1]);
+}
+
 test("production workflow is gated, pinned, read-only, isolated, and transfers through strict SSH", async () => {
   const workflow = await readWorkflow();
   const { document } = workflowJob(workflow);
@@ -158,6 +162,19 @@ test("production workflow pins host identity, confines partial cleanup, and uses
   assert.match(workflow, /rm -f -- "\$root\/\$part"/);
   assert.doesNotMatch(workflow, /rm -rf[^\n]*REMOTE_INCOMING_ROOT/);
   assert.doesNotMatch(workflow, /echo\s+[^\n]*(?:SSH_PRIVATE_KEY_MATERIAL|SSH_KNOWN_HOSTS_MATERIAL)/);
+});
+
+test("production Netcup remote blocks avoid unavailable shell commands", async () => {
+  const workflow = await readWorkflow();
+  const remoteBlocks = remoteShellBlocks(workflow);
+  assert.equal(remoteBlocks.length, 4);
+  const remoteShell = remoteBlocks.join("\n");
+  for (const command of ["awk", "stat", "unlink", "df"])
+    assert.doesNotMatch(remoteShell, new RegExp(`\\b${command}\\b`));
+  assert.match(remoteShell, /part_digest="\$\(sha256sum "\$root\/\$part"\)"/);
+  assert.match(remoteShell, /part_actual="\$\{part_digest%% \*\}"/);
+  assert.match(remoteShell, /final_digest="\$\(sha256sum "\$root\/\$final"\)"/);
+  assert.match(remoteShell, /final_actual="\$\{final_digest%% \*\}"/);
 });
 
 test("production temporary paths are initialized only at runner step time", async () => {

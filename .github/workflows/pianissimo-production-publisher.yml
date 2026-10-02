@@ -319,10 +319,14 @@ jobs:
           test -f "$root/.pianissimo-production-incoming" && test ! -L "$root/.pianissimo-production-incoming"
           test "$(cat "$root/.pianissimo-production-incoming")" = "pianissimo-production-incoming-v1"
           test -f "$root/$part" && test ! -L "$root/$part"
-          test "$(sha256sum "$root/$part" | awk '{print $1}')" = "$expected"
+          part_digest="$(sha256sum "$root/$part")"
+          part_actual="${part_digest%% *}"
+          test "$part_actual" = "$expected"
           if test -e "$root/$final" || test -L "$root/$final"; then
             test -f "$root/$final" && test ! -L "$root/$final"
-            test "$(sha256sum "$root/$final" | awk '{print $1}')" = "$expected"
+            final_digest="$(sha256sum "$root/$final")"
+            final_actual="${final_digest%% *}"
+            test "$final_actual" = "$expected"
             rm -f -- "$root/$part"
           else
             mv -- "$root/$part" "$root/$final"
