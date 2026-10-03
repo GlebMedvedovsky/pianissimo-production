@@ -165,9 +165,6 @@ export async function validatePublicationPackage(
   if (!CREATED_AT.test(String(publication.createdAt))) throw new Error("Invalid publication timestamp.");
   if (!Array.isArray(publication.media)) throw new Error("Publication media inventory is required.");
 
-  const canonicalManifestBytes = `${canonicalJson(manifestValue)}\n`;
-  if (manifestBytes !== canonicalManifestBytes)
-    throw new Error("manifest.json is not the immutable canonical Task 2 payload.");
   const manifestSha256 = sha256(manifestBytes);
   if (manifestSha256 !== publication.manifestSha256)
     throw new Error("Publication manifest SHA-256 mismatch.");

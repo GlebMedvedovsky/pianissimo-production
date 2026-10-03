@@ -23,7 +23,12 @@ import { validateReleaseTextReferences } from "../../scripts/release-reference-c
 const localBuildRoot = resolve(".local-builds");
 const mediaBytes = Buffer.from("deterministic-public-release-image");
 
-async function createPackage(testRoot: string) {
+type PackageOptions = {
+  prepareManifest?: (manifest: any) => void;
+  serializeManifest?: (manifest: any) => string;
+};
+
+async function createPackage(testRoot: string, options: PackageOptions = {}) {
   const packageRoot = resolve(testRoot, "package");
   await mkdir(resolve(packageRoot, "media"), { recursive: true });
   const manifest = structuredClone(releaseFixture) as any;
@@ -33,7 +38,8 @@ async function createPackage(testRoot: string) {
   manifest.site.mediaSlots.hero.image = "release-image";
   manifest.site.legal.notice = "First legal line\ncontinued legal line\n\nSecond legal <strong>section</strong>.";
   manifest.site.legal.privacy = "First privacy paragraph.\n\nSecond privacy line\nwith a meaningful break.";
-  const manifestBytes = `${canonicalJson(manifest)}\n`;
+  options.prepareManifest?.(manifest);
+  const manifestBytes = options.serializeManifest?.(manifest) ?? `${canonicalJson(manifest)}\n`;
   const manifestSha256 = sha256(manifestBytes);
   const media = [
     {
@@ -83,6 +89,66 @@ async function withRoot(run: (root: string) => Promise<void>) {
     await rm(root, { recursive: true, force: true });
   }
 }
+
+test("publication package accepts SHA-bound PHP scientific float notation", async () => {
+  await withRoot(async (root) => {
+    const scientific = await createPackage(resolve(root, "scientific"), {
+      prepareManifest: (manifest) => {
+        manifest.assets[0]!.width = 6.63e-5;
+        manifest.assets[0]!.height = 1.53e-5;
+        manifest.assets[0]!.crop.x = 6.3e-6;
+      },
+      serializeManifest: (manifest) => {
+        const nodeJson = canonicalJson(manifest);
+        const replacements = [
+          ['"width":0.0000663', '"width":6.63e-5'],
+          ['"height":0.0000153', '"height":1.53e-5'],
+          ['"x":0.0000063', '"x":6.3e-6'],
+        ] as const;
+        let phpJson = nodeJson;
+        for (const [decimal, scientific] of replacements) {
+          assert.ok(phpJson.includes(decimal), `missing Node float representation ${decimal}`);
+          phpJson = phpJson.replace(decimal, scientific);
+        }
+        return `${phpJson}\n`;
+      },
+    });
+
+    const validated = await validatePublicationPackage(scientific.packageRoot);
+    assert.match(validated.manifestBytes, /6\.63e-5/);
+    assert.match(validated.manifestBytes, /1\.53e-5/);
+    assert.match(validated.manifestBytes, /6\.3e-6/);
+    assert.notEqual(validated.manifestBytes, `${canonicalJson(validated.manifest)}\n`);
+    assert.equal(validated.manifest.assets[0]!.width, 0.0000663);
+
+    const tamperedBytes = validated.manifestBytes.replace("6.63e-5", "6.64e-5");
+    assert.notEqual(tamperedBytes, validated.manifestBytes);
+    await writeFile(resolve(scientific.packageRoot, "manifest.json"), tamperedBytes);
+    await assert.rejects(
+      validatePublicationPackage(scientific.packageRoot),
+      /manifest SHA-256 mismatch/,
+    );
+  });
+});
+
+test("publication package still rejects malformed and schema-invalid manifests", async () => {
+  await withRoot(async (root) => {
+    const malformed = await createPackage(resolve(root, "malformed"), {
+      serializeManifest: () => '{"schemaVersion":',
+    });
+    await assert.rejects(
+      validatePublicationPackage(malformed.packageRoot),
+      /must contain valid JSON/,
+    );
+
+    const schemaInvalid = await createPackage(resolve(root, "schema-invalid"), {
+      prepareManifest: (manifest) => {
+        manifest.mode = "invalid";
+      },
+    });
+    await assert.rejects(validatePublicationPackage(schemaInvalid.packageRoot));
+  });
+});
 
 test("publication package rejects manifest and deterministic package digest mismatches", async () => {
   await withRoot(async (root) => {
