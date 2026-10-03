@@ -17,6 +17,7 @@
     "preview": "npm run preview --workspace frontend",
     "check": "npm run check --workspace frontend && tsc --noEmit -p tsconfig.json",
     "test": "node scripts/run-ts.mjs --test",
+    "test:publication-cross-runtime": "node scripts/php-node-publication-regression.mjs",
     "test:e2e": "playwright test",
     "content:validate": "node scripts/run-ts.mjs scripts/validate-content.ts",
     "content:release": "node scripts/run-ts.mjs scripts/validate-content.ts --release",

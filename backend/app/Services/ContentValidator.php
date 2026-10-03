@@ -13,18 +13,82 @@ class ContentValidator
     public const KINNHAKENHANK_TRAILER_ASSET_ID='local-f-87d401c4a58387a5';
     public const KINNHAKENHANK_TRAILER_SHA256='fab8ab6335ef8c48b9c070b434f915c5f62a301570ee510e8bc11165f2803252';
 
+    /**
+     * Restore JSON object semantics lost by json_decode(..., true).
+     *
+     * Only empty lists at schema-declared object positions are ambiguous. Non-empty
+     * lists are preserved so the schema validator can reject genuine type errors.
+     */
+    public function normalizeJsonObjectSlots(array $manifest): array
+    {
+        return $this->normalizeJsonObjectSlotsAgainstSchema($manifest,$this->schema());
+    }
+
+    private function normalizeJsonObjectSlotsAgainstSchema(array $manifest, object $schema): array
+    {
+        $normalized=$this->normalizeJsonValue($manifest,$schema);
+
+        return is_array($normalized)?$normalized:$manifest;
+    }
+
+    private function normalizeJsonValue(mixed $value, object $schema): mixed
+    {
+        $schema=$this->matchingSchema($schema,$value);
+        $types=(array)($schema->type??[]);
+        if(in_array('object',$types,true)){
+            $properties=$schema->properties??null;
+            if(is_array($value)){
+                if(array_is_list($value))return $value===[]?(object)[]:$value;
+                foreach($value as $key=>$item){
+                    $propertySchema=is_object($properties)?($properties->{$key}??null):null;
+                    if(is_object($propertySchema))$value[$key]=$this->normalizeJsonValue($item,$propertySchema);
+                }
+            }elseif(is_object($value)){
+                foreach(get_object_vars($value) as $key=>$item){
+                    $propertySchema=is_object($properties)?($properties->{$key}??null):null;
+                    if(is_object($propertySchema))$value->{$key}=$this->normalizeJsonValue($item,$propertySchema);
+                }
+            }
+
+            return $value;
+        }
+        if(in_array('array',$types,true) && is_array($value) && is_object($schema->items??null)){
+            foreach($value as $key=>$item)$value[$key]=$this->normalizeJsonValue($item,$schema->items);
+        }
+
+        return $value;
+    }
+
+    private function matchingSchema(object $schema, mixed $value): object
+    {
+        if(!is_array($schema->anyOf??null))return $schema;
+        foreach($schema->anyOf as $candidate){
+            if(!is_object($candidate))continue;
+            $types=(array)($candidate->type??[]);
+            if($value===null && in_array('null',$types,true))return $candidate;
+            if(in_array('object',$types,true) && (is_object($value) || (is_array($value) && ($value===[] || !array_is_list($value)))))return $candidate;
+            if(in_array('array',$types,true) && is_array($value))return $candidate;
+        }
+
+        return $schema;
+    }
+
+    private function schema(): object
+    {
+        $contents=file_get_contents(config('cms.schema'));
+        if($contents===false)throw new DomainException('Manifest-Schema konnte nicht gelesen werden.');
+        $schema=json_decode($contents,false,512,JSON_THROW_ON_ERROR);
+        if(!is_object($schema))throw new DomainException('Manifest-Schema ist ungültig.');
+
+        return $schema;
+    }
+
     public function validate(array $m, bool $release = false, bool $checkFiles = true, string $policy = self::POLICY_PUBLICATION): void
     {
         if (!in_array($policy,[self::POLICY_PUBLICATION,self::POLICY_DRAFT_PREVIEW],true)) throw new DomainException('Unbekannte Validierungsrichtlinie.');
-        // json_decode(..., true) cannot distinguish {} from []; restore known object slots.
-        foreach ($m['projects']??[] as $i=>$p) {
-            foreach (['memberships','platformLinks','externalLinks'] as $key) if (isset($p[$key])) $m['projects'][$i][$key]=(object)$p[$key];
-        }
-        foreach ($m['tracks']??[] as $i=>$t) if (isset($t['platformOverrides'])) $m['tracks'][$i]['platformOverrides']=(object)$t['platformOverrides'];
-        if (isset($m['site']['artistLinks'])) $m['site']['artistLinks']=(object)$m['site']['artistLinks'];
-        if (isset($m['site']['profileLinks'])) $m['site']['profileLinks']=(object)$m['site']['profileLinks'];
-        $schema=json_decode(file_get_contents(config('cms.schema')));
-        $result=(new Validator())->validate(json_decode(json_encode($m, JSON_THROW_ON_ERROR)), $schema);
+        $schema=$this->schema();
+        $normalized=$this->normalizeJsonObjectSlotsAgainstSchema($m,$schema);
+        $result=(new Validator())->validate(json_decode(json_encode($normalized, JSON_THROW_ON_ERROR)), $schema);
         if (!$result->isValid()) {
             $errors=(new ErrorFormatter())->format($result->error());
             throw new DomainException('Manifest-Schema: '.json_encode($errors, JSON_UNESCAPED_UNICODE));

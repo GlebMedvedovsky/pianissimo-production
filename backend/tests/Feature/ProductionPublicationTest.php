@@ -23,7 +23,10 @@ class ProductionPublicationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->root = storage_path('framework/testing/production-publication-'.bin2hex(random_bytes(5)));
+        $crossRuntimeRoot = getenv('PUBLICATION_CROSS_RUNTIME_ROOT');
+        $this->root = is_string($crossRuntimeRoot) && $crossRuntimeRoot !== ''
+            ? $crossRuntimeRoot
+            : storage_path('framework/testing/production-publication-'.bin2hex(random_bytes(5)));
         $this->mediaRoot = $this->root.DIRECTORY_SEPARATOR.'allowed-media';
         $this->source = $this->mediaRoot.DIRECTORY_SEPARATOR.'release-image.jpg';
         File::ensureDirectoryExists($this->mediaRoot);
@@ -40,7 +43,9 @@ class ProductionPublicationTest extends TestCase
 
     protected function tearDown(): void
     {
-        File::deleteDirectory($this->root);
+        if (getenv('PUBLICATION_CROSS_RUNTIME_ROOT') === false) {
+            File::deleteDirectory($this->root);
+        }
         parent::tearDown();
     }
 
@@ -66,6 +71,135 @@ class ProductionPublicationTest extends TestCase
         $this->assertSame($first->publication_id, $second->publication_id);
         $this->assertSame($first->package_sha256, $second->package_sha256);
         $this->assertSame(1, ProductionPublication::count());
+    }
+
+    public function test_canonical_manifest_preserves_recursive_json_object_and_array_types(): void
+    {
+        $payload = $this->payload('json-types');
+        $audioSource = $this->mediaRoot.DIRECTORY_SEPARATOR.'release-audio.mp3';
+        file_put_contents($audioSource, 'deterministic-public-release-audio');
+        $audioSha = hash_file('sha256', $audioSource);
+        $payload['manifest']['assets'][] = [
+            'id' => 'release-audio',
+            'type' => 'audio',
+            'path' => 'media/release-audio.mp3',
+            'duration' => 1,
+            'alt' => 'Release audio fixture',
+            'crop' => ['x' => 50, 'y' => 50],
+            'origin' => 'Dedicated production package test fixture',
+            'source' => 'Generated test bytes',
+            'state' => 'approved',
+            'sha256' => $audioSha,
+        ];
+        $payload['media'][] = [
+            'assetId' => 'release-audio',
+            'type' => 'audio',
+            'publicPath' => 'media/release-audio.mp3',
+            'sourcePath' => $audioSource,
+            'sha256' => $audioSha,
+            'size' => filesize($audioSource),
+        ];
+        $payload['manifest']['projects'] = [[
+            'id' => 'json-types',
+            'slug' => 'json-types',
+            'title' => 'JSON types',
+            'synopsis' => 'Canonical object and array regression fixture',
+            'status' => 'published',
+            'order' => 1,
+            'productionType' => 'Test fixture',
+            'year' => null,
+            'credits' => [],
+            'categories' => [],
+            'memberships' => (object) [],
+            'awards' => [],
+            'gallery' => [],
+            'externalFilm' => null,
+            'platformLinks' => (object) [
+                'tidal' => 'https://tidal.com/album/json-types',
+                'spotify' => 'https://open.spotify.com/album/json-types',
+            ],
+            'tracks' => [],
+            'sourceIds' => [],
+            'externalLinks' => (object) [],
+        ]];
+        $payload['manifest']['tracks'] = [[
+            'id' => 'json-types-track',
+            'title' => 'JSON types track',
+            'audioAssetId' => 'release-audio',
+            'duration' => 1,
+            'peaks' => [],
+            'genres' => [],
+            'emotions' => [],
+            'platformOverrides' => (object) [],
+            'status' => 'published',
+            'libraryVisible' => true,
+        ]];
+        $payload['manifest']['site']['artistLinks'] = (object) [];
+        $payload['manifest']['site']['profileLinks'] = (object) [];
+        $payload['manifest']['assets'][0]['width'] = 1.0;
+        $payload['manifest']['assets'][0]['height'] = 6.63e-5;
+
+        $releaseManifest = $payload['manifest'];
+        $payload['manifest'] = json_decode(
+            json_encode($releaseManifest, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $first = $this->packager()->prepare($payload);
+        $manifestPath = $this->packageDirectory($first).DIRECTORY_SEPARATOR.'manifest.json';
+        $manifestBytes = file_get_contents($manifestPath);
+        $this->assertIsString($manifestBytes);
+        $this->assertStringContainsString('"memberships":{}', $manifestBytes);
+        $this->assertStringContainsString('"externalLinks":{}', $manifestBytes);
+        $this->assertStringContainsString('"platformOverrides":{}', $manifestBytes);
+        $this->assertStringContainsString('"artistLinks":{}', $manifestBytes);
+        $this->assertStringContainsString('"profileLinks":{}', $manifestBytes);
+        $this->assertStringContainsString('"awards":[]', $manifestBytes);
+        $this->assertStringContainsString('"peaks":[]', $manifestBytes);
+        $this->assertStringContainsString('"width":1.0', $manifestBytes);
+        $this->assertStringContainsString('"height":6.63e-5', $manifestBytes);
+        $spotifyPosition = strpos($manifestBytes, '"spotify":"https://open.spotify.com/album/json-types"');
+        $tidalPosition = strpos($manifestBytes, '"tidal":"https://tidal.com/album/json-types"');
+        $this->assertNotFalse($spotifyPosition);
+        $this->assertNotFalse($tidalPosition);
+        $this->assertLessThan($tidalPosition, $spotifyPosition);
+
+        $decoded = json_decode($manifestBytes, flags: JSON_THROW_ON_ERROR);
+        $this->assertIsArray($decoded->projects);
+        $this->assertIsObject($decoded->projects[0]->memberships);
+        $this->assertIsObject($decoded->projects[0]->externalLinks);
+        $this->assertIsArray($decoded->projects[0]->awards);
+        $this->assertIsObject($decoded->tracks[0]->platformOverrides);
+        $this->assertIsArray($decoded->tracks[0]->peaks);
+        $this->assertIsObject($decoded->site->artistLinks);
+        $this->assertIsObject($decoded->site->contacts);
+        $this->assertIsObject($decoded->site->legal);
+        $this->assertIsObject($decoded->site->consent);
+        $this->assertIsObject($decoded->site->analytics);
+        $this->assertIsObject($decoded->site->mediaSlots);
+        $this->assertIsObject($decoded->site->mediaSlots->hero);
+
+        $schemaInput = json_decode($manifestBytes, true, flags: JSON_THROW_ON_ERROR);
+        app(\App\Services\ContentValidator::class)->validate(
+            $schemaInput,
+            true,
+            false,
+            \App\Services\ContentValidator::POLICY_PUBLICATION,
+        );
+
+        $reordered = $payload;
+        $reordered['manifest'] = $releaseManifest;
+        $reordered['manifest'] = array_reverse($reordered['manifest'], true);
+        $reordered['manifest']['projects'][0]['platformLinks'] = (object) [
+            'spotify' => 'https://open.spotify.com/album/json-types',
+            'tidal' => 'https://tidal.com/album/json-types',
+        ];
+        $second = $this->packager()->prepare($reordered);
+        $this->assertSame($first->getKey(), $second->getKey());
+        $this->assertSame($first->manifest_sha256, $second->manifest_sha256);
+        $this->assertSame($first->package_sha256, $second->package_sha256);
+        $this->assertSame($manifestBytes, file_get_contents($manifestPath));
+
     }
 
     public function test_conflicting_content_for_claimed_identity_is_rejected(): void

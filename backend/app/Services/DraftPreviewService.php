@@ -105,18 +105,8 @@ class DraftPreviewService
             $asset['path']='media/preview/'.$entry['file'];
         }
         unset($asset);
-        foreach($manifest['projects'] as &$project){
-            $project['memberships']=(object)($project['memberships']??[]);
-            $project['platformLinks']=(object)($project['platformLinks']??[]);
-            if(array_key_exists('externalLinks',$project))$project['externalLinks']=(object)($project['externalLinks']??[]);
-        }
-        unset($project);
-        foreach($manifest['tracks'] as &$track)$track['platformOverrides']=(object)($track['platformOverrides']??[]);
-        unset($track);
-        if(array_key_exists('artistLinks',$manifest['site']))$manifest['site']['artistLinks']=(object)($manifest['site']['artistLinks']??[]);
-        if(array_key_exists('profileLinks',$manifest['site']))$manifest['site']['profileLinks']=(object)($manifest['site']['profileLinks']??[]);
         if(isset($manifest['site']['analytics']))$manifest['site']['analytics']['enabled']=false;
-        return $manifest;
+        return app(ContentValidator::class)->normalizeJsonObjectSlots($manifest);
     }
 
     public function media(DraftPreview $preview,string $file): array

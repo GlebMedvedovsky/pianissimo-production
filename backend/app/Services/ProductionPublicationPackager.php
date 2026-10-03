@@ -32,6 +32,7 @@ class ProductionPublicationPackager
         if (! is_array($manifest) || ($manifest['mode'] ?? null) !== 'release') {
             throw new DomainException('Production packages require an explicit release-mode manifest.');
         }
+        $manifest = $this->validator->normalizeJsonObjectSlots($manifest);
 
         // File checks are performed against the exact supplied inventory below.
         $this->validator->validate($manifest, true, false, ContentValidator::POLICY_PUBLICATION);
@@ -441,7 +442,13 @@ class ProductionPublicationPackager
     private function canonicalize(mixed $value): mixed
     {
         if (is_object($value)) {
-            $value = get_object_vars($value);
+            $properties = get_object_vars($value);
+            ksort($properties, SORT_STRING);
+            foreach ($properties as $key => $item) {
+                $properties[$key] = $this->canonicalize($item);
+            }
+
+            return (object) $properties;
         }
         if (! is_array($value)) {
             return $value;

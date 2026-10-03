@@ -131,6 +131,71 @@ test("publication package accepts SHA-bound PHP scientific float notation", asyn
   });
 });
 
+test("publication package schema preserves empty objects and arrays recursively", async () => {
+  await withRoot(async (root) => {
+    const valid = await createPackage(resolve(root, "valid-types"), {
+      prepareManifest: (manifest) => {
+        manifest.projects = [{
+          id: "json-types",
+          slug: "json-types",
+          title: "JSON types",
+          synopsis: "Canonical object and array regression fixture",
+          status: "published",
+          order: 1,
+          productionType: "Test fixture",
+          year: null,
+          credits: [],
+          categories: [],
+          memberships: {},
+          awards: [],
+          gallery: [],
+          externalFilm: null,
+          platformLinks: {},
+          tracks: [],
+          sourceIds: [],
+          externalLinks: {},
+        }];
+        manifest.site.artistLinks = {};
+        manifest.site.profileLinks = {};
+      },
+    });
+
+    const validated = await validatePublicationPackage(valid.packageRoot);
+    assert.deepEqual(validated.manifest.projects[0]!.memberships, {});
+    assert.deepEqual(validated.manifest.projects[0]!.awards, []);
+    assert.deepEqual(validated.manifest.projects[0]!.platformLinks, {});
+    assert.deepEqual(validated.manifest.site.artistLinks, {});
+
+    const corrupted = await createPackage(resolve(root, "corrupted-types"), {
+      prepareManifest: (manifest) => {
+        manifest.projects = [{
+          id: "json-types",
+          slug: "json-types",
+          title: "JSON types",
+          synopsis: "Corrupted object type fixture",
+          status: "published",
+          order: 1,
+          productionType: "Test fixture",
+          year: null,
+          credits: [],
+          categories: [],
+          memberships: {},
+          awards: [],
+          gallery: [],
+          externalFilm: null,
+          platformLinks: [],
+          tracks: [],
+          sourceIds: [],
+        }];
+      },
+    });
+    await assert.rejects(
+      validatePublicationPackage(corrupted.packageRoot),
+      /expected object, received array/,
+    );
+  });
+});
+
 test("publication package still rejects malformed and schema-invalid manifests", async () => {
   await withRoot(async (root) => {
     const malformed = await createPackage(resolve(root, "malformed"), {

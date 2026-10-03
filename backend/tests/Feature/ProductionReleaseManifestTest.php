@@ -51,6 +51,81 @@ class ProductionReleaseManifestTest extends TestCase
         app(ManifestExporter::class)->releasePackage();
     }
 
+    public function test_schema_driven_normalization_restores_every_nested_object_slot_without_changing_lists(): void
+    {
+        $manifest = [
+            'sources' => [],
+            'assets' => [['crop' => []]],
+            'projects' => [[
+                'credits' => [],
+                'categories' => [],
+                'memberships' => [
+                    'music' => ['crop' => []],
+                    'directing' => ['crop' => []],
+                ],
+                'awards' => [],
+                'gallery' => [],
+                'externalFilm' => [],
+                'platformLinks' => [],
+                'tracks' => [],
+                'sourceIds' => [],
+                'genres' => [],
+                'emotions' => [],
+                'externalLinks' => [],
+            ]],
+            'tracks' => [[
+                'peaks' => [],
+                'genres' => [],
+                'emotions' => [],
+                'platformOverrides' => [],
+            ]],
+            'site' => [
+                'biography' => [],
+                'cv' => [],
+                'contacts' => [],
+                'legal' => [],
+                'artistLinks' => [],
+                'profileLinks' => [],
+                'socialLinks' => [],
+                'collective' => [],
+                'consent' => [],
+                'analytics' => [],
+                'mediaSlots' => [
+                    'hero' => [],
+                    'composerMenu' => [],
+                    'directingMenu' => [],
+                    'about' => [],
+                ],
+            ],
+        ];
+
+        $normalized = app(ContentValidator::class)->normalizeJsonObjectSlots($manifest);
+
+        $this->assertIsObject($normalized['assets'][0]['crop']);
+        $this->assertIsObject($normalized['projects'][0]['memberships']['music']['crop']);
+        $this->assertIsObject($normalized['projects'][0]['memberships']['directing']['crop']);
+        $this->assertIsObject($normalized['projects'][0]['externalFilm']);
+        $this->assertIsObject($normalized['projects'][0]['platformLinks']);
+        $this->assertIsObject($normalized['projects'][0]['externalLinks']);
+        $this->assertIsObject($normalized['tracks'][0]['platformOverrides']);
+        foreach (['contacts', 'legal', 'artistLinks', 'profileLinks', 'collective', 'consent', 'analytics'] as $key) {
+            $this->assertIsObject($normalized['site'][$key]);
+        }
+        foreach (['hero', 'composerMenu', 'directingMenu', 'about'] as $key) {
+            $this->assertIsObject($normalized['site']['mediaSlots'][$key]);
+        }
+        foreach (['sources', 'biography', 'cv'] as $key) {
+            $this->assertIsArray($key === 'sources' ? $normalized[$key] : $normalized['site'][$key]);
+        }
+        foreach (['credits', 'categories', 'awards', 'gallery', 'tracks', 'sourceIds', 'genres', 'emotions'] as $key) {
+            $this->assertIsArray($normalized['projects'][0][$key]);
+        }
+        foreach (['peaks', 'genres', 'emotions'] as $key) {
+            $this->assertIsArray($normalized['tracks'][0][$key]);
+        }
+        $this->assertIsArray($normalized['site']['socialLinks']);
+    }
+
     public function test_kinnhakenhank_release_policy_accepts_only_exact_v2_id_and_sha(): void
     {
         $validator = app(ContentValidator::class);
