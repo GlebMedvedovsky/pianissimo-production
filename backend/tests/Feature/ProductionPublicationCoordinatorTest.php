@@ -27,6 +27,8 @@ class ProductionPublicationCoordinatorTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const LEGACY_ASSET_ID = 'legacy-unreferenced-temporary';
+
     private string $root;
     private string $exportRoot;
     private User $admin;
@@ -57,6 +59,11 @@ class ProductionPublicationCoordinatorTest extends TestCase
             $project['sourceIds'] = $privateSourceIds[$project['id']] ?? [];
         }
         unset($project);
+        $legacyAsset = $manifest['assets'][0];
+        $legacyAsset['id'] = self::LEGACY_ASSET_ID;
+        $legacyAsset['state'] = 'temporary';
+        $legacyAsset['alt'] = 'Unreferenced legacy test fixture';
+        $manifest['assets'][] = $legacyAsset;
         $this->root = storage_path('framework/testing/production-coordinator-'.bin2hex(random_bytes(5)));
         $this->exportRoot = storage_path('app/private/production-coordinator-tests/'.basename($this->root));
         File::ensureDirectoryExists($this->root);
@@ -108,12 +115,20 @@ class ProductionPublicationCoordinatorTest extends TestCase
             $acceptedManifest['projects'],
             fn (array $project): bool => $project['sourceIds'] !== [],
         ), 'The accepted CMS manifest must retain its private source references before release normalization.');
+        $acceptedLegacyAsset = collect($acceptedManifest['assets'])->firstWhere('id', self::LEGACY_ASSET_ID);
+        $this->assertIsArray($acceptedLegacyAsset);
+        $this->assertSame('temporary', $acceptedLegacyAsset['state']);
         Http::fake(['*' => Http::response(null, 204)]);
 
         $publication = app(ProductionPublicationCoordinator::class)->publish($this->admin->id);
-        $releaseManifest = json_decode((string) file_get_contents(
-            config('cms.publication_package_root').'/'.$publication->package_path.'/manifest.json'
-        ), true, flags: JSON_THROW_ON_ERROR);
+        $packageRoot = config('cms.publication_package_root').'/'.$publication->package_path;
+        $releaseManifest = json_decode((string) file_get_contents($packageRoot.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+        $publicationMetadata = json_decode((string) file_get_contents($packageRoot.'/publication.json'), true, flags: JSON_THROW_ON_ERROR);
+        $expectedAssetIds = $this->referencedAssetIds($acceptedManifest);
+        $releaseAssetIds = array_column($releaseManifest['assets'], 'id');
+        $inventoryAssetIds = array_column($publicationMetadata['media'], 'assetId');
+        sort($releaseAssetIds);
+        sort($inventoryAssetIds);
 
         $this->assertSame(ProductionPublicationStatus::Dispatching, $publication->status);
         $this->assertSame($accepted['candidateHash'], $publication->candidate_hash);
@@ -126,6 +141,9 @@ class ProductionPublicationCoordinatorTest extends TestCase
             array_values(array_filter(array_column($releaseManifest['projects'], 'sourceIds'))),
             'Every release project must omit private source references.',
         );
+        $this->assertNotContains(self::LEGACY_ASSET_ID, $releaseAssetIds);
+        $this->assertSame($expectedAssetIds, $releaseAssetIds);
+        $this->assertSame($expectedAssetIds, $inventoryAssetIds);
         Http::assertSentCount(1);
         Http::assertSent(fn (Request $request): bool =>
             $request->url() === 'https://api.github.com/repos/owner/pianissimo/actions/workflows/pianissimo-production-publisher.yml/dispatches'
@@ -142,6 +160,60 @@ class ProductionPublicationCoordinatorTest extends TestCase
         $this->assertSame($publication->getKey(), $duplicate->getKey());
         $this->assertSame(1, ProductionPublication::count());
         Http::assertSentCount(1);
+    }
+
+    public function test_referenced_temporary_media_still_blocks_production(): void
+    {
+        $manifest = $this->readActiveManifest();
+        $assetId = $this->referencedAssetIds($manifest)[0] ?? null;
+        $this->assertIsString($assetId);
+        MediaAsset::query()->findOrFail($assetId)->update(['state' => 'temporary']);
+        foreach ($manifest['assets'] as &$asset) {
+            if ($asset['id'] === $assetId) $asset['state'] = 'temporary';
+        }
+        unset($asset);
+        $this->writeActiveManifest($manifest);
+        $this->acceptChangedState();
+        Http::fake();
+
+        try {
+            app(ProductionPublicationCoordinator::class)->publish($this->admin->id);
+            $this->fail('Referenced temporary media must block production publication.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('temporäre Medien', $exception->getMessage());
+        }
+
+        $this->assertSame(0, ProductionPublication::count());
+        Http::assertNothingSent();
+    }
+
+    public function test_accepted_manifest_hash_is_verified_before_legacy_media_projection(): void
+    {
+        $accepted = $this->acceptChangedState();
+        $originalHash = hash_file('sha256', config('cms.manifest'));
+        $plan = json_decode((string) file_get_contents(
+            config('cms.frontend_apply_state').'/plans/'.$accepted['planHash'].'.json'
+        ), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame($originalHash, $plan['resultingManifestHash']);
+
+        $manifest = $this->readActiveManifest();
+        foreach ($manifest['assets'] as &$asset) {
+            if ($asset['id'] === self::LEGACY_ASSET_ID) $asset['alt'] = 'Tampered after acceptance';
+        }
+        unset($asset);
+        $this->writeActiveManifest($manifest);
+        $this->assertNotSame($originalHash, hash_file('sha256', config('cms.manifest')));
+        Http::fake();
+
+        try {
+            app(ProductionPublicationCoordinator::class)->publish($this->admin->id);
+            $this->fail('Tampering with unreferenced legacy media must invalidate the accepted manifest receipt.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('aktive Website-Stand stimmt nicht', $exception->getMessage());
+        }
+
+        $this->assertSame(0, ProductionPublication::count());
+        Http::assertNothingSent();
     }
 
     public function test_unaccepted_state_is_rejected_before_publication_or_dispatch(): void
@@ -289,5 +361,46 @@ class ProductionPublicationCoordinatorTest extends TestCase
         $applied = app(FrontendPublication::class)->apply($review['planHash'], $this->admin->id);
         $this->assertSame('success', $applied['status']);
         return ['candidateHash' => $candidate['hash'], 'planHash' => $review['planHash']];
+    }
+
+    private function readActiveManifest(): array
+    {
+        return json_decode((string) file_get_contents(config('cms.manifest')), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    private function writeActiveManifest(array $manifest): void
+    {
+        file_put_contents(
+            config('cms.manifest'),
+            json_encode(app(ContentValidator::class)->normalizeJsonObjectSlots($manifest), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n",
+        );
+    }
+
+    private function referencedAssetIds(array $manifest): array
+    {
+        $ids = [];
+        $add = static function (mixed $assetId) use (&$ids): void {
+            if (is_string($assetId) && $assetId !== '') $ids[$assetId] = true;
+        };
+        foreach ($manifest['projects'] as $project) {
+            foreach ($project['memberships'] as $membership) {
+                $add($membership['coverAssetId']);
+                $add($membership['hoverAssetId'] ?? null);
+            }
+            foreach ($project['gallery'] as $assetId) $add($assetId);
+            $add($project['localTrailerAssetId'] ?? null);
+            $add($project['localTrailerPosterId'] ?? null);
+        }
+        foreach ($manifest['tracks'] as $track) $add($track['audioAssetId']);
+        foreach ($manifest['site']['mediaSlots'] as $slot) {
+            $add($slot['image']);
+            $add($slot['video']);
+            $add($slot['poster']);
+        }
+        $add($manifest['site']['collective']['logoAssetId'] ?? null);
+        $ids = array_keys($ids);
+        sort($ids);
+
+        return $ids;
     }
 }

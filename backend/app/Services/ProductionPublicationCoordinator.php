@@ -151,14 +151,7 @@ final class ProductionPublicationCoordinator
         if (! is_array($manifest)) {
             throw new DomainException('Der aktive Website-Stand ist ungültig.');
         }
-        $manifest['mode'] = 'release';
-        $manifest['sources'] = [];
-        if (is_array($manifest['projects'] ?? null)) {
-            foreach ($manifest['projects'] as &$project) {
-                if (is_array($project)) $project['sourceIds'] = [];
-            }
-            unset($project);
-        }
+        $manifest = $this->productionProjection($manifest);
         $this->validator->validate($manifest, true, true, ContentValidator::POLICY_PUBLICATION);
 
         $sourceRevision = (string) config('cms.source_revision');
@@ -173,6 +166,63 @@ final class ProductionPublicationCoordinator
             'manifest' => $manifest,
             'media' => $withMedia ? $this->mediaInventory($manifest) : [],
         ];
+    }
+
+    private function productionProjection(array $manifest): array
+    {
+        $manifest['mode'] = 'release';
+        $manifest['sources'] = [];
+        if (is_array($manifest['projects'] ?? null)) {
+            foreach ($manifest['projects'] as &$project) {
+                if (is_array($project)) $project['sourceIds'] = [];
+            }
+            unset($project);
+        }
+
+        $referencedAssets = [];
+        $reference = static function (mixed $assetId) use (&$referencedAssets): void {
+            if (is_string($assetId) && $assetId !== '') $referencedAssets[$assetId] = true;
+        };
+        $projects = is_array($manifest['projects'] ?? null) ? $manifest['projects'] : [];
+        foreach ($projects as $project) {
+            if (! is_array($project)) continue;
+            $memberships = is_array($project['memberships'] ?? null) ? $project['memberships'] : [];
+            foreach ($memberships as $membership) {
+                if (! is_array($membership)) continue;
+                $reference($membership['coverAssetId'] ?? null);
+                $reference($membership['hoverAssetId'] ?? null);
+            }
+            if (is_array($project['gallery'] ?? null)) {
+                foreach ($project['gallery'] as $assetId) $reference($assetId);
+            }
+            $reference($project['localTrailerAssetId'] ?? null);
+            $reference($project['localTrailerPosterId'] ?? null);
+        }
+        $tracks = is_array($manifest['tracks'] ?? null) ? $manifest['tracks'] : [];
+        foreach ($tracks as $track) {
+            if (is_array($track)) $reference($track['audioAssetId'] ?? null);
+        }
+        $site = is_array($manifest['site'] ?? null) ? $manifest['site'] : [];
+        $mediaSlots = is_array($site['mediaSlots'] ?? null) ? $site['mediaSlots'] : [];
+        foreach ($mediaSlots as $slot) {
+            if (! is_array($slot)) continue;
+            $reference($slot['image'] ?? null);
+            $reference($slot['video'] ?? null);
+            $reference($slot['poster'] ?? null);
+        }
+        $collective = is_array($site['collective'] ?? null) ? $site['collective'] : [];
+        $reference($collective['logoAssetId'] ?? null);
+
+        if (is_array($manifest['assets'] ?? null)) {
+            $manifest['assets'] = array_values(array_filter(
+                $manifest['assets'],
+                static fn (mixed $asset): bool => is_array($asset)
+                    && is_string($asset['id'] ?? null)
+                    && isset($referencedAssets[$asset['id']]),
+            ));
+        }
+
+        return $manifest;
     }
 
     private function verifiedApplyReceipt(AuditEvent $event): array
