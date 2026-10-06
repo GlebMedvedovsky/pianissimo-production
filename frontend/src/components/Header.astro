@@ -16,9 +16,9 @@ const managedSocial=(content.site.socialLinks||[]).filter(link=>link.visible).so
  <button data-contact aria-label="Contact by email" title="Contact"><Icon name="mail"/></button>
  {managedSocial.length>0?managedSocial.map(link=><a href={link.url} target="_blank" rel="noreferrer" aria-label={link.label} title={link.label}><Icon name={socialIcon[link.provider]||'arrowUpRight'}/></a>):<>
   {contacts.instagram&&<a href={contacts.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram"><Icon name="instagram"/></a>}
-  {profiles.musicHub&&<a href={profiles.musicHub} target="_blank" rel="noreferrer" aria-label="Music Hub" title="Music Hub"><Icon name="music"/></a>}
-  {profiles.imdb&&<a class="profile-link" href={profiles.imdb} target="_blank" rel="noreferrer" aria-label="IMDb profile">IMDb</a>}
-  {profiles.crewUnited&&<a class="profile-link profile-link--crew" href={profiles.crewUnited} target="_blank" rel="noreferrer" aria-label="Crew United profile">Crew</a>}
+  {profiles.musicHub&&<a href={profiles.musicHub} target="_blank" rel="noreferrer" aria-label="Music Hub" title="Music Hub"><Icon name="musicHub"/></a>}
+  {profiles.imdb&&<a class="profile-link" href={profiles.imdb} target="_blank" rel="noreferrer" aria-label="IMDb profile" title="IMDb profile"><Icon name="imdb"/></a>}
+  {profiles.crewUnited&&<a class="profile-link profile-link--crew" href={profiles.crewUnited} target="_blank" rel="noreferrer" aria-label="Crew United profile" title="Crew United profile"><Icon name="crewUnited"/></a>}
  </>}
  {contacts.samples&&<a href={contacts.samples} target="_blank" rel="noreferrer" aria-label="Samples unterm Sofa" title="Samples unterm Sofa"><Icon name="sofa"/></a>}
 </aside>

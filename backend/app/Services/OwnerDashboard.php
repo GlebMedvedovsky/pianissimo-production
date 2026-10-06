@@ -27,8 +27,9 @@ class OwnerDashboard
         if(($analytics['provider']??'none')==='none' || !($analytics['enabled']??false))$hints[]=$this->hint('analytics','Analytics ist nicht eingerichtet','Derzeit werden keine Besucherstatistiken erhoben.',Analytics::getUrl());
         if($review['kind']==='stale')$hints[]=$this->hint('review-stale','Geprüfte Änderungen sind nicht mehr aktuell','Der Entwurf wurde nach der Prüfung geändert. Bitte prüfen Sie die Änderungen erneut.',Publication::getUrl());
         try{$packageMedia=count(app(ManifestExporter::class)->package(checkFiles:false)['manifest']['assets']);}catch(\Throwable){$packageMedia=null;}
+        $production=app(ProductionPublicationCoordinator::class)->status();
         return [
-            'status'=>['hasDraftChanges'=>$hasDraftChanges,'lastApply'=>$lastApply?->created_at,'review'=>$review['kind'],'productionConnected'=>false],
+            'status'=>['hasDraftChanges'=>$hasDraftChanges,'lastApply'=>$lastApply?->created_at,'review'=>$review['kind'],'productionConnected'=>$production['state']!=='not_configured','production'=>$production],
             'counts'=>['projects'=>Project::count(),'tracks'=>Track::count(),'media'=>MediaAsset::count(),'packageMedia'=>$packageMedia,'cv'=>CvEntry::count()],
             'links'=>['publication'=>Publication::getUrl(),'preview'=>route('draft-preview.open'),'projectIndex'=>ProjectResource::getUrl('index'),'projectCreate'=>ProjectResource::getUrl('create'),'trackIndex'=>TrackResource::getUrl('index'),'mediaIndex'=>MediaAssetResource::getUrl('index'),'mediaCreate'=>MediaAssetResource::getUrl('create'),'cvIndex'=>CvEntryResource::getUrl('index'),'about'=>About::getUrl(),'social'=>Social::getUrl(),'seo'=>Seo::getUrl(),'analytics'=>Analytics::getUrl()],
             'seo'=>['indexing'=>str_starts_with((string)($seo['robots']??''),'index')?'Freigegeben':'Ausgeschlossen','description'=>empty($seo['description'])?'Fehlt':'Vorhanden','canonical'=>empty($seo['canonicalBase'])?'Fehlt':'Vorhanden','og'=>empty($seo['ogAssetId'])?'Fehlt':'Vorhanden'],

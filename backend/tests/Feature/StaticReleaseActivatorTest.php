@@ -11,6 +11,7 @@ use App\Services\StaticReleaseArchive;
 use App\Services\StaticReleaseFilesystem;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Mockery;
@@ -24,6 +25,7 @@ class StaticReleaseActivatorTest extends TestCase
     private string $root;
     private string $incoming;
     private string $static;
+    private string $public;
 
     protected function setUp(): void
     {
@@ -31,14 +33,18 @@ class StaticReleaseActivatorTest extends TestCase
         $this->root = storage_path('framework/testing/static-release-'.bin2hex(random_bytes(5)));
         $this->incoming = $this->root.DIRECTORY_SEPARATOR.'incoming';
         $this->static = $this->root.DIRECTORY_SEPARATOR.'static';
+        $this->public = $this->root.DIRECTORY_SEPARATOR.'httpdocs';
         File::ensureDirectoryExists($this->incoming);
         File::ensureDirectoryExists($this->static.DIRECTORY_SEPARATOR.'releases');
+        File::ensureDirectoryExists($this->public);
+        file_put_contents($this->public.DIRECTORY_SEPARATOR.'index.html', 'previous-public-site');
         file_put_contents($this->incoming.DIRECTORY_SEPARATOR.StaticReleaseFilesystem::INCOMING_MARKER, StaticReleaseFilesystem::INCOMING_MARKER_CONTENT."\n");
         file_put_contents($this->static.DIRECTORY_SEPARATOR.StaticReleaseFilesystem::ROOT_MARKER, StaticReleaseFilesystem::ROOT_MARKER_CONTENT."\n");
         config([
             'cms.publication_driver' => 'package',
             'cms.production_incoming_root' => $this->incoming,
             'cms.static_release_root' => $this->static,
+            'cms.public_site_root' => $this->public,
         ]);
     }
 
@@ -56,6 +62,7 @@ class StaticReleaseActivatorTest extends TestCase
     {
         [$publication, $archive, $actualSha] = $this->release(1, declaredSha: str_repeat('a', 64));
         $this->expectFailure(fn () => $this->activate($publication, $archive, str_repeat('a', 64)), 'SHA-256');
+        $this->assertSame('previous-public-site', file_get_contents($this->public.DIRECTORY_SEPARATOR.'index.html'));
 
         [$publication, $archive, $sha] = $this->release(2);
         $wrongSequenceArchive = $this->filename(3, $publication->publication_id, $sha);
@@ -182,12 +189,20 @@ class StaticReleaseActivatorTest extends TestCase
         $this->assertSame('activated', $result['result']);
         $this->assertSame('releases/1-'.$first->publication_id, readlink($this->static.DIRECTORY_SEPARATOR.'current'));
         $this->assertSame(ProductionPublicationStatus::Active, $first->refresh()->status);
+        $this->assertStringContainsString('/_astro/app.js', file_get_contents($this->public.DIRECTORY_SEPARATOR.'index.html'));
+        $this->assertSame('release-media-1', file_get_contents($this->public.DIRECTORY_SEPARATOR.'media'.DIRECTORY_SEPARATOR.'release.jpg'));
+        $this->assertFileDoesNotExist($this->public.DIRECTORY_SEPARATOR.StaticReleaseArchive::METADATA_FILE);
+        $this->assertFileDoesNotExist($this->public.DIRECTORY_SEPARATOR.StaticReleaseArchive::FILES_FILE);
+        $this->assertFileDoesNotExist($this->public.DIRECTORY_SEPARATOR.StaticReleaseFilesystem::ARCHIVE_DIGEST_FILE);
 
         $retry = $this->activate($first, $firstArchive, $firstSha);
         $this->assertSame('already_active', $retry['result']);
 
         [$second, $secondArchive, $secondSha] = $this->release(2);
         $this->activate($second, $secondArchive, $secondSha);
+        $this->assertSame('release-media-2', file_get_contents($this->public.DIRECTORY_SEPARATOR.'media'.DIRECTORY_SEPARATOR.'release.jpg'));
+        $backup = dirname($this->public).DIRECTORY_SEPARATOR.'.pianissimo-httpdocs-previous';
+        $this->assertSame('release-media-1', file_get_contents($backup.DIRECTORY_SEPARATOR.'media'.DIRECTORY_SEPARATOR.'release.jpg'));
         $this->assertSame(1, ProductionPublication::query()->where('status', ProductionPublicationStatus::Active->value)->count());
         $this->assertSame(ProductionPublicationStatus::Superseded, $first->refresh()->status);
         $this->assertSame($second->getKey(), ProductionPublication::currentActive()?->getKey());
@@ -358,6 +373,58 @@ class StaticReleaseActivatorTest extends TestCase
         $this->app->instance(StaticReleaseFilesystem::class, $filesystem);
         $this->expectFailure(fn () => $this->activate($second, $secondArchive, $secondSha), 'simulated');
         $this->assertSame($previous, readlink($this->static.DIRECTORY_SEPARATOR.'current'));
+        $this->assertSame($first->getKey(), ProductionPublication::currentActive()?->getKey());
+        $this->assertSame('release-media-1', file_get_contents($this->public.DIRECTORY_SEPARATOR.'media'.DIRECTORY_SEPARATOR.'release.jpg'));
+    }
+
+    public function test_partial_public_swap_failure_records_ambiguous_state_and_fails_closed(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('Linux directory and symlink semantics are verified in the backend runtime.');
+        }
+        [$publication, $archive, $sha] = $this->release(1);
+        $moves = 0;
+        $filesystem = Mockery::mock(Filesystem::class);
+        $filesystem->shouldReceive('moveDirectory')->times(3)->andReturnUsing(
+            static function (string $from, string $to) use (&$moves): bool {
+                $moves++;
+                return $moves === 1 ? @rename($from, $to) : false;
+            }
+        );
+        $this->app->instance(
+            \App\Services\PhysicalPublicSiteDeployer::class,
+            new \App\Services\PhysicalPublicSiteDeployer($filesystem),
+        );
+
+        $this->expectFailure(fn () => $this->activate($publication, $archive, $sha), 'operator recovery');
+
+        $state = json_decode((string) file_get_contents(
+            $this->static.DIRECTORY_SEPARATOR.StaticReleaseFilesystem::STATE_FILE
+        ), true, flags: JSON_THROW_ON_ERROR);
+        $backup = dirname($this->public).DIRECTORY_SEPARATOR.'.pianissimo-httpdocs-previous';
+        $this->assertSame(3, $moves);
+        $this->assertSame('ambiguous', $state['status']);
+        $this->assertDirectoryDoesNotExist($this->public);
+        $this->assertSame('previous-public-site', file_get_contents($backup.DIRECTORY_SEPARATOR.'index.html'));
+    }
+
+    public function test_lifecycle_failure_restores_previous_pointer_and_physical_public_site(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('Linux symlink semantics are verified in the backend runtime.');
+        }
+        [$first, $firstArchive, $firstSha] = $this->release(1);
+        $this->activate($first, $firstArchive, $firstSha);
+        $previous = readlink($this->static.DIRECTORY_SEPARATOR.'current');
+        [$second, $secondArchive, $secondSha] = $this->release(2);
+
+        $lifecycle = Mockery::mock(ProductionPublicationService::class)->makePartial();
+        $lifecycle->shouldReceive('markActive')->once()->andThrow(new RuntimeException('simulated lifecycle failure'));
+        $this->app->instance(ProductionPublicationService::class, $lifecycle);
+
+        $this->expectFailure(fn () => $this->activate($second, $secondArchive, $secondSha), 'simulated lifecycle failure');
+        $this->assertSame($previous, readlink($this->static.DIRECTORY_SEPARATOR.'current'));
+        $this->assertSame('release-media-1', file_get_contents($this->public.DIRECTORY_SEPARATOR.'media'.DIRECTORY_SEPARATOR.'release.jpg'));
         $this->assertSame($first->getKey(), ProductionPublication::currentActive()?->getKey());
     }
 

@@ -58,10 +58,6 @@ class ProductionPublicationPackager
             $requestedBy ?? auth()->id(),
         );
 
-        if ($publication->status === ProductionPublicationStatus::Failed && $publication->failure_code === 'package_preparation_failed') {
-            $publication = $this->lifecycle->retryPreparation($publication);
-        }
-
         $final = $root.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $publication->package_path);
         $publicationBytes = $this->canonicalJson($this->publicationMetadata($publication, $inventory))."\n";
 
@@ -112,6 +108,8 @@ class ProductionPublicationPackager
             $existing = ProductionPublication::query()
                 ->where('plan_hash', $planHash)
                 ->where('source_revision', $sourceRevision)
+                ->where('status', '!=', ProductionPublicationStatus::Failed->value)
+                ->latest('attempt')
                 ->lockForUpdate()
                 ->first();
             if ($existing) {
@@ -129,6 +127,10 @@ class ProductionPublicationPackager
             }
             DB::table('production_publication_counters')->where('id', 1)->update(['next_sequence' => $sequence + 1]);
             $publicationId = strtolower((string) Str::uuid());
+            $attempt = (int) ProductionPublication::query()
+                ->where('plan_hash', $planHash)
+                ->where('source_revision', $sourceRevision)
+                ->max('attempt') + 1;
             $packagePath = 'production/'.str_pad((string) $sequence, 12, '0', STR_PAD_LEFT).'-'.$publicationId;
 
             return ProductionPublication::create([
@@ -137,6 +139,7 @@ class ProductionPublicationPackager
                 'candidate_hash' => $candidateHash,
                 'plan_hash' => $planHash,
                 'source_revision' => $sourceRevision,
+                'attempt' => $attempt,
                 'package_sha256' => $packageSha256,
                 'manifest_sha256' => $manifestSha256,
                 'package_path' => $packagePath,

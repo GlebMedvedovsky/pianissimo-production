@@ -238,7 +238,16 @@
 @media(min-width:801px) {
    html {
       --section-switch-width: 58px;
-      --section-switch-rest-width: 46px
+      --section-switch-rest-width: 46px;
+      --hero-right-axis: calc(var(--section-switch-width) + 35.5px)
+   }
+
+   .hero-controls {
+      right: calc(var(--hero-right-axis) - 22px)
+   }
+
+   .scroll-cue {
+      right: calc(var(--hero-right-axis) - 24px)
    }
 
 

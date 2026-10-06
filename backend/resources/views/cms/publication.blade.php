@@ -2,13 +2,21 @@
     <x-filament::section heading="Änderungen veröffentlichen">
         <p><strong>Speichern allein ändert die Website nicht.</strong> Öffnen Sie die Website-Vorschau für eine visuelle Kontrolle. „Änderungen prüfen“ bereitet anschließend alle notwendigen Sicherheitsprüfungen vor. Erst „Für Website übernehmen“ ändert den sichtbaren lokalen Website-Stand.</p>
         <p>„Nicht veröffentlichte Änderungen verwerfen“ setzt nur den CMS-Entwurf auf den zuletzt übernommenen Stand zurück. „Letzte Änderung zurücksetzen“ bleibt ausschließlich für einen bereits übernommenen Website-Stand.</p>
-        <ol style="list-style:decimal;padding-left:1.25rem"><li>Entwurf speichern</li><li>Website-Vorschau öffnen</li><li>Änderungen prüfen</li><li>Für Website übernehmen</li></ol>
+        <ol style="list-style:decimal;padding-left:1.25rem"><li>Entwurf speichern</li><li>Website-Vorschau öffnen</li><li>Änderungen prüfen</li><li>Für Website übernehmen</li><li>Jetzt öffentlich veröffentlichen</li></ol>
         @if(app(\App\Services\DraftPreviewService::class)->hasCurrentForUser((int)auth()->id()))
             <p role="status"><strong>Eine aktuelle private Website-Vorschau ist verfügbar.</strong></p>
         @else
             <p role="status"><strong>Noch keine aktuelle Vorschau vorhanden.</strong></p>
         @endif
-        <p>Die öffentliche Production-Website ist noch nicht verbunden.</p>
+        @php($production=app(\App\Services\ProductionPublicationCoordinator::class)->status())
+        <div role="status" wire:poll.5s>
+            <p><strong>{{ match($production['state']) {'ready'=>'Bereit zur öffentlichen Veröffentlichung','queued'=>'Veröffentlichung wird gestartet','in_progress'=>'Veröffentlichung läuft','published'=>'Erfolgreich veröffentlicht','failed'=>'Veröffentlichung fehlgeschlagen',default=>'Öffentliche Veröffentlichung noch nicht verfügbar'} }}</strong></p>
+            <p>{{ $production['message'] }}</p>
+            @if(isset($production['sequence']))<p>Veröffentlichung Nr. {{ $production['sequence'] }}</p>@endif
+            @if(isset($production['publishedAt']))<p>Veröffentlicht am {{ $production['publishedAt']->format('d.m.Y H:i') }}</p>@endif
+            @if(isset($production['lastPublishedAt']) && $production['state']!=='published')<p>Letzte erfolgreiche Veröffentlichung: Nr. {{ $production['lastPublishedSequence'] }} · {{ $production['lastPublishedAt']->format('d.m.Y H:i') }}</p>@endif
+            @if(isset($production['failureMessage']))<p role="alert">{{ $production['failureMessage'] }}</p>@endif
+        </div>
         @php($reviewState=app(\App\Services\FrontendPublication::class)->currentReview())
         @if($reviewState['kind']==='stale')
             <p role="status"><strong>Die geprüften Änderungen sind nicht mehr aktuell.</strong> Wählen Sie „Änderungen erneut prüfen“. Eine veraltete Prüfung kann nicht übernommen werden.</p>
@@ -42,6 +50,9 @@
                         <li>{{ $description }}</li>
                     @endforeach
                 </ul>
+            @endif
+            @if(($result['kind']??null)==='production')
+                <p><strong>Öffentliche Veröffentlichung Nr. {{ $result['sequence'] }} wurde gestartet.</strong></p>
             @endif
             @if(isset($result['path']))
                 <p>Der technische Paketstand wurde sicher gespeichert.</p>

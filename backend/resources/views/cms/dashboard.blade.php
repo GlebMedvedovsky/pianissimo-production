@@ -11,7 +11,12 @@
             @elseif($owner['status']['hasDraftChanges'])
                 <p>Die Änderungen wurden noch nicht geprüft.</p>
             @endif
-            <p>Die öffentliche Production-Website ist noch nicht verbunden.</p>
+            @php($production=$owner['status']['production'])
+            <p role="status" wire:poll.5s><strong>{{ match($production['state']) {'ready'=>'Bereit zur öffentlichen Veröffentlichung','queued'=>'Veröffentlichung wird gestartet','in_progress'=>'Veröffentlichung läuft','published'=>'Erfolgreich veröffentlicht','failed'=>'Veröffentlichung fehlgeschlagen',default=>'Öffentliche Veröffentlichung noch nicht verfügbar'} }}</strong><br>{{ $production['message'] }}</p>
+            @if(isset($production['sequence']))<p>Veröffentlichung Nr. {{ $production['sequence'] }}</p>@endif
+            @if(isset($production['publishedAt']))<p>Zuletzt öffentlich veröffentlicht: {{ $production['publishedAt']->format('d.m.Y H:i') }}</p>@endif
+            @if(isset($production['lastPublishedAt']) && $production['state']!=='published')<p>Letzte erfolgreiche Veröffentlichung: Nr. {{ $production['lastPublishedSequence'] }} · {{ $production['lastPublishedAt']->format('d.m.Y H:i') }}</p>@endif
+            @if(isset($production['failureMessage']))<p role="alert">{{ $production['failureMessage'] }}</p>@endif
             <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem">
                 @if($owner['status']['hasDraftChanges'])
                     <x-filament::button tag="a" :href="$owner['links']['preview']" target="_blank" rel="noopener">Website-Vorschau öffnen</x-filament::button>

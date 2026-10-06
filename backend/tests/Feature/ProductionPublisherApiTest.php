@@ -234,16 +234,13 @@ class ProductionPublisherApiTest extends TestCase
         $this->assertSame('Publisher reported a sanitized build failure. See the safe failure code.', $publication->failure_message);
         $this->assertStringNotContainsString('SUPER-SECRET', $publication->toJson());
         $retry = $this->authorized()->postJson($this->claimUrl($publication), ['runner_id' => 'runner-failure']);
-        $retry->assertOk()
-            ->assertJsonPath('status', 'dispatched')
-            ->assertJsonPath('resume.state', 'dispatched')
-            ->assertJsonPath('resume.build_required', true);
+        $retry->assertStatus(409)->assertExactJson(['message' => 'Publication claim rejected.']);
     }
 
     public function test_rerun_resume_policy_covers_each_publisher_state_and_rejects_a_different_run(): void
     {
         $this->withoutMiddleware(ThrottleRequests::class);
-        $states = ['dispatched', 'building', 'built', 'uploading', 'uploaded', 'failed', 'activating', 'active'];
+        $states = ['dispatched', 'building', 'built', 'uploading', 'uploaded', 'activating', 'active'];
         foreach ($states as $state) {
             $publication = $this->publication('resume-'.$state);
             $runner = 'github-123456';
@@ -272,13 +269,9 @@ class ProductionPublisherApiTest extends TestCase
             if ($state === 'active') {
                 $publication = $service->markActive($publication);
             }
-            if ($state === 'failed') {
-                $publication = $service->markFailed($publication->refresh(), 'workflow_failed');
-            }
-
             $response = $this->authorized()->postJson($this->claimUrl($publication), ['runner_id' => $runner]);
             $response->assertOk()->assertJsonPath('claim_result', 'already_claimed');
-            $expected = $state === 'failed' ? 'dispatched' : $state;
+            $expected = $state;
             $buildRequired = in_array($expected, ['dispatched', 'building', 'built', 'uploading'], true);
             $response->assertJsonPath('resume.state', $expected)
                 ->assertJsonPath('resume.build_required', $buildRequired)
@@ -313,11 +306,12 @@ class ProductionPublisherApiTest extends TestCase
         $failedAfterBuild = $service->markBuilt($failedAfterBuild, $archiveSha, $filesSha, $metadataSha);
         $failedAfterBuild = $service->markFailed($failedAfterBuild, 'upload_failed');
         $this->authorized()->postJson($this->claimUrl($failedAfterBuild), ['runner_id' => 'github-123456'])
-            ->assertOk()
-            ->assertJsonPath('resume.state', 'built')
-            ->assertJsonPath('release_sha256', $archiveSha)
-            ->assertJsonPath('release_files_sha256', $filesSha)
-            ->assertJsonPath('release_metadata_sha256', $metadataSha);
+            ->assertStatus(409)
+            ->assertExactJson(['message' => 'Publication claim rejected.']);
+        $failedAfterBuild->refresh();
+        $this->assertSame($archiveSha, $failedAfterBuild->release_sha256);
+        $this->assertSame($filesSha, $failedAfterBuild->release_files_sha256);
+        $this->assertSame($metadataSha, $failedAfterBuild->release_metadata_sha256);
     }
 
     public function test_dispatch_payload_is_exact_and_route_has_auth_and_rate_limit_middleware(): void

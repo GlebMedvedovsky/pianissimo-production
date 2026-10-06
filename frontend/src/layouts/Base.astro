@@ -61,7 +61,7 @@ const robots = publicationBuild && !draftPreview ? 'index, follow' : 'noindex, n
     {section !== 'home' && <div hidden data-hero-parking><MediaSlot name="hero" content={content} /></div>}
     <Header section={section} content={content} />
     <main id="content"><slot /></main>
-    <footer class="site-footer"><div class="footer-wordmark">PIANISSIMO <span>PRODUCTION</span></div><div><span>© {new Date().getFullYear()} Sebastian Greim</span><a href="/legal/">Legal Notice</a><a href="/privacy/">Privacy Policy</a><button data-consent-settings>Cookie Settings</button><span class="portfolio-label">Portfolio</span></div></footer>
+    <footer class="site-footer"><div class="footer-wordmark">PIANISSIMO <span>PRODUCTION</span></div><div><span>© {new Date().getFullYear()} Sebastian Greim</span><a href="/legal/">Legal Notice</a><a href="/privacy/">Privacy Policy</a><a href="https://www.gleb-digital.de/" target="_blank" rel="noreferrer">Web development by Gleb Medvedovskyy ↗</a><button data-consent-settings>Cookie Settings</button><span class="portfolio-label">Portfolio</span></div></footer>
     <Dialogs content={content} />
     <Player />
     <ProjectTemplates context={section === 'directing' ? 'directing' : 'music'} content={content} />

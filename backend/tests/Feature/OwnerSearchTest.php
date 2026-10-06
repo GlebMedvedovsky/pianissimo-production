@@ -57,7 +57,8 @@ class OwnerSearchTest extends TestCase
     public function test_help_search_is_help_only_and_supports_fuzzy_terms(): void
     {
         $help = app(HelpCenter::class);
-        $this->assertCount(72, $help->articles());
+        $this->assertCount(73, $help->articles());
+        $this->assertContains('Jetzt öffentlich veröffentlichen', array_column($help->articles(), 'title'));
         $this->assertContains('Galerie sortieren', array_column($help->search('galeri'), 'title'));
         $this->assertContains('Große Dateien per SFTP hochladen', array_column($help->search('sftp'), 'title'));
         $this->assertNotEmpty($help->search('verofentlichen'));

@@ -61,18 +61,6 @@ class ProductionPublicationService
                 $locked->save();
                 $this->audit($locked, ProductionPublicationStatus::Dispatched->value);
             }
-            if ($locked->status === ProductionPublicationStatus::Failed) {
-                $hasReleaseIdentity = is_string($locked->release_sha256)
-                    && is_string($locked->release_files_sha256)
-                    && is_string($locked->release_metadata_sha256);
-                $locked->status = $hasReleaseIdentity
-                    ? ProductionPublicationStatus::Built
-                    : ProductionPublicationStatus::Dispatched;
-                $locked->failure_code = null;
-                $locked->failure_message = null;
-                $locked->save();
-                $this->audit($locked, 'publisher-retry-'.$locked->status->value);
-            }
             if (! in_array($locked->status, $this->resumablePublisherStatuses(), true)) {
                 throw new DomainException('Claimed production publication cannot resume the publisher workflow.');
             }
@@ -132,6 +120,20 @@ class ProductionPublicationService
     public function markDispatching(ProductionPublication $publication): ProductionPublication
     {
         return $this->transition($publication, ProductionPublicationStatus::Dispatching);
+    }
+
+    public function beginDispatch(ProductionPublication $publication): array
+    {
+        return DB::transaction(function () use ($publication): array {
+            $locked = ProductionPublication::query()->lockForUpdate()->findOrFail($publication->getKey());
+            if ($locked->status !== ProductionPublicationStatus::Prepared) {
+                return ['publication' => $locked->refresh(), 'dispatch' => false];
+            }
+            $locked->status = ProductionPublicationStatus::Dispatching;
+            $locked->save();
+            $this->audit($locked, ProductionPublicationStatus::Dispatching->value);
+            return ['publication' => $locked->refresh(), 'dispatch' => true];
+        }, 3);
     }
 
     public function markDispatched(ProductionPublication $publication): ProductionPublication
@@ -301,19 +303,6 @@ class ProductionPublicationService
         ], true);
     }
 
-    public function retryPreparation(ProductionPublication $publication): ProductionPublication
-    {
-        $publication->refresh();
-        if ($publication->status !== ProductionPublicationStatus::Failed || $publication->failure_code !== 'package_preparation_failed') {
-            throw new DomainException('Only failed package preparation may be retried.');
-        }
-
-        return $this->transition($publication, ProductionPublicationStatus::Preparing, [
-            'failure_code' => null,
-            'failure_message' => null,
-        ]);
-    }
-
     public function markSuperseded(ProductionPublication $publication): ProductionPublication
     {
         return $this->transition($publication, ProductionPublicationStatus::Superseded);
@@ -399,7 +388,6 @@ class ProductionPublicationService
             ProductionPublicationStatus::Uploaded,
             ProductionPublicationStatus::Activating,
             ProductionPublicationStatus::Active,
-            ProductionPublicationStatus::Failed,
         ];
     }
 
@@ -410,7 +398,7 @@ class ProductionPublicationService
             $publication->publication_id,
             'status-'.$status,
             $publication->package_sha256,
-            ['sequence' => $publication->sequence, 'status' => $status],
+            ['sequence' => $publication->sequence, 'attempt' => $publication->attempt, 'status' => $status],
         );
     }
 }

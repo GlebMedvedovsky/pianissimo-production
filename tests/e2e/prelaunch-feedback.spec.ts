@@ -7,6 +7,14 @@ test("pre-launch copy, right-side Scroll control and footer spacing", async ({ p
   const cue = await page.locator(".scroll-cue").boundingBox();
   expect(cue).not.toBeNull();
   expect(cue!.x + cue!.width / 2).toBeGreaterThan(1440 * 0.75);
+  const [rail, fullscreen] = await Promise.all([
+    page.locator(".social-rail").boundingBox(),
+    page.locator("[data-hero-full]").boundingBox(),
+  ]);
+  expect(rail).not.toBeNull();
+  expect(fullscreen).not.toBeNull();
+  const centers = [rail!, fullscreen!, cue!].map(box => box.x + box.width / 2);
+  expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
   await page.locator(".scroll-cue").click();
   await expect(page).toHaveURL(/\/#main-menu$/);
   await expect.poll(() => page.evaluate(() => {
@@ -36,4 +44,13 @@ test("mobile Music Library selects have internal left spacing", async ({ page },
     );
     expect(padding).toBeGreaterThanOrEqual(10);
   }
+});
+
+test("footer includes the external developer credit", async ({ page }) => {
+  await ready(page, "/");
+  const credit = page.getByRole("link", { name: "Web development by Gleb Medvedovskyy ↗" });
+  await expect(credit).toHaveAttribute("href", "https://www.gleb-digital.de/");
+  await expect(credit).toHaveAttribute("target", "_blank");
+  await expect(credit).toHaveAttribute("rel", "noreferrer");
+  await expect(credit.locator("xpath=ancestor::footer")).toHaveClass(/site-footer/);
 });

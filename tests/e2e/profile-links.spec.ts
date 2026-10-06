@@ -14,3 +14,13 @@ test('CMS profile links, streaming profiles and collective membership render acc
  const targets=await page.locator('.social-rail > *').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return {width:box.width,height:box.height}}));
  if((await page.viewportSize())!.width<=800) for(const target of targets){expect(target.width).toBeGreaterThanOrEqual(40);expect(target.height).toBeGreaterThanOrEqual(40);}
 });
+
+test('social rail uses service icons without changing its control footprints',async({page})=>{
+ await page.goto('/',{waitUntil:'domcontentloaded'});
+ for(const name of ['Music Hub','IMDb profile','Crew United profile']){
+  await expect(page.getByRole('link',{name}).locator('svg')).toHaveCount(1);
+ }
+ const targets=await page.locator('.social-rail > *').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return {width:box.width,height:box.height}}));
+ if((await page.viewportSize())!.width<=800) for(const target of targets){expect(target.width).toBeGreaterThanOrEqual(40);expect(target.height).toBeGreaterThanOrEqual(40);}
+ else for(const target of targets){expect(target.width).toBe(33);expect(target.height).toBe(35);}
+});

@@ -2,6 +2,8 @@
 
 return [
     'api_token' => env('CMS_PUBLISHER_API_TOKEN'),
+    'production_automation_enabled' => (bool) env('CMS_PRODUCTION_AUTOMATION_ENABLED', false),
+    'production_timeout_minutes' => (int) env('CMS_PRODUCTION_TIMEOUT_MINUTES', 45),
     'github' => [
         'repository' => env('CMS_GITHUB_REPOSITORY'),
         'ref' => env('CMS_GITHUB_REF'),

@@ -6,6 +6,7 @@ use Filament\Notifications\Notification;
 use App\Services\ManifestExporter;
 use App\Services\FrontendPublication;
 use App\Services\DraftStateSnapshot;
+use App\Services\ProductionPublicationCoordinator;
 class Publication extends \Filament\Pages\Page
 {
     protected static ?int $navigationSort=30;
@@ -22,7 +23,8 @@ class Publication extends \Filament\Pages\Page
     {
         return [Action::make('help')->label('Anleitung')->url(fn()=>Help::getUrl(['article'=>'veroeffentlichung']).'#veroeffentlichung'),Action::make('websitePreview')->label('Website-Vorschau öffnen')->icon('heroicon-o-computer-desktop')->url(fn()=>route('draft-preview.open'))->openUrlInNewTab(),
             Action::make('review')->label(fn()=>app(FrontendPublication::class)->currentReview()['kind']==='stale'?'Änderungen erneut prüfen':'Änderungen prüfen')->action(fn()=> $this->review()),
-            Action::make('apply')->label('Für Website übernehmen')->color('success')->visible(fn()=>app(FrontendPublication::class)->currentReview()['kind']==='current')->requiresConfirmation()->modalHeading('Diese geprüften Änderungen wirklich für die Website übernehmen?')->modalDescription('Nur die zuvor geprüften Änderungen werden übernommen. Die öffentliche Production-Website ist noch nicht verbunden.')->action(fn()=> $this->apply()),
+            Action::make('apply')->label('Für Website übernehmen')->color('success')->visible(fn()=>app(FrontendPublication::class)->currentReview()['kind']==='current')->requiresConfirmation()->modalHeading('Diese geprüften Änderungen wirklich für die Website übernehmen?')->modalDescription('Nur die zuvor geprüften Änderungen werden übernommen. Anschließend kann dieser Stand öffentlich veröffentlicht werden.')->action(fn()=> $this->apply()),
+            Action::make('publishProduction')->label(fn()=>app(ProductionPublicationCoordinator::class)->status()['state']==='failed'?'Erneut öffentlich veröffentlichen':'Jetzt öffentlich veröffentlichen')->color('success')->icon('heroicon-o-globe-alt')->visible(fn()=>app(ProductionPublicationCoordinator::class)->status()['ready']===true)->requiresConfirmation()->modalHeading('Diesen übernommenen Stand öffentlich veröffentlichen?')->modalDescription('Der exakt übernommene und geprüfte Stand wird gebaut, erneut validiert und erst danach sicher auf der öffentlichen Website aktiviert.')->action(fn()=> $this->publishProduction()),
             Action::make('discard')->label('Nicht veröffentlichte Änderungen verwerfen')->color('danger')->visible(fn()=>app(DraftStateSnapshot::class)->hasChanges())->requiresConfirmation()->modalHeading('Nicht veröffentlichte Änderungen verwerfen?')->modalDescription(function(){try{$items=app(DraftStateSnapshot::class)->preview()['descriptions'];return "Diese Änderungen gehen verloren:\n• ".implode("\n• ",$items)."\n\nDie Website selbst wird nicht verändert.";}catch(\Throwable $e){return $e->getMessage();}})->action(fn()=> $this->discard()),
             Action::make('rollback')->label('Letzte Änderung zurücksetzen')->color('danger')->requiresConfirmation()->modalHeading('Letzte Änderung zurücksetzen?')->modalDescription(function(){try{$r=app(FrontendPublication::class)->rollbackReview((int)auth()->id());return 'Stand vom '.$r['timestamp'].' · '.count($r['affectedPaths']).' betroffene Pfade.';}catch(\Throwable $e){return $e->getMessage();}})->action(fn()=> $this->rollback()),
             ActionGroup::make([
@@ -45,6 +47,7 @@ class Publication extends \Filament\Pages\Page
     }
     public function review(): void { $this->guard(function(){app(ManifestExporter::class)->export(true,false,(int)auth()->id());$candidate=app(ManifestExporter::class)->export(false,false,(int)auth()->id());$this->result=app(FrontendPublication::class)->review($candidate['hash'],(int)auth()->id());},'Änderungen geprüft'); }
     public function apply(): void { $this->guard(function(){$review=app(FrontendPublication::class)->currentReview();if($review['kind']!=='current')throw new \DomainException('Die geprüften Änderungen sind nicht mehr aktuell. Bitte prüfen Sie die Änderungen erneut.');$this->result=['kind'=>'applied',...app(FrontendPublication::class)->apply($review['planHash'],(int)auth()->id())];},'Für Website übernommen'); }
+    public function publishProduction(): void { $this->guard(function(){$publication=app(ProductionPublicationCoordinator::class)->publish((int)auth()->id());$this->result=['kind'=>'production','sequence'=>$publication->sequence,'status'=>$publication->status->value];},'Öffentliche Veröffentlichung gestartet'); }
     public function discard(): void { $this->guard(fn()=> $this->result=['kind'=>'draft-discarded',...app(DraftStateSnapshot::class)->discard((int)auth()->id())],'Nicht veröffentlichte Änderungen verworfen'); }
     public function candidateState(): array
     {

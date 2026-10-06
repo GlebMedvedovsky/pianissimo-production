@@ -250,7 +250,12 @@ p {
     height: 35px;
     display: flex;
     align-items: center;
-    justify-content: center
+    justify-content: center;
+    transition: color 220ms ease
+}
+
+.social-rail>:focus-visible {
+    color: var(--focus)
 }
 
 .piano-mark {
@@ -471,6 +476,17 @@ p {
 .scroll-cue svg {
     width: 24px;
     height: 24px
+}
+
+.scroll-cue>span,
+.scroll-cue>svg {
+    animation: scroll-cue-pulse 3s ease-in-out infinite
+}
+
+@keyframes scroll-cue-pulse {
+    50% {
+        opacity: .68
+    }
 }
 
 .menu-about {
@@ -1582,6 +1598,13 @@ body:has(.player[hidden]) .cookie-notice {
     .scene-sticky:has(.composer-choice:hover) .music-half .media-slot,
     .scene-sticky:has(.director-choice:hover) .directing-half .media-slot {
         transform: scale(1.04)
+    }
+}
+
+@media(prefers-reduced-motion:reduce) {
+    .scroll-cue>span,
+    .scroll-cue>svg {
+        animation: none
     }
 }
 

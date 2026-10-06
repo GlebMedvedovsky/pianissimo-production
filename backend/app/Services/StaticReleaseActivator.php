@@ -17,6 +17,7 @@ class StaticReleaseActivator
         private readonly StaticReleaseFilesystem $filesystem,
         private readonly StaticReleaseArchive $archive,
         private readonly ProductionPublicationService $lifecycle,
+        private readonly PhysicalPublicSiteDeployer $publicSite,
     ) {}
 
     public function activate(string $publicationId, int|string $sequence, string $archiveFilename, string $expectedSha256, string $runnerId): array
@@ -53,13 +54,25 @@ class StaticReleaseActivator
             } else {
                 $this->stageRelease($archivePath, $releaseDirectory, $publication, $expectedSha256, $staticRoot);
             }
+            $publicDeployment = $this->publicSite->prepare($releaseDirectory, $publication);
 
             if ($current === $target && $publication->status === ProductionPublicationStatus::Active) {
+                try {
+                    $this->publicSite->activate($publicDeployment);
+                } catch (AmbiguousPublicDeploymentException $failure) {
+                    $this->recordCurrentPublicStateAmbiguous($staticRoot, $state);
+                    throw new RuntimeException('Public website activation is ambiguous; production state requires operator recovery.', previous: $failure);
+                }
                 return ['publication' => $publication, 'release' => $target, 'result' => 'already_active'];
             }
 
             $previousState = $state;
-            $previous = $this->filesystem->switchCurrent($staticRoot, $target);
+            try {
+                $previous = $this->filesystem->switchCurrent($staticRoot, $target);
+            } catch (Throwable $failure) {
+                $this->publicSite->abort($publicDeployment);
+                throw $failure;
+            }
             $nextState = [
                 'version' => 1,
                 'highestActivatedSequence' => max($highest, $identity['sequence']),
@@ -69,8 +82,21 @@ class StaticReleaseActivator
             ];
             try {
                 $this->filesystem->writeState($staticRoot, $nextState);
+                $publicDeployment = $this->publicSite->activate($publicDeployment);
                 $publication = $this->finishActivationLifecycle($publication);
             } catch (Throwable $failure) {
+                if ($failure instanceof AmbiguousPublicDeploymentException) {
+                    $this->compensatePointer($staticRoot, $previous, $previousState, $target);
+                    $this->recordAmbiguousPublicState($staticRoot, $previousState, $previous, $target);
+                    throw new RuntimeException('Public website activation is ambiguous; production state requires operator recovery.', previous: $failure);
+                }
+                try {
+                    $this->publicSite->rollback($publicDeployment);
+                } catch (Throwable) {
+                    $this->compensatePointer($staticRoot, $previous, $previousState, $target);
+                    $this->recordAmbiguousPublicState($staticRoot, $previousState, $previous, $target);
+                    throw new RuntimeException('Public website rollback failed; production state requires operator recovery.');
+                }
                 $this->compensatePointer($staticRoot, $previous, $previousState, $target);
                 throw $failure;
             }
@@ -104,9 +130,16 @@ class StaticReleaseActivator
                 throw new DomainException('Production activation state is ambiguous and requires operator recovery.');
             }
             $this->validateRetainedRelease($releaseDirectory, $publication, (string) $publication->release_sha256);
+            $publicDeployment = $this->publicSite->prepare($releaseDirectory, $publication);
             $current = $this->filesystem->currentTarget($staticRoot);
             $this->assertStateMatchesCurrent($state, $current);
             if ($current === $target && $publication->status === ProductionPublicationStatus::Active) {
+                try {
+                    $this->publicSite->activate($publicDeployment);
+                } catch (AmbiguousPublicDeploymentException $failure) {
+                    $this->recordCurrentPublicStateAmbiguous($staticRoot, $state);
+                    throw new RuntimeException('Public website activation is ambiguous; production state requires operator recovery.', previous: $failure);
+                }
                 return ['publication' => $publication, 'release' => $target, 'result' => 'already_active'];
             }
             if (! in_array($publication->status, [ProductionPublicationStatus::Superseded, ProductionPublicationStatus::RolledBack], true)) {
@@ -116,7 +149,12 @@ class StaticReleaseActivator
                 throw new DomainException('Rollback requires an existing active production release.');
             }
             $previousState = $state;
-            $previous = $this->filesystem->switchCurrent($staticRoot, $target);
+            try {
+                $previous = $this->filesystem->switchCurrent($staticRoot, $target);
+            } catch (Throwable $failure) {
+                $this->publicSite->abort($publicDeployment);
+                throw $failure;
+            }
             $nextState = [
                 'version' => 1,
                 'highestActivatedSequence' => max((int) $state['highestActivatedSequence'], $this->sequenceFromTarget($current), (int) $publication->sequence),
@@ -126,8 +164,21 @@ class StaticReleaseActivator
             ];
             try {
                 $this->filesystem->writeState($staticRoot, $nextState);
+                $publicDeployment = $this->publicSite->activate($publicDeployment);
                 $publication = $this->lifecycle->activateRollback($publication);
             } catch (Throwable $failure) {
+                if ($failure instanceof AmbiguousPublicDeploymentException) {
+                    $this->compensatePointer($staticRoot, $previous, $previousState, $target);
+                    $this->recordAmbiguousPublicState($staticRoot, $previousState, $previous, $target);
+                    throw new RuntimeException('Public website activation is ambiguous; production state requires operator recovery.', previous: $failure);
+                }
+                try {
+                    $this->publicSite->rollback($publicDeployment);
+                } catch (Throwable) {
+                    $this->compensatePointer($staticRoot, $previous, $previousState, $target);
+                    $this->recordAmbiguousPublicState($staticRoot, $previousState, $previous, $target);
+                    throw new RuntimeException('Public website rollback failed; production state requires operator recovery.');
+                }
                 $this->compensatePointer($staticRoot, $previous, $previousState, $target);
                 throw $failure;
             }
@@ -362,6 +413,31 @@ class StaticReleaseActivator
                 // The command fails closed; operators must inspect current and both markers.
             }
             throw new RuntimeException('Production activation compensation failed; state is ambiguous.');
+        }
+    }
+
+    private function recordAmbiguousPublicState(string $staticRoot, array $previousState, ?string $restored, string $attempted): void
+    {
+        try {
+            $this->filesystem->writeState($staticRoot, [
+                'version' => 1,
+                'highestActivatedSequence' => max((int) ($previousState['highestActivatedSequence'] ?? 0), $this->sequenceFromTarget($attempted)),
+                'activeRelease' => $restored,
+                'previousRelease' => $attempted,
+                'status' => 'ambiguous',
+            ]);
+        } catch (Throwable) {
+            // The activation command already fails closed; operators must inspect both physical roots.
+        }
+    }
+
+    private function recordCurrentPublicStateAmbiguous(string $staticRoot, array $state): void
+    {
+        try {
+            $state['status'] = 'ambiguous';
+            $this->filesystem->writeState($staticRoot, $state);
+        } catch (Throwable) {
+            // The activation command already fails closed; operators must inspect both physical roots.
         }
     }
 }

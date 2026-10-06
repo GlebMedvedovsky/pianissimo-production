@@ -16,6 +16,7 @@ class ProductionPublication extends Model
         return [
             'status' => ProductionPublicationStatus::class,
             'sequence' => 'integer',
+            'attempt' => 'integer',
             'active_slot' => 'integer',
             'dispatched_at' => 'immutable_datetime',
             'claimed_at' => 'immutable_datetime',
@@ -52,7 +53,7 @@ class ProductionPublication extends Model
             ProductionPublicationStatus::Uploaded => [ProductionPublicationStatus::Activating, ProductionPublicationStatus::Failed],
             ProductionPublicationStatus::Activating => [ProductionPublicationStatus::Active, ProductionPublicationStatus::Failed],
             ProductionPublicationStatus::Active => [ProductionPublicationStatus::Superseded, ProductionPublicationStatus::RolledBack],
-            ProductionPublicationStatus::Failed => [ProductionPublicationStatus::Preparing, ProductionPublicationStatus::Dispatched, ProductionPublicationStatus::Built],
+            ProductionPublicationStatus::Failed => [],
             ProductionPublicationStatus::Superseded, ProductionPublicationStatus::RolledBack => [ProductionPublicationStatus::Active],
         }, true);
     }
@@ -72,6 +73,9 @@ class ProductionPublication extends Model
             if ((int) $publication->sequence < 1) {
                 throw new DomainException('Production publication sequence must be positive.');
             }
+            if ((int) ($publication->attempt ?? 1) < 1) {
+                throw new DomainException('Production publication attempt must be positive.');
+            }
             $expectedPath = 'production/'.str_pad((string) $publication->sequence, 12, '0', STR_PAD_LEFT).'-'.$publication->publication_id;
             if ($publication->package_path !== $expectedPath) {
                 throw new DomainException('Production publication package path is not the deterministic private relative path.');
@@ -84,7 +88,7 @@ class ProductionPublication extends Model
         });
 
         static::updating(function (self $publication): void {
-            foreach (['publication_id', 'sequence', 'candidate_hash', 'plan_hash', 'source_revision', 'package_sha256', 'manifest_sha256', 'package_path', 'requested_by'] as $field) {
+            foreach (['publication_id', 'sequence', 'candidate_hash', 'plan_hash', 'source_revision', 'attempt', 'package_sha256', 'manifest_sha256', 'package_path', 'requested_by'] as $field) {
                 if ($publication->isDirty($field)) {
                     throw new DomainException("Immutable production publication field cannot change: {$field}.");
                 }

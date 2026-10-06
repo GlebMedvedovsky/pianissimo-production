@@ -167,6 +167,19 @@ final class ProductionPreflight
             $this->add($checks, preg_match('/^[A-Za-z0-9_.-]+\.ya?ml$/D', $workflow) === 1, 'CMS_PREVIEW_WORKFLOW', 'a workflow filename is required for package previews');
             $this->add($checks, strlen($token) >= 32 && strlen($token) <= 512 && preg_match('/\s/', $token) !== 1, 'CMS_GITHUB_TOKEN', 'an Actions:write token is required for package previews');
         }
+        if (config('publisher.production_automation_enabled') === true) {
+            $repository = (string) config('publisher.github.repository');
+            $ref = (string) config('publisher.github.ref');
+            $workflow = (string) config('publisher.github.workflow');
+            $token = (string) config('publisher.github.token');
+            $this->add($checks, config('cms.publication_driver') === 'package', 'CMS_PUBLICATION_DRIVER', 'package is required for automatic production publishing');
+            $this->add($checks, preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#D', $repository) === 1, 'CMS_GITHUB_REPOSITORY', 'owner/repository is required for automatic production publishing');
+            $this->add($checks, $ref !== '' && strlen($ref) <= 255 && preg_match('#^[A-Za-z0-9._/-]+$#D', $ref) === 1 && ! str_contains($ref, '..') && ! str_contains($ref, '//'), 'CMS_GITHUB_REF', 'a safe exact branch or tag is required for automatic production publishing');
+            $this->add($checks, preg_match('/^[A-Za-z0-9_.-]+\.ya?ml$/D', $workflow) === 1, 'CMS_PRODUCTION_WORKFLOW', 'a workflow filename is required for automatic production publishing');
+            $this->add($checks, strlen($token) >= 32 && strlen($token) <= 512 && preg_match('/\s/', $token) !== 1, 'CMS_GITHUB_TOKEN', 'an Actions:write token is required for automatic production publishing');
+            $timeout = (int) config('publisher.production_timeout_minutes');
+            $this->add($checks, $timeout >= 5 && $timeout <= 120, 'CMS_PRODUCTION_TIMEOUT_MINUTES', 'must be between 5 and 120 minutes');
+        }
         $mailDefault = config('mail.default');
         $this->add(
             $checks,
