@@ -16,7 +16,7 @@ This is a strict operator procedure. Preview success never authorizes public pro
 - Run the frontend/unit suite, Astro/typecheck, normal production build, and package-preview build when preview/frontend code changed.
 - Run `git diff --check`.
 - Inspect unstaged and staged paths separately. Exclude `.env`, credentials, private media, generated archives/chunks, logs, caches, test fixtures, and temporary diffs.
-- Confirm `PIANISSIMO_PRODUCTION_WORKFLOW_ENABLED` was not enabled and no activation command entered the preview workflow.
+- Verify the current value and ownership of `PIANISSIMO_PRODUCTION_WORKFLOW_ENABLED` without changing it. Preview validation must never invoke a production activation command.
 
 PowerShell (local examples):
 
@@ -37,7 +37,7 @@ Use the repository's current scripts if names differ; record exact commands and 
 - Commit only reviewed source/docs/tests; never secrets or generated runtime material.
 - Record the exact commit SHA from `git rev-parse HEAD`.
 - Push deliberately, then verify local HEAD, remote branch, and `origin/main` agree.
-- Reconfirm the production workflow gate is still `false`.
+- Record the current production workflow gate without changing it. A code push does not authorize publishing, disabling or reconfiguring the production workflow.
 
 ## 4. Backend deployment (only when explicitly authorized)
 
@@ -85,9 +85,7 @@ This root has no marker file because application cleanup is never recursive: onl
 
 ## 6. GitHub private-preview workflow
 
-The first live preview dispatch reached GitHub and passed repository, workflow, active-state, ref, and permission probes, but GitHub rejected parsing before run creation because `${{ runner.temp }}` was used in job-level `env`. The hardening branch initializes temporary paths at runner step time via `$RUNNER_TEMP` and `$GITHUB_ENV`. The same latent defect was corrected in the production publisher workflow while its disabled-by-default gate remained off; do not enable that workflow to test this correction.
-
-Local real-build validation then found a second pre-run blocker: frontend code synthesized undeclared `-480.webp` media paths, which the strict release reference validator correctly rejects, and preview CSS emitted root-absolute `/_astro/` font URLs outside the authenticated route. The branch uses canonical declared media paths and an authenticated preview-only build base. Verify both behaviors in the next live package preview; do not weaken the archive validator or add a public `/_astro/*` route.
+The repository contains the corrected package-preview workflow: temporary paths are initialised at runner step time through `$RUNNER_TEMP`/`$GITHUB_ENV`, canonical manifest media paths are used, and preview assets stay behind the authenticated preview route. Treat the older parser and synthesized-media-path incidents as historical regression context, not current operating state. Do not enable, disable or repurpose the production workflow to test private preview.
 
 - Verify variable names: `PIANISSIMO_CMS_URL`, `PIANISSIMO_PREVIEW_WORKFLOW_ENABLED`.
 - Verify secret name: `PIANISSIMO_PUBLISHER_API_TOKEN`. Never print its value.
@@ -116,13 +114,14 @@ The following still require live verification after deployment:
 
 Stop if any measured environment differs from `NETCUP_RUNBOOK.md`; update the runbook through review before improvising.
 
-## 8. Public production cutover
+## 8. Public production publication
 
-- Treat public cutover as a completely separate, explicitly authorized change.
-- Keep `PIANISSIMO_PRODUCTION_WORKFLOW_ENABLED=false` until that authorization includes backups, validation, activation, and rollback.
-- Back up and inventory `/httpdocs` and any existing WordPress/public installation first.
-- Never infer that a successful preview, backend deployment, or hosting upgrade authorizes switching `releases/static/current`, the document root, DNS, or public content.
+- Treat every public publication, rollback or publication-pipeline configuration change as a separate, explicitly authorized operation.
+- Read and record the current workflow gate and active publication state; do not assume the historical value `false`, and do not change the gate merely to test a deployment.
+- Back up and inventory the physical `/httpdocs`, its retained previous copy, active/retained static releases, publication records, database and private storage before work that can affect them.
+- Never infer that a successful preview, code deployment, hosting upgrade or Git push authorizes activation, rollback, document-root changes, DNS changes or content replacement.
 - Never infer that a successful SFTP media import authorizes a public release or changes production publication state.
+- A code-only deployment must not import the repository content baseline into Production or overwrite MariaDB, active manifest, managed media, Apply state or publication packages.
 
 ## 9. Rollback and emergency handling
 

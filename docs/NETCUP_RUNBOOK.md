@@ -14,7 +14,7 @@ Read this file before changing or diagnosing Pianissimo production. It records s
 - Observed FastCGI `open_basedir`:
   `/var/www/vhosts/hosting213834.a2e58.netcup.net/:/tmp/:/var/lib/php/sessions`.
 - The CMS URL is `https://admin.pianissimo-production.de`. The public URL is `https://pianissimo-production.de`.
-- The CMS document root is the Laravel `public` directory below `app/backend`. The configured public-site root is `/pianissimo-production.de/httpdocs`; a public cutover is a separate, explicitly authorized operation.
+- The CMS document root is the Laravel `public` directory below `app/backend`. The configured public-site root is the physical directory `/pianissimo-production.de/httpdocs`. According to owner-provided status, the site is now in Production; the active publication and physical release state must still be verified read-only before operational work.
 - MySQL connectivity, migrations, Laravel/Filament login, CMS import, published Filament assets, production-media reads, and private preview-snapshot writes have been verified. Database passwords are not recorded here.
 - `backend/storage` is a relative symlink: `../../private/runtime/cms/storage`. Keep it relative; an SSH-absolute target does not resolve correctly in FastCGI's namespace.
 - The shell was observed without `unlink`, `stat`, or `df`. `/usr/bin/sha256sum` was separately verified for the gated production publisher. Do not infer availability of a normal GNU/Linux userspace; PHP filesystem APIs provide the preview/application runtime operations.
@@ -92,7 +92,7 @@ Variables:
 
 - `PIANISSIMO_CMS_URL`
 - `PIANISSIMO_PREVIEW_WORKFLOW_ENABLED` (currently verified `true`)
-- `PIANISSIMO_PRODUCTION_WORKFLOW_ENABLED` (currently verified `false`)
+- `PIANISSIMO_PRODUCTION_WORKFLOW_ENABLED` (read the current value; do not infer it from the 2026-10-01 checkpoint and do not change it without explicit authorization)
 - `NETCUP_SSH_HOST`, `NETCUP_SSH_USER`, `NETCUP_SSH_PORT`
 - `NETCUP_PIANISSIMO_PRODUCTION_INCOMING_ROOT`, `NETCUP_PIANISSIMO_BACKEND_ROOT`, `NETCUP_PHP_BIN`
 

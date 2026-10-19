@@ -1,6 +1,6 @@
 # Pianissimo CMS-Handbuch
 
-Stand: 27. September 2026. Dieses Handbuch beschreibt die lokale CMS-Oberfläche für Sebastian und künftige Redakteurinnen, Redakteure oder Assistenzpersonen. Production ist nicht verbunden und bleibt gesperrt.
+Stand: 20. Oktober 2026. Dieses Handbuch beschreibt die lokale und produktive CMS-Oberfläche für Sebastian sowie künftige Redakteurinnen, Redakteure oder Assistenzpersonen. Das CMS ist mit einem kontrollierten Production-Veröffentlichungsablauf verbunden. Jede öffentliche Veröffentlichung bleibt eine eigene, bestätigungspflichtige Aktion.
 
 ## Hinweis für KI-Assistenten
 
@@ -14,8 +14,9 @@ Antworte in nicht-technischer Sprache. Nenne immer den genauen CMS-Pfad und die 
 4. Texte, Medien, Reihenfolge und Darstellung prüfen.
 5. **Änderungen prüfen** wählen und die Änderungsliste lesen.
 6. Erst nach Freigabe **Für Website übernehmen** wählen.
+7. Nur wenn dieser übernommene Stand öffentlich erscheinen soll, **Jetzt öffentlich veröffentlichen** wählen und die Bestätigung lesen.
 
-Die Übernahme ändert nur den verbundenen lokalen Website-Stand. Sie ist kein Deployment ins Internet. Production bleibt blockiert.
+**Für Website übernehmen** macht den geprüften Stand zum akzeptierten Website-Stand, veröffentlicht ihn aber noch nicht im Internet. **Jetzt öffentlich veröffentlichen** erstellt daraus ein unveränderliches Production-Paket, lässt die festgelegte Code-Version bauen und aktiviert den geprüften Release erst nach erfolgreicher Validierung. Speichern, Übernehmen und öffentliches Veröffentlichen sind drei verschiedene Schritte.
 
 ## Erste Schritte
 
@@ -31,14 +32,33 @@ Die Übernahme ändert nur den verbundenen lokalen Website-Stand. Sie ist kein D
 
 ### 2–7. Entwurf und Veröffentlichung
 
-| Workflow                                   | CMS-Pfad                                  | Vorgehen und Wirkung                                                                                                                       |
-| ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Was ist ein Entwurf?                       | Bearbeitungsseite → **Entwurf speichern** | Speichert im CMS. Die aktive Website bleibt unverändert.                                                                                   |
-| Website-Vorschau öffnen                    | `System → Veröffentlichung`               | Erst speichern, dann **Website-Vorschau öffnen**. Die private Vorschau veröffentlicht nichts.                                              |
-| Änderungen prüfen                          | `System → Veröffentlichung`               | **Änderungen prüfen**, Fehler beheben, Änderungsliste lesen. Noch keine Übernahme.                                                         |
-| Für Website übernehmen                     | `System → Veröffentlichung`               | Nur den aktuellen geprüften Stand mit **Für Website übernehmen** bestätigen. Kein Production-Deployment.                                   |
-| Nicht veröffentlichte Änderungen verwerfen | `System → Veröffentlichung`               | Liste prüfen und **Nicht veröffentlichte Änderungen verwerfen** bestätigen. Website bleibt unverändert; Entwurfsänderungen gehen verloren. |
-| Letzte Änderung zurücksetzen               | `System → Veröffentlichung`               | **Letzte Änderung zurücksetzen** stellt den vorherigen übernommenen Website-Stand her. CMS-Entwürfe bleiben bestehen.                      |
+| Workflow                                   | CMS-Pfad                                  | Vorgehen und Wirkung                                                                                                                        |
+| ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Was ist ein Entwurf?                       | Bearbeitungsseite → **Entwurf speichern** | Speichert in MariaDB und privatem Storage. Übernommene und öffentliche Website bleiben unverändert.                                         |
+| Website-Vorschau öffnen                    | `System → Veröffentlichung`               | Erst speichern, dann **Website-Vorschau öffnen**. Die private, zeitlich begrenzte Vorschau veröffentlicht nichts.                           |
+| Änderungen prüfen                          | `System → Veröffentlichung`               | **Änderungen prüfen**, Fehler beheben und die Änderungsliste lesen. Noch keine Übernahme und keine öffentliche Veröffentlichung.             |
+| Für Website übernehmen                     | `System → Veröffentlichung`               | Übernimmt nur den exakt geprüften Stand als akzeptierten Website-Stand. Die öffentliche Website bleibt bis zur Production-Publikation gleich. |
+| Jetzt öffentlich veröffentlichen           | `System → Veröffentlichung`               | Baut und validiert den übernommenen Stand mit der festgelegten Code-Revision und aktiviert ihn anschließend öffentlich.                      |
+| Nicht veröffentlichte Änderungen verwerfen | `System → Veröffentlichung`               | Liste prüfen und bestätigen. Öffentliche und übernommene Website bleiben unverändert; Entwurfsänderungen gehen verloren.                     |
+| Letzte Änderung zurücksetzen               | `System → Veröffentlichung`               | Stellt den vorherigen übernommenen Website-Stand aus der lokalen Revision wieder her. Das ist nicht automatisch ein öffentlicher Rollback.   |
+
+### Öffentliche Veröffentlichung
+
+**Wo finde ich das?** `System → Veröffentlichung`
+
+Die Aktion **Jetzt öffentlich veröffentlichen** ist nur sichtbar, wenn ein geprüfter, übernommener Stand technisch bereit ist. Nach der Bestätigung wird genau dieser Stand als unveränderliches Paket vorbereitet. GitHub Actions verwendet die festgelegte Git-Revision, validiert das Paket, baut die statische Astro-Website und überträgt den Release kontrolliert zum Server. Erst die erfolgreiche serverseitige Aktivierung ändert die öffentliche Website.
+
+Während der Verarbeitung den Status im CMS beachten und nicht durch erneutes Speichern „reparieren“. Ein neuer Draft ändert ein bereits laufendes oder aktives unveränderliches Paket nicht. Bei einem Fehler bleibt der vorherige öffentliche Stand maßgeblich; Support soll Status und Logs prüfen, ohne Tokens, Cookies oder Zugangsdaten weiterzugeben.
+
+Ein öffentlicher Rollback ist eine separate, autorisierte Operator-Aktion. **Letzte Änderung zurücksetzen** im CMS betrifft zunächst den übernommenen Website-Stand und ersetzt keinen Production-Rollback.
+
+### Code-Synchronisation und Content-Synchronisation
+
+- **Code** wird über Git/GitHub synchronisiert. Jede Production-Publikation ist an eine exakte Git-Revision gebunden.
+- **Content** bleibt in MariaDB und privatem Storage: Entwürfe, Originale, verwaltete Medien, Apply-Belege und Publikationsdaten werden nicht automatisch nach GitHub übertragen.
+- GitHub Actions liest den Code und lädt ein geprüftes Veröffentlichungspaket aus dem CMS. Der Workflow erstellt daraus keinen Git-Commit.
+
+Ein `git pull` aktualisiert deshalb keinen CMS-Entwurf. Um Production-Inhalte lokal wiederherzustellen, werden eine separat freigegebene Datenbank-/Storage-Sicherung und Prüfsummen benötigt. Bei einem Code-Deployment dürfen Production-Datenbank, `.env`, privater Storage, aktives Manifest, Apply-Status und Releases nicht durch Repository-Dateien ersetzt werden.
 
 ## Medien
 
@@ -177,7 +197,7 @@ Unter `Website → Social Links` mit **Social Link hinzufügen** Anbieter, Bezei
 - **Standard-OG-Bild**: globale Linkvorschau; Projekte können ein eigenes Bild setzen.
 - **Robots-Vorgabe**: globale Regel. Globales `noindex` verhindert Indexierung auch für einzeln erlaubte Projekte.
 
-Vor einer späteren Production-Freigabe Domain/Canonical, Titel, Beschreibungen, OG-Bilder, robots, Projekt-noindex, Datenschutz, Consent und externe Dienste prüfen. Diese Prüfung autorisiert kein Deployment; Production bleibt blockiert.
+Vor jeder relevanten öffentlichen Veröffentlichung Domain/Canonical, Titel, Beschreibungen, OG-Bilder, robots, Projekt-noindex, Datenschutz, Consent und externe Dienste prüfen. Diese Prüfung veröffentlicht noch nichts und autorisiert keine zusätzliche Deployment-, DNS- oder Tracking-Änderung.
 
 ## Cookie, Consent und Datenschutz
 
@@ -197,6 +217,8 @@ Vor einer späteren Production-Freigabe Domain/Canonical, Titel, Beschreibungen,
 - GA4: Measurement-ID im Format `G-XXXXXXXXXX`; niemals Passwort oder Secret.
 - Plausible: öffentliche Domain ohne `https://` und ohne Pfad.
 - Bericht exportieren: im Anbieter-Dashboard Zeitraum wählen und CSV/PDF exportieren. Das CMS speichert keine eigenen Besucherprofile.
+
+Die endgültige SEO-Indexierung und die reale Analytics-Einrichtung bleiben Aufgaben des Website-Inhabers. Das CMS stellt Felder, Provider-Auswahl und Consent-Anbindung bereit; daraus folgt keine Garantie, dass Suchmaschinen indexieren oder ein externer Analytics-Dienst vollständig eingerichtet und geprüft ist. Das ist eine bewusste betriebliche Zuständigkeit und kein automatisch festgestellter Implementierungsfehler.
 - KI-Auswertung: unnötige personenbezogene Daten entfernen, nur den Bericht hochladen, Ziel/Zeitraum/Fragen nennen und Empfehlungen selbst prüfen. Keine Passwörter, Tokens oder privaten Besucherdaten hochladen.
 
 ## System
