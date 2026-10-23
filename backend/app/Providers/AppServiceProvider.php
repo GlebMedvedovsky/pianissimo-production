@@ -8,7 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 class AppServiceProvider extends ServiceProvider
 {
-    public function register(): void {}
+    public function register(): void
+    {
+        $this->app->bind(\App\Contracts\AudioAnalyzer::class, \App\Services\FfmpegAudioAnalyzer::class);
+    }
     public function boot(): void
     {
         config([
@@ -24,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('publisher-preview-upload', static fn (Request $request): Limit => Limit::perMinute(120)
             ->by(hash('sha256', (string) $request->ip())));
         RateLimiter::for('content-sync', static fn (Request $request): Limit => Limit::perMinute(120)
+            ->by(hash('sha256', (string) $request->ip())));
+        RateLimiter::for('audio-analysis', static fn (Request $request): Limit => Limit::perMinute(60)
             ->by(hash('sha256', (string) $request->ip())));
         RateLimiter::for('contact', static fn (Request $request): Limit => Limit::perMinute(5)
             ->by(hash('sha256', (string) $request->ip())));

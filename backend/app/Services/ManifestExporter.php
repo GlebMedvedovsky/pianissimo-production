@@ -51,6 +51,7 @@ class ManifestExporter
         }
         $tracks=[];
         foreach (Track::whereIn('id',array_unique($trackIds))->orderBy('id')->get() as $t) {
+            if ($validationPolicy===ContentValidator::POLICY_PUBLICATION && $t->audio_asset_id && !app(TrackAudioMetadata::class)->publicationReady($t)) throw new DomainException("{$t->id}: Audio-Metadaten sind noch nicht bereit.");
             if ($validationPolicy===ContentValidator::POLICY_PUBLICATION && $t->audio_asset_id && !in_array($t->rights_scope,['existing_local_draft','next_draft','public'])) throw new DomainException("{$t->id}: Playback-Nutzung für den nächsten Entwurf ist unbestätigt.");
             $assetIds[]=$t->audio_asset_id;
             $tracks[]=['id'=>$t->id,'title'=>$t->title,'audioAssetId'=>$t->audio_asset_id,'duration'=>$t->duration,'peaks'=>$t->peaks,

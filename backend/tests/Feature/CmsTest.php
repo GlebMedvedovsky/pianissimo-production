@@ -223,13 +223,31 @@ class CmsTest extends TestCase
         Livewire::test(\App\Filament\Resources\Pages\ListExternalServices::class)->callTableAction('delete',$record->id)->assertHasNoErrors();
         $this->assertSame(0,ExternalService::count());
     }
-    public function test_changing_playback_invalidates_waveform_and_unconfirmed_audio_is_blocked(): void
+    public function test_changing_playback_queues_metadata_and_blocks_publication_until_ready(): void
     {
         $track=Track::whereNotNull('audio_asset_id')->firstOrFail();
         $other=MediaAsset::where('type','audio')->where('id','!=',$track->audio_asset_id)->firstOrFail();
         $track->update(['audio_asset_id'=>$other->id,'rights_scope'=>'unconfirmed']);
-        $this->assertNull($track->fresh()->peaks); $this->assertNull($track->fresh()->audio_sha256);
+        $track->refresh();
+        $this->assertContains($track->audio_metadata_status,['pending','failed']);
+        $this->assertNull($track->peaks); $this->assertNull($track->audio_sha256);
         $this->expectException(\DomainException::class); app(ManifestExporter::class)->package();
+    }
+    public function test_ready_audio_passes_publication_export_and_pending_or_failed_visible_audio_blocks_it(): void
+    {
+        app(ManifestExporter::class)->package();
+        $track=Track::whereNotNull('audio_asset_id')->where('status','published')->firstOrFail();
+        $baseline=$track->only(['duration','peaks','audio_sha256','waveform_sha256','audio_metadata_status','audio_metadata_integrity_sha256']);
+        $tampered=$track->peaks;$tampered[0]=$tampered[0]===0.123456?0.234567:0.123456;
+        $track->forceFill(['peaks'=>$tampered])->saveQuietly();
+        try{app(ManifestExporter::class)->package();$this->fail('Tampered ready metadata must block publication export.');}
+        catch(\DomainException $exception){$this->assertStringContainsString('Audio-Metadaten',$exception->getMessage());}
+        $track->forceFill($baseline)->saveQuietly();
+        foreach(['pending','failed'] as $status){
+            $track->forceFill(['audio_metadata_status'=>$status,'duration'=>null,'peaks'=>null,'audio_sha256'=>null,'waveform_sha256'=>null])->saveQuietly();
+            try{app(ManifestExporter::class)->package();$this->fail("$status audio metadata must block publication export.");}
+            catch(\DomainException $exception){$this->assertStringContainsString('Audio-Metadaten',$exception->getMessage());}
+        }
     }
     public function test_hover_type_and_unsafe_urls_match_frontend_rules(): void
     {

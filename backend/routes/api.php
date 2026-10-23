@@ -4,6 +4,7 @@ use App\Http\Controllers\ProductionPublisherController;
 use App\Http\Controllers\ProductionContentSyncController;
 use App\Http\Controllers\DraftPreviewPublisherController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\AudioAnalysisController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/contact', [ContactController::class, 'store'])
@@ -23,6 +24,15 @@ Route::prefix('content-sync/v1')
         Route::get('/publications/{publicationId}/media/{sha256}', [ProductionContentSyncController::class, 'media'])
             ->where(['publicationId' => '[0-9a-f-]{36}', 'sha256' => '[0-9a-f]{64}'])
             ->name('content-sync.media');
+    });
+
+Route::prefix('audio-analysis/v1')
+    ->middleware(['audio-analysis.auth', 'throttle:audio-analysis'])
+    ->group(function (): void {
+        Route::get('/assets/{assetId}/source', [AudioAnalysisController::class, 'source'])
+            ->where('assetId', '[a-z0-9]+(?:-[a-z0-9]+)*');
+        Route::post('/assets/{assetId}/result', [AudioAnalysisController::class, 'result'])
+            ->where('assetId', '[a-z0-9]+(?:-[a-z0-9]+)*');
     });
 
 Route::prefix('publisher/v1')

@@ -18,7 +18,7 @@ class Stage04ATest extends TestCase
   $this->withServerVariables(['REMOTE_ADDR'=>'172.21.0.1'])->withHeaders(['X-Forwarded-Host'=>'attacker.invalid','X-Forwarded-Proto'=>'https'])->get('/admin')->assertStatus(400);
  }
  public function test_standalone_library_opt_in_exports_once_without_a_fake_project():void {
-  $t=Track::findOrFail('hole-in-that-dough')->replicate();$t->id='synthetic-library';$t->library_visible=true;$t->save();
+  $t=Track::findOrFail('hole-in-that-dough')->replicate();$t->id='synthetic-library';$t->library_visible=true;$t->audio_asset_id=null;$t->save();
   $p=app(ManifestExporter::class)->package()['manifest'];$row=collect($p['tracks'])->firstWhere('id',$t->id);
   $this->assertTrue($row['libraryVisible']);$this->assertCount(1,array_filter($p['tracks'],fn($r)=>$r['id']===$t->id));
   foreach($p['projects'] as $r)$this->assertNotContains($t->id,array_column($r['tracks'],'trackId'));

@@ -52,7 +52,11 @@ class ManifestImporter
                 'title'=>$t['title'],'audio_asset_id'=>$t['audioAssetId'],'duration'=>$t['duration'],'peaks'=>$t['peaks'],
                 'genres'=>$t['genres'],'emotions'=>$t['emotions'],'platform_overrides'=>$t['platformOverrides'],'status'=>$t['status'],
                 'audio_sha256'=>$t['audioSha256']??null,'waveform_sha256'=>$t['waveformSha256']??null,'tag_source'=>$t['tagSource']??null,'rights_scope'=>'existing_local_draft',
-                'library_visible'=>$t['libraryVisible']??false,
+                'library_visible'=>$t['libraryVisible']??false,'audio_metadata_error'=>null,
+                'audio_metadata_status'=>!empty($t['audioAssetId']) && isset($t['duration'],$t['peaks'],$t['audioSha256'],$t['waveformSha256'])?'ready':'missing',
+                'audio_analysis_job_id'=>null,
+                'audio_metadata_integrity_sha256'=>!empty($t['audioAssetId']) && isset($t['duration'],$t['peaks'],$t['audioSha256'],$t['waveformSha256'])
+                    ?TrackAudioMetadata::metadataIntegritySha256((float)$t['duration'],$t['peaks'],$t['audioSha256'],$t['waveformSha256']):null,
             ]);
             foreach ($m['projects'] as $p) {
                 $members=[];

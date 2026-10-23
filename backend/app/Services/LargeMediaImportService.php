@@ -173,6 +173,7 @@ final class LargeMediaImportService
                         'filename' => $selection,
                     ]);
                 }
+                $storage->dispatchCreatedAudio($asset);
                 return $asset;
             } catch (Throwable $exception) {
                 if (! $committed && is_string($claimedSource) && is_file($claimedSource) && ! is_link($claimedSource)

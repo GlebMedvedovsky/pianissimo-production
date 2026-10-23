@@ -47,6 +47,9 @@ class ProductionReadinessTest extends TestCase
         $this->assertSame(512000, $configuration['media_max_kb']);
         $this->assertSame(512000, $configuration['media_upload_max_kb']);
         $this->assertSame(512000, $configuration['media_import_max_kb']);
+        $this->assertSame('/usr/bin/ffprobe', $configuration['audio_ffprobe_path']);
+        $this->assertSame('/usr/bin/ffmpeg', $configuration['audio_ffmpeg_path']);
+        $this->assertSame(96, $configuration['audio_waveform_samples']);
         $this->assertSame(15, $configuration['preview_ttl_minutes']);
         $this->assertSame('http://127.0.0.1:4321', $configuration['preview_frontend_url']);
         $this->assertSame('http://host.docker.internal:4321', $configuration['preview_frontend_internal_url']);
@@ -293,6 +296,20 @@ class ProductionReadinessTest extends TestCase
         $this->assertSame('FAIL', $this->check($checks, 'Livewire temporary upload limit')['status']);
     }
 
+    public function test_preflight_requires_separate_remote_audio_analysis_credentials(): void
+    {
+        $this->configurePreflight();
+        $checks = app(ProductionPreflight::class)->run();
+        $this->assertSame('PASS', $this->check($checks, 'AUDIO_ANALYSIS_API_TOKEN')['status']);
+        $this->assertSame('PASS', $this->check($checks, 'Audio API token separation')['status']);
+        $this->assertSame('PASS', $this->check($checks, 'Audio dispatch token separation')['status']);
+
+        config(['audio-analysis.api_token' => config('publisher.api_token')]);
+        $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'Audio API token separation')['status']);
+        config(['audio-analysis.api_token' => str_repeat('a', 48), 'audio-analysis.github.dispatch_token' => config('publisher.github.token')]);
+        $this->assertSame('FAIL', $this->check(app(ProductionPreflight::class)->run(), 'Audio dispatch token separation')['status']);
+    }
+
     public function test_preflight_does_not_expose_secrets_or_mutate_filesystem_or_database(): void
     {
         $this->configurePreflight();
@@ -409,6 +426,13 @@ class ProductionReadinessTest extends TestCase
             'cms.media_max_kb' => 65536,
             'cms.media_upload_max_kb' => 65536,
             'cms.media_import_max_kb' => 65536,
+            'audio-analysis.api_token' => str_repeat('a', 48),
+            'audio-analysis.public_cms_url' => 'https://admin.pianissimo-production.de',
+            'audio-analysis.github.repository' => 'pianissimo/audio-worker',
+            'audio-analysis.github.ref' => 'main',
+            'audio-analysis.github.workflow' => 'pianissimo-audio-analysis.yml',
+            'audio-analysis.github.dispatch_token' => str_repeat('d', 48),
+            'audio-analysis.waveform_samples' => 96,
             'livewire.temporary_file_upload.rules' => ['required', 'file', 'max:65536'],
             'cms.private_media_root' => $this->fixtureRoot.'/private-media',
             'cms.publication_package_root' => $this->fixtureRoot.'/packages',

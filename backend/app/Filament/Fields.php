@@ -80,8 +80,18 @@ class Fields
     {
         return [Section::make('Track')->columnSpanFull()->schema([
             self::id(),TextInput::make('title')->label('Titel')->required(),self::status(),Toggle::make('library_visible')->label('Eigenständig in der Music Library zeigen')->default(false)->helperText('Nur mit bestätigter Auswahl und Playback-Freigabe; keine zusätzliche Projektkarte.'),Select::make('rights_scope')->label('Nutzungsfreigabe')->options(['unconfirmed'=>'Unbestätigt','existing_local_draft'=>'Bestehender lokaler Entwurf','next_draft'=>'Nächster Entwurf','public'=>'Öffentliche Nutzung ausdrücklich erlaubt'])->default('unconfirmed')->required(),
-            self::media('audio_asset_id','Playback-Datei','audio')->helperText('Leer lassen, solange diese konkrete Playback-Version nicht bestätigt ist.'),TextInput::make('duration')->label('Dauer in Sekunden')->numeric()->minValue(0.001),...self::tags(),
-            \Filament\Infolists\Components\TextEntry::make('waveform_info')->label('Waveform')->state(fn($record)=>$record?->peaks?count($record->peaks).' vorbereitete Werte. Bei Wechsel der Playback-Datei werden diese zurückgesetzt.':'Noch keine bestätigte Waveform.'),
+            self::media('audio_asset_id','Playback-Datei','audio')->helperText('Nach dem Hochladen wird die Audiodatei automatisch verarbeitet. Das dauert normalerweise bis zu 1 Minute, in Einzelfällen bis zu 2–3 Minuten. Bitte warten Sie, bis „Bereit“ angezeigt wird.'),TextInput::make('duration')->label('Dauer in Sekunden')->numeric()->disabled()->dehydrated(false)->helperText('Wird automatisch aus der Playback-Datei ermittelt.'),...self::tags(),
+            \Filament\Infolists\Components\TextEntry::make('waveform_info')->label('Waveform')->state(function($record) {
+                if (!$record) return 'Fehlt';
+                return match(app(\App\Services\TrackAudioMetadata::class)->status($record)) {
+                    'ready' => 'Bereit ('.count($record->peaks).' Werte)',
+                    'pending' => 'Audio-Metadaten werden vorbereitet …',
+                    'processing' => 'Audio-Metadaten werden verarbeitet …',
+                    'stale' => 'Audio-Metadaten müssen erneut vorbereitet werden',
+                    'failed' => 'Verarbeitung fehlgeschlagen',
+                    default => 'Fehlt',
+                };
+            }),
             Section::make('Streaming-Links')->schema(self::links('platform_overrides'))->columns(2),
             Repeater::make('soundtrack')->label('Projekt-Zuordnung (optional)')->relationship()->schema([Select::make('project_id')->label('Projekt')->options(fn()=>Project::orderBy('title')->pluck('title','id'))->searchable()->required()->distinct(),TextInput::make('sort_order')->label('Reihenfolge im Soundtrack (leer = offen)')->integer()->nullable()])->defaultItems(0)->columns(2),
         ])->columns(2)];

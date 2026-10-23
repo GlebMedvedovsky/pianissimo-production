@@ -1,0 +1,41 @@
+name: Pianissimo audio analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset_id:
+        required: true
+        type: string
+      expected_audio_sha256:
+        required: true
+        type: string
+      analysis_job_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audio-analysis-${{ inputs.asset_id }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      AUDIO_ANALYSIS_CMS_BASE_URL: ${{ vars.AUDIO_ANALYSIS_CMS_BASE_URL }}
+      AUDIO_ANALYSIS_API_TOKEN: ${{ secrets.AUDIO_ANALYSIS_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify audio tools
+        run: |
+          ffmpeg -version
+          ffprobe -version
+      - name: Analyze exact CMS audio asset
+        env:
+          ASSET_ID: ${{ inputs.asset_id }}
+          EXPECTED_AUDIO_SHA256: ${{ inputs.expected_audio_sha256 }}
+          ANALYSIS_JOB_ID: ${{ inputs.analysis_job_id }}
+        run: node scripts/audio-analysis-worker.mjs "$ASSET_ID" "$EXPECTED_AUDIO_SHA256" "$ANALYSIS_JOB_ID"

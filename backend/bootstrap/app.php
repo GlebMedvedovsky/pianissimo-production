@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'publisher.auth' => \App\Http\Middleware\AuthenticateProductionPublisher::class,
             'content-sync.auth' => \App\Http\Middleware\AuthenticateProductionContentSync::class,
+            'audio-analysis.auth' => \App\Http\Middleware\AuthenticateAudioAnalysis::class,
         ]);
         $middleware->redirectGuestsTo('/admin/login');
     })

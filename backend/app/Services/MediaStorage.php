@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\MediaAsset;
+use App\Models\{MediaAsset, Track};
 use DomainException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class MediaStorage
@@ -123,17 +124,38 @@ class MediaStorage
         return $data;
     }
 
+    public function dispatchCreatedAudio(MediaAsset $asset): void
+    {
+        if ($asset->type === 'audio' && is_string($asset->storage_path) && $asset->storage_path !== '') {
+            app(TrackAudioMetadata::class)->dispatchForAsset($asset);
+        }
+    }
+
     public function replace(MediaAsset $asset, string $relative, ?string $originalName = null): void
     {
-        $metadata = $this->inspectStored($relative, $asset->id, $originalName);
+        $previousStoragePath = $asset->storage_path;
+        $canonicalCreated = false;
+        $metadata = $this->inspectStored($relative, $asset->id, $originalName, null, $canonicalCreated);
         if ($metadata['type'] !== $asset->type) {
             if ($metadata['storage_path'] !== $asset->storage_path) {
                 $this->deleteStored($metadata['storage_path']);
             }
             throw new DomainException('Die Ersatzdatei muss denselben Medientyp haben.');
         }
-        $asset->update($metadata);
-        app(AuditLogger::class)->record('media', $asset->id, 'replace', $metadata['sha256'], ['mime' => $metadata['mime_type'], 'size' => $metadata['file_size']]);
+        try {
+            DB::transaction(function () use ($asset, $metadata): void {
+                $asset->update($metadata);
+                if ($asset->type === 'audio') Track::where('audio_asset_id', $asset->id)
+                    ->update(TrackAudioMetadata::emptyMetadata('pending'));
+                app(AuditLogger::class)->record('media', $asset->id, 'replace', $metadata['sha256'], ['mime' => $metadata['mime_type'], 'size' => $metadata['file_size']]);
+            });
+        } catch (\Throwable $exception) {
+            if ($canonicalCreated && $metadata['storage_path'] !== $previousStoragePath) {
+                try { $this->deleteStored($metadata['storage_path']); } catch (\Throwable) {}
+            }
+            throw $exception;
+        }
+        if ($asset->type === 'audio') app(TrackAudioMetadata::class)->dispatchForAsset($asset->fresh(), true);
     }
 
     public function originalsRoot(bool $writable = false): string
@@ -172,6 +194,25 @@ class MediaStorage
             throw new DomainException('Die private Mediendatei fehlt.');
         }
         return $file;
+    }
+
+    public function resolveAsset(MediaAsset $asset): string
+    {
+        if ($asset->storage_path) return $this->resolveStored((string) $asset->storage_path);
+        $path = (string) $asset->path;
+        if (! preg_match('#^media/[a-zA-Z0-9/_-]+\.(?:mp3|wav|ogg)$#D', $path) || str_contains($path, '..')) {
+            throw new DomainException('Der Audio-Medienpfad ist ungültig.');
+        }
+        $relative = substr($path, strlen('media/'));
+        foreach ([config('cms.media_root'), config('cms.private_media_root')] as $configuredRoot) {
+            $root = realpath((string) $configuredRoot);
+            if ($root === false || ! is_dir($root) || is_link((string) $configuredRoot)) continue;
+            $candidate = $root.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relative);
+            if (is_link($candidate)) continue;
+            $file = realpath($candidate);
+            if ($file !== false && is_file($file) && $this->inside($file, $root)) return $file;
+        }
+        throw new DomainException('Die zugeordnete Audio-Datei fehlt.');
     }
 
     public function deleteStored(string $relative): void

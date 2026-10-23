@@ -46,6 +46,12 @@ final class CmsConfiguration
             'media_max_kb' => (int) $get('CMS_MEDIA_APPLICATION_MAX_KB', $legacyMediaMaxKb),
             'media_upload_max_kb' => (int) $get('CMS_MEDIA_UPLOAD_MAX_KB', $legacyMediaMaxKb),
             'media_import_max_kb' => (int) $get('CMS_MEDIA_IMPORT_MAX_KB', $legacyMediaMaxKb),
+            'audio_ffprobe_path' => $get('CMS_FFPROBE_PATH', '/usr/bin/ffprobe'),
+            'audio_ffmpeg_path' => $get('CMS_FFMPEG_PATH', '/usr/bin/ffmpeg'),
+            'audio_waveform_samples' => (int) $get('CMS_AUDIO_WAVEFORM_SAMPLES', 96),
+            'audio_waveform_sample_rate' => (int) $get('CMS_AUDIO_WAVEFORM_SAMPLE_RATE', 8000),
+            'audio_analysis_timeout_seconds' => (int) $get('CMS_AUDIO_ANALYSIS_TIMEOUT_SECONDS', 120),
+            'audio_analysis_max_decoded_bytes' => (int) $get('CMS_AUDIO_ANALYSIS_MAX_DECODED_BYTES', 134217728),
             'preview_ttl_minutes' => (int) $get('CMS_PREVIEW_TTL_MINUTES', 15),
             'preview_frontend_url' => $get('CMS_PREVIEW_FRONTEND_URL', 'http://127.0.0.1:4321'),
             'preview_frontend_internal_url' => $get('CMS_PREVIEW_FRONTEND_INTERNAL_URL', 'http://host.docker.internal:4321'),
@@ -74,7 +80,7 @@ final class CmsConfiguration
             $configuration[$key] = self::translateProductionPath($configuration[$key], $runtimeSiteRoot);
             $configuration['explicit_environment'][$variable] = $get($variable) !== null && trim((string) $get($variable)) !== '';
         }
-        foreach (['CMS_MEDIA_APPLICATION_MAX_KB', 'CMS_MEDIA_UPLOAD_MAX_KB', 'CMS_MEDIA_IMPORT_MAX_KB'] as $variable) {
+        foreach (['CMS_MEDIA_APPLICATION_MAX_KB', 'CMS_MEDIA_UPLOAD_MAX_KB', 'CMS_MEDIA_IMPORT_MAX_KB', 'CMS_FFPROBE_PATH', 'CMS_FFMPEG_PATH'] as $variable) {
             $configuration['explicit_environment'][$variable] = $get($variable) !== null && trim((string) $get($variable)) !== '';
         }
         $configuration['manifest'] = $configuration['active_manifest'];

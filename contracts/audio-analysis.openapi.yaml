@@ -1,0 +1,127 @@
+openapi: 3.1.0
+info:
+  title: Pianissimo Audio Analysis Transport
+  version: 1.0.0
+  description: Narrow private transport between the CMS and the audio-analysis workflow.
+servers:
+  - url: https://admin.pianissimo-production.de/api/audio-analysis/v1
+security:
+  - audioAnalysisToken: []
+paths:
+  /assets/{assetId}/source:
+    get:
+      operationId: downloadAudioAnalysisSource
+      summary: Claim an analysis job and stream its exact canonical audio source.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+        - name: expectedSha
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/Sha256' }
+        - name: analysisJobId
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/JobId' }
+      responses:
+        '200':
+          description: Exact audio bytes for the current immutable job identity.
+          headers:
+            Content-Length: { schema: { type: integer, minimum: 1 } }
+            ETag: { schema: { type: string } }
+            X-Audio-SHA256: { schema: { $ref: '#/components/schemas/Sha256' } }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            audio/mpeg:
+              schema: { type: string, format: binary }
+            audio/wav:
+              schema: { type: string, format: binary }
+            audio/ogg:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /assets/{assetId}/result:
+    post:
+      operationId: submitAudioAnalysisResult
+      summary: Submit one successful or failed result for the current job identity.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/SuccessResult'
+                - $ref: '#/components/schemas/FailureResult'
+      responses:
+        '200':
+          description: Result accepted exactly once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { const: accepted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    audioAnalysisToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque dedicated token
+  parameters:
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+  schemas:
+    Sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+    JobId: { type: string, pattern: '^[a-f0-9]{32}$' }
+    CanonicalPeaks:
+      type: array
+      minItems: 96
+      maxItems: 96
+      items: { type: number, minimum: 0, maximum: 1, multipleOf: 0.000001 }
+    SuccessResult:
+      type: object
+      additionalProperties: false
+      required: [status, assetId, audioSha256, analysisJobId, duration, peaks, waveformSha256]
+      properties:
+        status: { const: success }
+        assetId: { type: string }
+        audioSha256: { $ref: '#/components/schemas/Sha256' }
+        analysisJobId: { $ref: '#/components/schemas/JobId' }
+        duration: { type: number, exclusiveMinimum: 0, maximum: 86400 }
+        peaks: { $ref: '#/components/schemas/CanonicalPeaks' }
+        waveformSha256: { $ref: '#/components/schemas/Sha256' }
+    FailureResult:
+      type: object
+      additionalProperties: false
+      required: [status, assetId, audioSha256, analysisJobId, failureCode]
+      properties:
+        status: { const: failed }
+        assetId: { type: string }
+        audioSha256: { $ref: '#/components/schemas/Sha256' }
+        analysisJobId: { $ref: '#/components/schemas/JobId' }
+        failureCode: { type: string, pattern: '^[a-z0-9_]{1,64}$' }
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+  responses:
+    Unauthorized:
+      description: Dedicated bearer token missing or invalid.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Asset unavailable.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Job, asset identity, source, or result is stale or invalid.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

@@ -66,6 +66,22 @@ final class ProductionPreflight
             'effective Livewire max rule must exactly match CMS_MEDIA_UPLOAD_MAX_KB',
         );
 
+        $audioApiToken = (string) config('audio-analysis.api_token');
+        $audioDispatchToken = (string) config('audio-analysis.github.dispatch_token');
+        $this->add($checks, strlen($audioApiToken) >= 32 && strlen($audioApiToken) <= 512 && preg_match('/\s/', $audioApiToken) !== 1, 'AUDIO_ANALYSIS_API_TOKEN', 'a dedicated high-entropy API token is required');
+        $this->add($checks, ! in_array($audioApiToken, [(string) config('publisher.api_token'), (string) config('publisher.content_sync_api_token')], true), 'Audio API token separation', 'must differ from publisher and content-sync tokens');
+        $audioUrl = (string) config('audio-analysis.public_cms_url');
+        $this->add($checks, parse_url($audioUrl, PHP_URL_SCHEME) === 'https' && strtolower((string) parse_url($audioUrl, PHP_URL_HOST)) === self::PRODUCTION_HOST, 'AUDIO_ANALYSIS_PUBLIC_CMS_URL', 'must use the production CMS HTTPS origin');
+        $audioRepository = (string) config('audio-analysis.github.repository');
+        $audioRef = (string) config('audio-analysis.github.ref');
+        $audioWorkflow = (string) config('audio-analysis.github.workflow');
+        $this->add($checks, preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#D', $audioRepository) === 1, 'AUDIO_ANALYSIS_GITHUB_REPOSITORY', 'owner/repository is required');
+        $this->add($checks, $audioRef !== '' && strlen($audioRef) <= 255 && preg_match('#^[A-Za-z0-9._/-]+$#D', $audioRef) === 1 && ! str_contains($audioRef, '..') && ! str_contains($audioRef, '//'), 'AUDIO_ANALYSIS_GITHUB_REF', 'a safe branch or tag is required');
+        $this->add($checks, preg_match('/^[A-Za-z0-9_.-]+\.ya?ml$/D', $audioWorkflow) === 1, 'AUDIO_ANALYSIS_GITHUB_WORKFLOW', 'a workflow filename is required');
+        $this->add($checks, strlen($audioDispatchToken) >= 32 && strlen($audioDispatchToken) <= 512 && preg_match('/\s/', $audioDispatchToken) !== 1, 'AUDIO_ANALYSIS_GITHUB_DISPATCH_TOKEN', 'a dedicated Actions dispatch token is required');
+        $this->add($checks, ! in_array($audioDispatchToken, [$audioApiToken, (string) config('publisher.github.token')], true), 'Audio dispatch token separation', 'must differ from API and publisher dispatch tokens');
+        $this->add($checks, (int) config('audio-analysis.waveform_samples') === 96, 'Audio waveform samples', 'the canonical contract requires exactly 96 samples');
+
         $this->add($checks, PHP_VERSION_ID >= 80400, 'PHP version', 'PHP 8.4 or newer is required');
         foreach (['pdo_mysql', 'fileinfo', 'mbstring', 'openssl', 'json', 'tokenizer', 'xml', 'curl'] as $extension) {
             $this->add($checks, extension_loaded($extension), "PHP extension: $extension", 'required extension must be loaded');

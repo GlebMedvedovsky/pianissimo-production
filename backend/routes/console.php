@@ -2,6 +2,7 @@
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use App\Services\{ManifestImporter,ManifestExporter,ContentValidator};
+use App\Models\Track;
 
 Artisan::command('cms:import {--dry-run : Validate and report, roll back all database changes}', function () {
     $m=json_decode(file_get_contents(config('cms.manifest')),true,512,JSON_THROW_ON_ERROR);
@@ -51,3 +52,43 @@ Artisan::command('cms:production-preflight {--check-database : Run a read-only d
 
     return $failures === 0 ? 0 : 1;
 })->purpose('Read-only production environment, path and runtime checks');
+
+Artisan::command('cms:audio-metadata:backfill {--dry-run : Analyze and report without changing tracks} {--track= : Restrict to one stable track ID}', function () {
+    $dryRun = (bool) $this->option('dry-run');
+    $trackId = $this->option('track');
+    $query = Track::query()->whereNotNull('audio_asset_id')->orderBy('id');
+    if (is_string($trackId) && trim($trackId) !== '') $query->whereKey(trim($trackId));
+    $tracks = $query->get();
+    if (is_string($trackId) && trim($trackId) !== '' && $tracks->isEmpty()) {
+        $this->error('Track wurde nicht gefunden oder hat keine Playback-Datei.');
+        return 1;
+    }
+
+    $counts = ['queued' => 0, 'would_queue' => 0, 'skipped' => 0, 'failed' => 0];
+    $service = app(\App\Services\TrackAudioMetadata::class);
+    $seenAssets = [];
+    foreach ($tracks as $track) {
+        if (! $service->needsRefresh($track)) {
+            $counts['skipped']++;
+            continue;
+        }
+        if (isset($seenAssets[$track->audio_asset_id])) {
+            $counts['skipped']++;
+            continue;
+        }
+        $seenAssets[$track->audio_asset_id] = true;
+        if ($dryRun) {
+            $counts['would_queue']++;
+            continue;
+        }
+        try {
+            $service->retry($track);
+            $counts[$track->fresh()->audio_metadata_status === 'failed' ? 'failed' : 'queued']++;
+        } catch (\Throwable) {
+            $counts['failed']++;
+            $this->warn("Audio-Verarbeitung konnte nicht eingeplant werden: {$track->id}");
+        }
+    }
+    $this->line(json_encode($counts, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    return $counts['failed'] === 0 ? 0 : 1;
+})->purpose('Queue missing or stale audio metadata without publishing');
