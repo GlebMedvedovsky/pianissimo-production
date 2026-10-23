@@ -4,12 +4,14 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, resolve } from "node:path";
 import { isFileServingAllowed } from "vite";
 import { audioFixtures } from "../scripts/fixture-middleware.mjs";
+import { createProductionContentMediaMiddleware } from "../scripts/production-content-media.mjs";
 
 const localPath = (relative) =>
   fileURLToPath(new URL(relative, import.meta.url)).replaceAll("\\", "/");
 
 const publicationBuild = process.env.PIANISSIMO_PUBLICATION_BUILD === "1";
 const previewBuild = process.env.PIANISSIMO_PREVIEW_BUILD === "1";
+const productionContent = process.env.PIANISSIMO_PRODUCTION_CONTENT === "1";
 const contactApiUrl = publicationBuild
   ? "https://admin.pianissimo-production.de/api/contact"
   : "http://127.0.0.1:8080/api/contact";
@@ -17,11 +19,18 @@ const previewAssetBase = process.env.PIANISSIMO_PREVIEW_ASSET_BASE;
 const publicationManifestPath = process.env.PIANISSIMO_MANIFEST_PATH;
 const publicationPublicDir = process.env.PIANISSIMO_PUBLIC_DIR;
 const publicationOutDir = process.env.PIANISSIMO_OUT_DIR;
+const productionMediaRoot = process.env.PIANISSIMO_MEDIA_ROOT;
+if (publicationBuild && productionContent) {
+  throw new Error("Publication build and production-content dev modes are mutually exclusive.");
+}
 if (
-  !publicationBuild &&
+  !publicationBuild && !productionContent &&
   (publicationManifestPath || publicationPublicDir || publicationOutDir)
 ) {
   throw new Error("Publication build paths require PIANISSIMO_PUBLICATION_BUILD=1.");
+}
+if (!productionContent && productionMediaRoot) {
+  throw new Error("Production media root requires PIANISSIMO_PRODUCTION_CONTENT=1.");
 }
 if (
   publicationBuild &&
@@ -30,6 +39,17 @@ if (
   ))
 ) {
   throw new Error("Publication build paths must be explicit absolute paths.");
+}
+if (
+  productionContent &&
+  (
+    !publicationManifestPath || !productionMediaRoot ||
+    !isAbsolute(publicationManifestPath) || !isAbsolute(productionMediaRoot) ||
+    publicationPublicDir || publicationOutDir ||
+    resolve(publicationManifestPath) !== resolve(productionMediaRoot, "..", "manifest.json")
+  )
+) {
+  throw new Error("Production-content mode requires matching absolute package manifest and media paths.");
 }
 if (previewAssetBase && (!previewBuild || previewAssetBase !== "/draft-preview/assets/")) {
   throw new Error("Preview asset base must identify the authenticated preview asset route.");
@@ -48,7 +68,7 @@ const manifestModule = {
   },
   load(id) {
     if (id !== "\0virtual:pianissimo-manifest") return null;
-    const path = publicationBuild
+    const path = publicationBuild || productionContent
       ? publicationManifestPath
       : localPath("../content/manifest.json");
     const stat = lstatSync(path);
@@ -57,6 +77,17 @@ const manifestModule = {
     }
     const parsed = JSON.parse(readFileSync(path, "utf8"));
     return `export default ${JSON.stringify(parsed)};`;
+  },
+};
+
+const productionContentMedia = {
+  name: "production-content-media",
+  apply: "serve",
+  enforce: "pre",
+  configureServer(server) {
+    if (productionContent) {
+      server.middlewares.use(createProductionContentMediaMiddleware(productionMediaRoot));
+    }
   },
 };
 
@@ -144,9 +175,10 @@ export default defineConfig({
     define: {
       "import.meta.env.PIANISSIMO_CONTACT_API_URL": JSON.stringify(contactApiUrl),
       "import.meta.env.PIANISSIMO_PUBLICATION_BUILD": JSON.stringify(publicationBuild ? "1" : "0"),
+      "import.meta.env.PIANISSIMO_PRODUCTION_CONTENT": JSON.stringify(productionContent ? "1" : "0"),
       "import.meta.env.PIANISSIMO_PREVIEW_BUILD": JSON.stringify(previewBuild ? "1" : "0"),
     },
-    plugins: [manifestModule, privateLocalMaterials, audioFixtures],
+    plugins: [manifestModule, productionContentMedia, privateLocalMaterials, audioFixtures],
     server: {
       allowedHosts: ["host.docker.internal"],
       // A shared viewing session must never silently move to another port.
@@ -187,6 +219,7 @@ export default defineConfig({
           localPath("../content/manifest.json"),
           localPath("./dist") + "/**",
           localPath("../.local-builds") + "/**",
+          localPath("../.local-content") + "/**",
         ],
       },
     },

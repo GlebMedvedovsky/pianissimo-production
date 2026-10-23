@@ -11,7 +11,9 @@
   },
   "scripts": {
     "dev": "npm run dev --workspace frontend",
+    "dev:production": "node scripts/run-ts.mjs scripts/dev-production-content.ts",
     "build": "npm run content:validate && npm run build --workspace frontend && node scripts/check-dist.mjs",
+    "build:production-content": "node scripts/run-ts.mjs scripts/build-production-content.ts",
     "build:publication": "node scripts/run-ts.mjs scripts/build-publication-cli.ts",
     "build:preview": "node scripts/run-ts.mjs scripts/build-preview-cli.ts",
     "sync:production": "node scripts/run-ts.mjs scripts/sync-production-content.ts",

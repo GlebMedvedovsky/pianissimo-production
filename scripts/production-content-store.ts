@@ -20,6 +20,8 @@ import {
 } from "./publication-package";
 
 const SHA256 = /^[a-f0-9]{64}$/;
+const REVISION = /^[a-f0-9]{40}$/;
+const UUID_V4 = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 
 const comparable = (value: string) =>
   (process.platform === "win32" ? value.toLowerCase() : value).replaceAll("\\", "/");
@@ -34,6 +36,11 @@ export type LocalActiveSnapshot = {
   manifestSha256: string;
   releaseSha256: string | null;
   packagePath: string;
+};
+
+export type ActiveProductionContent = {
+  active: LocalActiveSnapshot;
+  package: Awaited<ReturnType<typeof validatePublicationPackage>>;
 };
 
 export class ProductionContentStore {
@@ -185,6 +192,67 @@ export class ProductionContentStore {
       if (error.code === "ENOENT") return null;
       throw error;
     });
+  }
+
+  async resolveActivePackage(): Promise<ActiveProductionContent> {
+    const root = await lstat(this.root).catch(() => null);
+    if (!root?.isDirectory() || root.isSymbolicLink())
+      throw new Error("Synchronized production-content store is missing or unsafe.");
+    if (comparable(await realpath(this.root)) !== comparable(this.root))
+      throw new Error("Synchronized production-content store may not traverse symlinks.");
+    const activeStat = await lstat(this.activePath).catch(() => null);
+    if (!activeStat?.isFile() || activeStat.isSymbolicLink())
+      throw new Error("Synchronized production-content active.json is missing or unsafe.");
+    let value: unknown;
+    try {
+      value = JSON.parse(await readFile(this.activePath, "utf8"));
+    } catch {
+      throw new Error("Synchronized production-content active.json is malformed.");
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("Synchronized production-content active.json is malformed.");
+    const record = value as Record<string, unknown>;
+    const expectedKeys = [
+      "activatedAt", "contractVersion", "manifestSha256", "packagePath", "packageSha256",
+      "publicationId", "releaseSha256", "sequence", "sourceRevision",
+    ];
+    const actualKeys = Object.keys(record).sort();
+    if (actualKeys.length !== expectedKeys.length || actualKeys.some((key, index) => key !== expectedKeys[index]))
+      throw new Error("Synchronized production-content active.json contract is invalid.");
+    if (
+      record.contractVersion !== 1 ||
+      !UUID_V4.test(String(record.publicationId)) ||
+      !Number.isSafeInteger(record.sequence) || Number(record.sequence) < 1 ||
+      typeof record.activatedAt !== "string" || !Number.isFinite(Date.parse(record.activatedAt)) ||
+      !REVISION.test(String(record.sourceRevision)) ||
+      !SHA256.test(String(record.packageSha256)) ||
+      !SHA256.test(String(record.manifestSha256)) ||
+      (record.releaseSha256 !== null && !SHA256.test(String(record.releaseSha256)))
+    ) throw new Error("Synchronized production-content active.json identity is invalid.");
+    const packageSha256 = String(record.packageSha256);
+    if (record.packagePath !== `packages/${packageSha256}`)
+      throw new Error("Synchronized production-content package path is invalid.");
+    const packageRoot = this.packagePath(packageSha256);
+    const publicationPackage = await validatePublicationPackage(packageRoot);
+    let publication: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(await readFile(resolve(packageRoot, "publication.json"), "utf8"));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+      publication = parsed as Record<string, unknown>;
+    } catch {
+      throw new Error("Synchronized production publication metadata is malformed.");
+    }
+    if (
+      publication.publicationId !== record.publicationId ||
+      publication.sequence !== record.sequence ||
+      publication.sourceRevision !== record.sourceRevision ||
+      publication.packageSha256 !== record.packageSha256 ||
+      publication.manifestSha256 !== record.manifestSha256
+    ) throw new Error("active.json does not match its synchronized immutable package.");
+    return {
+      active: record as unknown as LocalActiveSnapshot,
+      package: publicationPackage,
+    };
   }
 
   private async ensureDirectory(path: string) {

@@ -105,6 +105,32 @@ changing `.local-content/active.json`; it never writes into tracked frontend,
 backend or content files. A Git/source-revision difference produces a warning but
 does not modify the checkout or prevent synchronization.
 
+Run the current checkout against that exact synchronized snapshot:
+
+```powershell
+git pull origin main
+npm.cmd run sync:production
+npm.cmd run dev:production
+```
+
+Use `npm.cmd run dev:production -- --require-source-revision` when the current
+Git HEAD must exactly match the publication's recorded source revision. Without
+that flag, a mismatch is reported as a warning and current checkout code is used.
+The production-content dev server loads the synchronized manifest and owns all
+`/media/...` routes from the verified package; missing synchronized media returns
+an error and never falls back to repository fixtures. Code-owned public assets,
+including the favicon, continue to come from the checkout.
+
+Create an isolated local static build without publishing or deploying it:
+
+```powershell
+npm.cmd run build:production-content
+```
+
+The output is written under ignored `.local-builds/` storage. The synchronized
+source package remains under `.local-content/`; neither command overwrites tracked
+content or frontend media.
+
 Local CMS:
 
 ```powershell
