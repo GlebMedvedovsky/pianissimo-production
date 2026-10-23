@@ -88,6 +88,23 @@ npm.cmd run dev
 
 The frontend is available at `http://127.0.0.1:4321/`.
 
+Synchronize the currently active immutable production content into the ignored
+`.local-content/` store:
+
+```powershell
+Copy-Item .env.example .env.local
+# Set CMS_CONTENT_SYNC_API_TOKEN in .env.local, then run:
+npm.cmd run sync:production
+```
+
+`CMS_CONTENT_SYNC_URL` may be the CMS origin or the full
+`/api/content-sync/v1` base URL. Environment variables override `.env.local`.
+The token is never accepted as a command-line argument. Synchronization verifies
+the immutable publication, release manifest and every media hash before atomically
+changing `.local-content/active.json`; it never writes into tracked frontend,
+backend or content files. A Git/source-revision difference produces a warning but
+does not modify the checkout or prevent synchronization.
+
 Local CMS:
 
 ```powershell
