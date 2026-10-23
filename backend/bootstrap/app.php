@@ -13,7 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO |
             \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT);
         $middleware->append(\App\Http\Middleware\LocalCmsAccess::class);
-        $middleware->alias(['publisher.auth' => \App\Http\Middleware\AuthenticateProductionPublisher::class]);
+        $middleware->alias([
+            'publisher.auth' => \App\Http\Middleware\AuthenticateProductionPublisher::class,
+            'content-sync.auth' => \App\Http\Middleware\AuthenticateProductionContentSync::class,
+        ]);
         $middleware->redirectGuestsTo('/admin/login');
     })
     ->withExceptions(function (Exceptions $exceptions): void {})

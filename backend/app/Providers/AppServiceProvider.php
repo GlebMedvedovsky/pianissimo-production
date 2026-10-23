@@ -23,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
             ->by(hash('sha256', (string) $request->ip())));
         RateLimiter::for('publisher-preview-upload', static fn (Request $request): Limit => Limit::perMinute(120)
             ->by(hash('sha256', (string) $request->ip())));
+        RateLimiter::for('content-sync', static fn (Request $request): Limit => Limit::perMinute(120)
+            ->by(hash('sha256', (string) $request->ip())));
         RateLimiter::for('contact', static fn (Request $request): Limit => Limit::perMinute(5)
             ->by(hash('sha256', (string) $request->ip())));
         $invalidate=static fn()=>app(DraftPreviewService::class)->invalidateAll();

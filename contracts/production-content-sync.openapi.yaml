@@ -1,0 +1,258 @@
+openapi: 3.1.0
+info:
+  title: Pianissimo Production Content Sync API
+  version: 1.0.0
+  description: >-
+    Read-only access to immutable CMS publication packages that have previously
+    been activated successfully. The API never exposes CMS drafts, originals,
+    mutable media roots, filesystem paths, or publication lifecycle mutations.
+servers:
+  - url: https://admin.pianissimo-production.de/api/content-sync/v1
+security:
+  - contentSyncBearer: []
+paths:
+  /production/active:
+    get:
+      operationId: discoverActiveProductionPublication
+      summary: Discover the currently active immutable production publication
+      responses:
+        "200":
+          description: Current active publication identity and relative read endpoints.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivePublication"
+              example:
+                contractVersion: 1
+                publicationId: 123e4567-e89b-42d3-a456-426614174000
+                sequence: 6
+                activatedAt: "2026-10-08T08:10:00Z"
+                sourceRevision: 0123456789abcdef0123456789abcdef01234567
+                packageSha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                manifestSha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+                releaseSha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+                publicationUrl: /api/content-sync/v1/publications/123e4567-e89b-42d3-a456-426614174000/publication.json
+                manifestUrl: /api/content-sync/v1/publications/123e4567-e89b-42d3-a456-426614174000/manifest.json
+                mediaUrlTemplate: /api/content-sync/v1/publications/123e4567-e89b-42d3-a456-426614174000/media/{sha256}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/HttpsRequired"
+        "404":
+          $ref: "#/components/responses/Unavailable"
+  /publications/{publicationId}/publication.json:
+    get:
+      operationId: getProductionPublicationMetadata
+      summary: Read the exact canonical publication metadata bytes
+      description: >-
+        The publication may be active or a retained previously activated
+        rollback candidate. A later activation does not revoke access.
+      parameters:
+        - $ref: "#/components/parameters/PublicationId"
+      responses:
+        "200":
+          description: Byte-for-byte immutable publication.json from the verified package.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicationMetadata"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/HttpsRequired"
+        "404":
+          $ref: "#/components/responses/Unavailable"
+        "409":
+          $ref: "#/components/responses/IntegrityFailure"
+  /publications/{publicationId}/manifest.json:
+    get:
+      operationId: getProductionPublicationManifest
+      summary: Read the exact immutable release manifest bytes
+      parameters:
+        - $ref: "#/components/parameters/PublicationId"
+      responses:
+        "200":
+          description: Byte-for-byte manifest.json from the verified package.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/HttpsRequired"
+        "404":
+          $ref: "#/components/responses/Unavailable"
+        "409":
+          $ref: "#/components/responses/IntegrityFailure"
+  /publications/{publicationId}/media/{sha256}:
+    get:
+      operationId: getProductionPublicationMedia
+      summary: Stream one media object selected by its verified inventory SHA-256
+      parameters:
+        - $ref: "#/components/parameters/PublicationId"
+        - $ref: "#/components/parameters/Sha256"
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+          example: bytes=0-1048575
+      responses:
+        "200":
+          description: Complete verified media object.
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: Quoted SHA-256 of the complete media object.
+            Content-Length:
+              schema:
+                type: integer
+            Accept-Ranges:
+              schema:
+                type: string
+                const: bytes
+          content:
+            image/webp: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            audio/mpeg: { schema: { type: string, format: binary } }
+            audio/wav: { schema: { type: string, format: binary } }
+            audio/ogg: { schema: { type: string, format: binary } }
+            video/mp4: { schema: { type: string, format: binary } }
+            video/webm: { schema: { type: string, format: binary } }
+        "206":
+          description: Safe byte range of the verified complete media object.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/HttpsRequired"
+        "404":
+          $ref: "#/components/responses/Unavailable"
+        "409":
+          $ref: "#/components/responses/IntegrityFailure"
+        "416":
+          description: Requested byte range is not satisfiable for the verified object.
+components:
+  securitySchemes:
+    contentSyncBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Dedicated CMS_CONTENT_SYNC_API_TOKEN; it grants read-only package access only.
+  parameters:
+    PublicationId:
+      name: publicationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    Sha256:
+      name: sha256
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Sha256"
+  schemas:
+    Sha256:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+    ActivePublication:
+      type: object
+      additionalProperties: false
+      required:
+        - contractVersion
+        - publicationId
+        - sequence
+        - activatedAt
+        - sourceRevision
+        - packageSha256
+        - manifestSha256
+        - releaseSha256
+        - publicationUrl
+        - manifestUrl
+        - mediaUrlTemplate
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        publicationId: { type: string, format: uuid }
+        sequence: { type: integer, minimum: 1 }
+        activatedAt: { type: string, format: date-time }
+        sourceRevision: { type: string, pattern: "^[0-9a-f]{40}$" }
+        packageSha256: { $ref: "#/components/schemas/Sha256" }
+        manifestSha256: { $ref: "#/components/schemas/Sha256" }
+        releaseSha256:
+          oneOf:
+            - $ref: "#/components/schemas/Sha256"
+            - type: "null"
+        publicationUrl: { type: string }
+        manifestUrl: { type: string }
+        mediaUrlTemplate: { type: string }
+    PublicationMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - candidateHash
+        - contractVersion
+        - createdAt
+        - manifestSha256
+        - media
+        - packageSha256
+        - planHash
+        - publicationId
+        - sequence
+        - sourceRevision
+      properties:
+        candidateHash: { $ref: "#/components/schemas/Sha256" }
+        contractVersion: { type: integer, const: 1 }
+        createdAt: { type: string, format: date-time }
+        manifestSha256: { $ref: "#/components/schemas/Sha256" }
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaEntry"
+        packageSha256: { $ref: "#/components/schemas/Sha256" }
+        planHash: { $ref: "#/components/schemas/Sha256" }
+        publicationId: { type: string, format: uuid }
+        sequence: { type: integer, minimum: 1 }
+        sourceRevision: { type: string, pattern: "^[0-9a-f]{40}$" }
+    MediaEntry:
+      type: object
+      additionalProperties: false
+      required: [assetId, publicPath, sha256, size, type]
+      properties:
+        assetId: { type: string, minLength: 1 }
+        publicPath: { type: string, pattern: "^media/[A-Za-z0-9._/-]+$" }
+        sha256: { $ref: "#/components/schemas/Sha256" }
+        size: { type: integer, minimum: 0 }
+        type: { type: string, enum: [image, audio, video] }
+    Error:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message: { type: string }
+  responses:
+    Unauthorized:
+      description: Missing, invalid, or unconfigured content-sync credential.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    HttpsRequired:
+      description: Production content sync is available only over HTTPS.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unavailable:
+      description: The publication or object is not eligible or does not exist.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    IntegrityFailure:
+      description: The retained immutable package failed closed during integrity verification.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
