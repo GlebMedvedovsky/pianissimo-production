@@ -7,6 +7,8 @@ import { initScene, scrollToPosition, scrollToSceneAbout } from "./navigation/sc
 import { initFilters } from "./navigation/filters";
 import { initProjectModal } from "./navigation/modals";
 import { coordinator, playable, renderPlayer } from "./media/player";
+import { initTrackWaveforms } from "./media/waveform";
+import { initPlayerIdle } from "./media/player-idle";
 import { initConsent } from "./media/consent";
 import { initAnalytics } from "./analytics";
 import { initLocalVideo } from "./media/local-video";
@@ -94,6 +96,8 @@ function init() {
   initAnalytics(signal);
   coordinator.section(location.hash === "#about" ? "about" : currentSection());
   renderPlayer();
+  initTrackWaveforms(signal);
+  initPlayerIdle(signal);
   const root = document.documentElement;
   root.classList.add("js");
   root.classList.remove("is-loading");
@@ -346,10 +350,12 @@ document.addEventListener("click", (event) => {
       list?.querySelectorAll<HTMLElement>("[data-track-row]:not([hidden])") ||
         [],
     ).map((row) => row.dataset.trackRow!);
-    void coordinator.select(
-      playable(track.dataset.playTrack!),
-      ids.map(playable),
-    );
+    const selected = track.dataset.playTrack!;
+    if (coordinator.state.kind === "track" && coordinator.state.track?.id === selected) {
+      void coordinator.toggle();
+    } else {
+      void coordinator.select(playable(selected), ids.map(playable));
+    }
   }
 });
 document.addEventListener("submit", async (event) => {

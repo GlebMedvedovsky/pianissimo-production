@@ -70,7 +70,7 @@ class FrontendPublication
         $m['site']['cv']=array_values(array_filter($m['site']['cv'],fn($r)=>in_array($r['status'],['published','needs-confirmation'],true)));
         $assetIds=[]; $add=function($id) use (&$assetIds){if($id)$assetIds[$id]=true;};
         foreach ($m['projects'] as $p) { foreach ((array)$p['memberships'] as $member) {$add($member['coverAssetId']);$add($member['hoverAssetId']??null);} foreach ($p['gallery'] as $id)$add($id);$add($p['localTrailerAssetId']??null);$add($p['localTrailerPosterId']??null); }
-        foreach ($m['tracks'] as $t)$add($t['audioAssetId']); foreach ($m['site']['mediaSlots'] as $slot){$add($slot['image']);$add($slot['video']);$add($slot['poster']);}$add($m['site']['collective']['logoAssetId']??null);
+        foreach ($m['tracks'] as $t){$add($t['coverAssetId']??null);$add($t['audioAssetId']);} foreach ($m['site']['mediaSlots'] as $slot){$add($slot['image']);$add($slot['video']);$add($slot['poster']);}$add($m['site']['collective']['logoAssetId']??null);
         $m['assets']=array_values(array_filter($m['assets'],fn($a)=>isset($assetIds[$a['id']]) && $a['state']!=='test'));
         foreach ($m['assets'] as &$a) { unset($a['sourceSha256'],$a['origin'],$a['source']); $a['credit']=$a['credit']??null; if(!empty($a['duration']))$a['duration']=(float)sprintf('%.14g',$a['duration']); } unset($a);
         $m['sources']=[]; foreach (['projects','tracks','assets'] as $key)$m[$key]=$this->idMap($m[$key]); return $m;

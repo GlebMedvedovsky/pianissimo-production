@@ -9,7 +9,7 @@ export function publicContent(input:Manifest,policy:'publication'|'draft-preview
  data.site.cv=data.site.cv.filter(c=>c.status==='published'||c.status==='needs-confirmation');
  const assetIds=new Set<string>();const add=(id:string|null|undefined)=>{if(id)assetIds.add(id)};
  data.projects.forEach(p=>{Object.values(p.memberships).forEach(m=>{add(m.coverAssetId);add(m.hoverAssetId)});add(p.localTrailerAssetId);add(p.localTrailerPosterId);p.gallery.forEach(add)});
- data.tracks.forEach(t=>add(t.audioAssetId));Object.values(data.site.mediaSlots).forEach(s=>{add(s.image);add(s.video);add(s.poster)});add(data.site.collective?.logoAssetId);
+ data.tracks.forEach(t=>{add(t.coverAssetId);add(t.audioAssetId)});Object.values(data.site.mediaSlots).forEach(s=>{add(s.image);add(s.video);add(s.poster)});add(data.site.collective?.logoAssetId);
  data.assets=data.assets.filter(a=>assetIds.has(a.id)&&(policy==='draft-preview'||a.state!=='test')).map(a=>({...a,origin:'Curated local derivative',source:'Provenance is recorded in the project content registry.'}));
  data.sources=[];data.projects.forEach(p=>p.sourceIds=[]);
  return data;

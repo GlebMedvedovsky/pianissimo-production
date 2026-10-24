@@ -61,3 +61,19 @@ export function projectForTrack(data: Manifest, id: string) {
     (p) => p.status === "published" && p.tracks.some((t) => t.trackId === id),
   );
 }
+export function trackCoverAssetId(data: Manifest, track: Track) {
+  if (track.coverAssetId) return track.coverAssetId;
+  const candidates = [
+    ...new Set(
+      data.projects
+        .filter(
+          project =>
+            project.status === "published" &&
+            project.tracks.some(item => item.trackId === track.id) &&
+            project.memberships.music,
+        )
+        .map(project => project.memberships.music!.coverAssetId),
+    ),
+  ];
+  return candidates.length === 1 ? candidates[0] : undefined;
+}

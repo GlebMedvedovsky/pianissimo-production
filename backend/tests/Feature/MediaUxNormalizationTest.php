@@ -91,6 +91,7 @@ class MediaUxNormalizationTest extends TestCase
         Track::create([
             'id' => 'qa-media-audio',
             'title' => 'QA audio',
+            'cover_asset_id' => $imageA->id,
             'audio_asset_id' => $audio->id,
             'duration' => 1.0,
             'peaks' => null,
@@ -110,6 +111,8 @@ class MediaUxNormalizationTest extends TestCase
         $this->assertSame($video->id, $projected['localTrailerAssetId']);
         $this->assertSame($imageC->id, $projected['localTrailerPosterId']);
         $this->assertSame($audio->id, collect($package['manifest']['tracks'])->firstWhere('id', 'qa-media-audio')['audioAssetId']);
+        $this->assertSame($imageA->id, collect($package['manifest']['tracks'])->firstWhere('id', 'qa-media-audio')['coverAssetId']);
+        $this->assertTrue(collect($package['manifest']['assets'])->contains(fn($asset) => $asset['id'] === $imageA->id));
         $additional = ((array) app(SettingsExporter::class)->export()['projectMedia'])[$project->id];
         $this->assertTrue(collect($additional)->contains(
             fn($row) => $row['slot'] === 'soundtrack_cover' && $row['media_asset_id'] === $imageB->id,
@@ -140,6 +143,11 @@ class MediaUxNormalizationTest extends TestCase
         try {
             Track::findOrFail('qa-media-audio')->update(['audio_asset_id' => $imageA->id]);
             $this->fail('Playback must reject image.');
+        } catch (DomainException) {
+        }
+        try {
+            Track::findOrFail('qa-media-audio')->update(['cover_asset_id' => $video->id]);
+            $this->fail('Track cover must reject video.');
         } catch (DomainException) {
         }
         try {

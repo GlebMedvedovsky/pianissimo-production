@@ -488,8 +488,11 @@ export class MediaCoordinator {
   }
 
   seek(fraction: number) {
-    const duration = this.active.duration;
-    if (Number.isFinite(duration) && duration > 0) {
+    const duration =
+      Number.isFinite(this.active.duration) && this.active.duration > 0
+        ? this.active.duration
+        : this.state.duration;
+    if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
       this.active.currentTime = Math.max(0, Math.min(1, fraction)) * duration;
       this.state.time = this.active.currentTime;
       this.emit();

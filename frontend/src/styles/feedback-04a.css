@@ -577,3 +577,269 @@
    }
 
 }
+
+/* Phase 5D: deterministic track waveforms and unobtrusive shared playback. */
+.track-list {
+   --wave-played: var(--color-accent);
+   --wave-unplayed: color-mix(in srgb, currentColor 32%, transparent)
+}
+
+.track-row {
+   display: grid;
+   grid-template-columns: 28px minmax(190px, 270px) minmax(120px, 1fr) 48px 44px minmax(82px, 112px);
+   align-items: center;
+   column-gap: 12px;
+   box-sizing: border-box
+}
+
+.track-summary {
+   min-width: 0;
+   display: flex;
+   align-items: center;
+   gap: 14px
+}
+
+.track-summary .track-description {
+   min-width: 0;
+   flex: 1 1 auto
+}
+
+.track-number,
+.track-duration {
+   font-variant-numeric: tabular-nums
+}
+
+.track-play-slot,
+.track-platform-slot {
+   min-width: 0;
+   display: flex;
+   align-items: center
+}
+
+.track-play-slot {
+   justify-content: center
+}
+
+.track-platform-slot {
+   flex-direction: column;
+   align-items: flex-start;
+   gap: 3px
+}
+
+.track-platform-slot .track-platform {
+   margin: 0;
+   white-space: nowrap
+}
+
+.track-cell-placeholder {
+   opacity: .48
+}
+
+.track-cover-play {
+   position: relative;
+   width: 48px;
+   height: 48px;
+   flex: 0 0 48px;
+   overflow: hidden;
+   display: grid;
+   place-items: center;
+   padding: 0;
+   color: #fff;
+   background: transparent;
+   border: 0;
+   border-radius: 3px;
+   cursor: pointer
+}
+
+.track-cover-play>img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+   transition: filter 180ms ease
+}
+
+.track-cover-placeholder {
+   width: 100%;
+   height: 100%;
+   display: grid;
+   place-items: center;
+   color: color-mix(in srgb, currentColor 55%, transparent);
+   background: color-mix(in srgb, currentColor 8%, transparent);
+   border: 1px solid color-mix(in srgb, currentColor 14%, transparent)
+}
+
+.track-cover-icon {
+   position: absolute;
+   inset: 0;
+   display: grid;
+   place-items: center;
+   opacity: 0;
+   transition: opacity 180ms ease
+}
+
+.track-cover-icon>span:not([hidden]) {
+   display: grid;
+   place-items: center
+}
+
+.track-cover-play:hover>img,
+.track-cover-play:focus-visible>img,
+.track-row.is-playing .track-cover-play>img {
+   filter: brightness(.45)
+}
+
+.track-cover-play:hover .track-cover-icon,
+.track-cover-play:focus-visible .track-cover-icon,
+.track-row.is-playing .track-cover-icon {
+   opacity: 1
+}
+
+.track-cover-play--static {
+   cursor: default
+}
+
+.compact .track-cover-play {
+   width: 38px;
+   height: 38px;
+   flex-basis: 38px
+}
+
+.track-wave {
+   --waveform-height: 40px;
+   height: var(--waveform-height);
+   min-height: var(--waveform-height)
+}
+
+.compact .track-wave {
+   display: block
+}
+
+.compact .track-duration {
+   display: inline
+}
+
+.track-wave[data-waveform] {
+   cursor: pointer;
+   touch-action: none
+}
+
+.track-wave[data-waveform][data-scrubbing] {
+   cursor: grabbing
+}
+
+.track-wave[data-waveform]:focus-visible {
+   border-radius: 3px;
+   outline: 2px solid var(--focus);
+   outline-offset: 3px
+}
+
+.track-wave svg {
+   display: block;
+   width: 100%;
+   height: 100%;
+   overflow: visible
+}
+
+.wave-bars-unplayed {
+   fill: var(--wave-unplayed)
+}
+
+.wave-bars-played {
+   fill: var(--wave-played);
+   clip-path: inset(0 100% 0 0)
+}
+
+.track-wave--pending {
+   display: flex;
+   align-items: center;
+   border-block: 1px dashed color-mix(in srgb, currentColor 20%, transparent)
+}
+
+.track-wave--pending span {
+   font-size: 9px;
+   letter-spacing: .08em;
+   text-transform: uppercase;
+   opacity: .55
+}
+
+.track-play-button>span:not([hidden]) {
+   display: grid;
+   place-items: center
+}
+
+.player {
+   opacity: 1;
+   transition: opacity 260ms ease
+}
+
+.player.is-idle:not(:hover):not(:focus-within) {
+   opacity: .28
+}
+
+@media(min-width:801px) {
+   .track-list {
+      box-sizing: border-box;
+      padding-inline-end: 72px
+   }
+}
+
+@media(max-width:800px) {
+   .track-row {
+      grid-template-columns: 24px minmax(0, 1fr) 44px;
+      grid-template-areas:
+         'number summary play'
+         'wave wave wave'
+         'duration platform platform';
+      gap: 10px 8px
+   }
+
+   .track-number { grid-area: number }
+   .track-summary { grid-area: summary }
+   .track-play-slot { grid-area: play }
+   .track-wave { grid-area: wave }
+   .track-duration { grid-area: duration }
+   .track-platform-slot { grid-area: platform }
+
+   .track-wave,
+   .compact .track-wave {
+      order: 20;
+      flex: none;
+      width: 100%;
+      min-width: 0;
+      display: block
+   }
+
+   .track-wave--pending {
+      display: flex
+   }
+
+   .track-duration,
+   .compact .track-duration {
+      display: inline;
+      font-variant-numeric: tabular-nums
+   }
+
+   .track-platform {
+      order: 0
+   }
+
+   .track-platform-slot {
+      flex-direction: row;
+      justify-content: flex-end;
+      flex-wrap: wrap
+   }
+
+   .track-cover-play {
+      width: 40px;
+      height: 40px;
+      flex-basis: 40px
+   }
+}
+
+@media(prefers-reduced-motion:reduce) {
+   .player,
+   .track-cover-play>img,
+   .track-cover-icon {
+      transition: none
+   }
+}

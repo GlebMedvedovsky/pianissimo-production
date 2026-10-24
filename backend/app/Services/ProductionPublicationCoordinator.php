@@ -200,7 +200,10 @@ final class ProductionPublicationCoordinator
         }
         $tracks = is_array($manifest['tracks'] ?? null) ? $manifest['tracks'] : [];
         foreach ($tracks as $track) {
-            if (is_array($track)) $reference($track['audioAssetId'] ?? null);
+            if (is_array($track)) {
+                $reference($track['coverAssetId'] ?? null);
+                $reference($track['audioAssetId'] ?? null);
+            }
         }
         $site = is_array($manifest['site'] ?? null) ? $manifest['site'] : [];
         $mediaSlots = is_array($site['mediaSlots'] ?? null) ? $site['mediaSlots'] : [];

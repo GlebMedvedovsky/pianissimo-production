@@ -208,6 +208,7 @@ export const projectSchema = z.object({
 export const trackSchema = z.object({
   id,
   title: z.string().min(1),
+  coverAssetId: id.nullable().optional(),
   audioAssetId: id.nullable(),
   duration: z.number().positive().nullable(),
   peaks: z.array(z.number().min(0).max(1)).nullable(),
@@ -336,6 +337,7 @@ export function validateManifest(
     });
   }
   data.tracks.forEach((t) => {
+    ref(t.coverAssetId || null, "image");
     ref(t.audioAssetId, "audio");
     if (t.peaks && !t.duration) throw Error(`Peaks need duration: ${t.id}`);
   });

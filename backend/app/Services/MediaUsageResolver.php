@@ -21,6 +21,7 @@ class MediaUsageResolver
             $rows[]=$this->row('project_media:'.$r->id,'Projekt „'.$r->project->title.'“',$labels[$r->slot]??$r->slot,false,$types[$r->slot]??$asset->type,ProjectResource::getUrl('edit',['record'=>$r->project_id]));
         }
         foreach (Track::where('audio_asset_id',$asset->id)->get() as $r) $rows[]=$this->row('track:'.$r->id,'Track „'.$r->title.'“','Playback',false,'audio',TrackResource::getUrl('edit',['record'=>$r->id]));
+        foreach (Track::where('cover_asset_id',$asset->id)->get() as $r) $rows[]=$this->row('track_cover:'.$r->id,'Track „'.$r->title.'“','Track-Cover',false,'image',TrackResource::getUrl('edit',['record'=>$r->id]));
         foreach (Project::where('seo','like','%"ogAssetId":"'.$asset->id.'"%')->get() as $r) if (($r->seo['ogAssetId']??null)===$asset->id) $rows[]=$this->row('project_seo:'.$r->id,'Projekt „'.$r->title.'“','SEO-Bild',false,'image',ProjectResource::getUrl('edit',['record'=>$r->id]));
         $settings=[
             ['home','media.image','Startseite','Bild','image',Home::getUrl()],['home','media.video','Startseite','Video','video',Home::getUrl()],['home','media.poster','Startseite','Poster','image',Home::getUrl()],
@@ -82,6 +83,7 @@ class MediaUsageResolver
         if ($kind==='membership') { $row=Membership::findOrFail((int)$parts[0]); $row->update([$parts[1]==='cover'?'cover_asset_id':'hover_asset_id'=>$replacement]); return; }
         if ($kind==='project_media') { $row=ProjectMedia::findOrFail((int)$parts[0]); $detach?$row->delete():$row->update(['media_asset_id'=>$replacement]); return; }
         if ($kind==='track') { Track::findOrFail($parts[0])->update(['audio_asset_id'=>$replacement]); return; }
+        if ($kind==='track_cover') { Track::findOrFail($parts[0])->update(['cover_asset_id'=>$replacement]); return; }
         if ($kind==='project_seo') { $row=Project::findOrFail($parts[0]); $seo=$row->seo??[]; $seo['ogAssetId']=$replacement; $row->update(['seo'=>$seo]); return; }
         if ($kind==='setting') { $setting=array_shift($parts); $row=Setting::read($setting); data_set($row,implode(':',$parts),$replacement); Setting::put($setting,$row); return; }
         throw new DomainException('Unbekannte Medienverwendung.');

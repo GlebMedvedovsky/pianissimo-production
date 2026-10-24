@@ -54,8 +54,10 @@ class ManifestExporter
             if ($validationPolicy===ContentValidator::POLICY_PUBLICATION && $t->audio_asset_id && !app(TrackAudioMetadata::class)->publicationReady($t)) throw new DomainException("{$t->id}: Audio-Metadaten sind noch nicht bereit.");
             if ($validationPolicy===ContentValidator::POLICY_PUBLICATION && $t->audio_asset_id && !in_array($t->rights_scope,['existing_local_draft','next_draft','public'])) throw new DomainException("{$t->id}: Playback-Nutzung für den nächsten Entwurf ist unbestätigt.");
             $assetIds[]=$t->audio_asset_id;
+            $assetIds[]=$t->cover_asset_id;
             $tracks[]=['id'=>$t->id,'title'=>$t->title,'audioAssetId'=>$t->audio_asset_id,'duration'=>$t->duration,'peaks'=>$t->peaks,
                 'genres'=>$t->genres,'emotions'=>$t->emotions,'platformOverrides'=>$this->links($t->platform_overrides),'status'=>'published',
+                ...$this->optional(['coverAssetId'=>$t->cover_asset_id]),
                 ...($t->library_visible?['libraryVisible'=>true]:[]),
                 ...$this->optional(['audioSha256'=>$t->audio_sha256,'waveformSha256'=>$t->waveform_sha256,'tagSource'=>$t->tag_source])];
         }

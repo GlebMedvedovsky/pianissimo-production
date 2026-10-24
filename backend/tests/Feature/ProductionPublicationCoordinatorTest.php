@@ -391,7 +391,10 @@ class ProductionPublicationCoordinatorTest extends TestCase
             $add($project['localTrailerAssetId'] ?? null);
             $add($project['localTrailerPosterId'] ?? null);
         }
-        foreach ($manifest['tracks'] as $track) $add($track['audioAssetId']);
+        foreach ($manifest['tracks'] as $track) {
+            $add($track['coverAssetId'] ?? null);
+            $add($track['audioAssetId']);
+        }
         foreach ($manifest['site']['mediaSlots'] as $slot) {
             $add($slot['image']);
             $add($slot['video']);

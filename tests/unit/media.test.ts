@@ -122,6 +122,15 @@ const queue: Playable[] = [
   { id: "one", title: "Test one", url: "/one.wav" },
   { id: "two", title: "Test two", url: "/two.wav" },
 ];
+test("seek uses trusted track metadata while native duration is still unavailable", async () => {
+  const media = new FakeMedia();
+  media.duration = Number.NaN;
+  const c = new MediaCoordinator(media);
+  await c.select({ ...queue[0]!, duration: 80 }, queue);
+  c.seek(.25);
+  assert.equal(media.currentTime, 20);
+  assert.equal(c.state.time, 20);
+});
 test("queue, next, previous and end remain predictable", async () => {
   const media = new FakeMedia(),
     c = new MediaCoordinator(media);

@@ -8,6 +8,7 @@ import {
   selectProjects,
   selectTracks,
   platformLinks,
+  trackCoverAssetId,
 } from "../../frontend/src/lib/content/selectors";
 import { aboutTheme } from "../../frontend/src/config/site.config";
 test("Letterboxd only permits confirmed stills, never video or hover video", () => {
@@ -43,6 +44,29 @@ test("manifest validates, IDs and references are checked", () => {
   const path = structuredClone(raw);
   path.assets[0]!.path = "../private.jpg";
   assert.throws(() => validateManifest(path));
+});
+test("track covers prefer explicit media, use only an unambiguous project fallback, then allow a placeholder", () => {
+  const manifest = validateManifest(structuredClone(raw));
+  const track = manifest.tracks.find(item =>
+    manifest.projects.some(project => project.tracks.some(row => row.trackId === item.id)),
+  )!;
+  const project = manifest.projects.find(item => item.tracks.some(row => row.trackId === track.id))!;
+  const fallback = project.memberships.music!.coverAssetId;
+  assert.equal(trackCoverAssetId(manifest, track), fallback);
+
+  const explicit = { ...track, coverAssetId: manifest.assets.find(asset => asset.type === "image")!.id };
+  assert.equal(trackCoverAssetId(manifest, explicit), explicit.coverAssetId);
+
+  const ambiguous = structuredClone(manifest);
+  const second = structuredClone(project);
+  second.id = "cover-fallback-test";
+  second.slug = "cover-fallback-test";
+  second.memberships.music!.coverAssetId = manifest.assets.find(asset => asset.type === "image" && asset.id !== fallback)!.id;
+  ambiguous.projects.push(second);
+  assert.equal(trackCoverAssetId(ambiguous, track), undefined);
+
+  const standalone = { ...track, id: "standalone-cover-test", coverAssetId: null };
+  assert.equal(trackCoverAssetId(manifest, standalone), undefined);
 });
 test("profile links and collective are optional for older manifests", () => {
   const previous = structuredClone(raw);

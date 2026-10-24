@@ -6,6 +6,7 @@ class Track extends StableModel
     {
         parent::booted();
         static::saving(function ($track): void {
+            \App\Services\MediaTypePolicy::assert($track->cover_asset_id,'image','Track-Cover');
             \App\Services\MediaTypePolicy::assert($track->audio_asset_id,'audio','Track-Playback');
             app(\App\Services\TrackAudioMetadata::class)->prepareForSave($track);
         });
@@ -18,4 +19,5 @@ class Track extends StableModel
     protected $casts = ['peaks'=>'array','genres'=>'array','emotions'=>'array','platform_overrides'=>'array','duration'=>'float','library_visible'=>'boolean'];
     public function soundtrack() { return $this->hasMany(ProjectTrack::class)->orderBy('sort_order')->orderBy('id'); }
     public function audioAsset() { return $this->belongsTo(MediaAsset::class,'audio_asset_id'); }
+    public function coverAsset() { return $this->belongsTo(MediaAsset::class,'cover_asset_id'); }
 }

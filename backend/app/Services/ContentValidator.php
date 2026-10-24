@@ -131,6 +131,7 @@ class ContentValidator
             foreach ($p['sourceIds'] as $s) if (!isset($sources[$s])) $fail("$id: fehlende Quelle.");
         }
         foreach ($m['tracks'] as $t) {
+            $ref($t['coverAssetId']??null,['image'],$t['id']);
             $ref($t['audioAssetId'],['audio'],$t['id']);
             if ($t['peaks']!==null && $t['duration']===null) $fail("{$t['id']}: Waveform benötigt eine Dauer.");
         }

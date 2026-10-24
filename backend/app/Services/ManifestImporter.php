@@ -49,7 +49,7 @@ class ManifestImporter
                 'rights_scope'=>'existing_local_draft',
             ]);
             foreach ($m['tracks'] as $t) $put(Track::class,$t['id'],[
-                'title'=>$t['title'],'audio_asset_id'=>$t['audioAssetId'],'duration'=>$t['duration'],'peaks'=>$t['peaks'],
+                'title'=>$t['title'],'cover_asset_id'=>$t['coverAssetId']??null,'audio_asset_id'=>$t['audioAssetId'],'duration'=>$t['duration'],'peaks'=>$t['peaks'],
                 'genres'=>$t['genres'],'emotions'=>$t['emotions'],'platform_overrides'=>$t['platformOverrides'],'status'=>$t['status'],
                 'audio_sha256'=>$t['audioSha256']??null,'waveform_sha256'=>$t['waveformSha256']??null,'tag_source'=>$t['tagSource']??null,'rights_scope'=>'existing_local_draft',
                 'library_visible'=>$t['libraryVisible']??false,'audio_metadata_error'=>null,
