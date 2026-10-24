@@ -258,6 +258,33 @@ p {
     color: var(--focus)
 }
 
+.social-rail[data-icon-style=rounded]>* svg {
+    box-sizing: content-box;
+    padding: 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+    stroke-width: 1.7
+}
+
+.social-rail[data-icon-style=filled]>* svg {
+    box-sizing: content-box;
+    padding: 6px;
+    border-radius: 6px;
+    background: var(--text);
+    color: var(--background);
+    stroke-width: 2
+}
+
+.social-rail[data-icon-style=accent]>* svg {
+    box-sizing: content-box;
+    padding: 6px;
+    border: 1px solid var(--color-accent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-accent) 16%, var(--background));
+    color: var(--color-accent);
+    stroke-width: 1.8
+}
+
 .piano-mark {
     display: block;
     overflow: visible

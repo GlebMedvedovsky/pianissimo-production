@@ -1,7 +1,7 @@
 <?php
 namespace App\Services;
 
-use App\Filament\Pages\{About,Analytics,Consent,Publication,Seo,Social};
+use App\Filament\Pages\{About,Analytics,Consent,NavigationIcons,Publication,Seo};
 use App\Filament\Resources\{CvEntryResource,MediaAssetResource,ProjectResource,TrackResource};
 use App\Models\{AuditEvent,CvEntry,MediaAsset,Membership,Project,ProjectMedia,ProjectTrack,Setting,Track};
 
@@ -31,7 +31,7 @@ class OwnerDashboard
         return [
             'status'=>['hasDraftChanges'=>$hasDraftChanges,'lastApply'=>$lastApply?->created_at,'review'=>$review['kind'],'productionConnected'=>$production['state']!=='not_configured','production'=>$production],
             'counts'=>['projects'=>Project::count(),'tracks'=>Track::count(),'media'=>MediaAsset::count(),'packageMedia'=>$packageMedia,'cv'=>CvEntry::count()],
-            'links'=>['publication'=>Publication::getUrl(),'preview'=>route('draft-preview.open'),'projectIndex'=>ProjectResource::getUrl('index'),'projectCreate'=>ProjectResource::getUrl('create'),'trackIndex'=>TrackResource::getUrl('index'),'mediaIndex'=>MediaAssetResource::getUrl('index'),'mediaCreate'=>MediaAssetResource::getUrl('create'),'cvIndex'=>CvEntryResource::getUrl('index'),'about'=>About::getUrl(),'social'=>Social::getUrl(),'seo'=>Seo::getUrl(),'analytics'=>Analytics::getUrl()],
+            'links'=>['publication'=>Publication::getUrl(),'preview'=>route('draft-preview.open'),'projectIndex'=>ProjectResource::getUrl('index'),'projectCreate'=>ProjectResource::getUrl('create'),'trackIndex'=>TrackResource::getUrl('index'),'mediaIndex'=>MediaAssetResource::getUrl('index'),'mediaCreate'=>MediaAssetResource::getUrl('create'),'cvIndex'=>CvEntryResource::getUrl('index'),'about'=>About::getUrl(),'icons'=>NavigationIcons::getUrl(),'seo'=>Seo::getUrl(),'analytics'=>Analytics::getUrl()],
             'seo'=>['indexing'=>str_starts_with((string)($seo['robots']??''),'index')?'Freigegeben':'Ausgeschlossen','description'=>empty($seo['description'])?'Fehlt':'Vorhanden','canonical'=>empty($seo['canonicalBase'])?'Fehlt':'Vorhanden','og'=>empty($seo['ogAssetId'])?'Fehlt':'Vorhanden'],
             'analytics'=>['provider'=>match($analytics['provider']??'none'){'ga4'=>'Google Analytics 4','plausible'=>'Plausible',default=>'Nicht eingerichtet'},'active'=>(bool)($analytics['enabled']??false)],
             'hints'=>$hints,

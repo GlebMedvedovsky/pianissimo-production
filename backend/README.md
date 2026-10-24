@@ -47,7 +47,7 @@ Compose project: `pianissimo-cms`; services: `app`, `web`, `db`. Only nginx expo
 
 ## Editing and models
 
-The German menu provides the owner Dashboard and searchable **Hilfe / Handbuch**; Projekte, Tracks, Medien, About and CV; Startseite, Film Music, Directing, Kontakt, Social Links, SEO, Website-Farben and Analytics; Impressum, Datenschutz, Cookie/Consent, Externe Dienste and Lizenzen/Credits; Site-Einstellungen, Benutzer and Veröffentlichung.
+The German menu provides the owner Dashboard and searchable **Hilfe / Handbuch**; Projekte, Tracks, Medien, About and CV; Startseite, Film Music, Directing, Kontakt, Navigation & Symbole, SEO, Website-Farben and Analytics; Impressum, Datenschutz, Cookie/Consent, Externe Dienste and Lizenzen/Credits; Site-Einstellungen, Benutzer and Veröffentlichung.
 
 Tables (besides Laravel's migration bookkeeping): `users`, `projects`, `memberships`, `project_media`, `tracks`, `project_tracks`, `media_assets`, `cv_entries`, `settings`, `external_services`, `import_records`, `publications`.
 

@@ -75,6 +75,7 @@ class ManifestExporter
             $cv[]=['date'=>$r->date,'text'=>implode(' — ',array_filter([$r->title,$r->institution,$r->description])),'status'=>$r->status,...$this->optional(['link'=>$r->link,'linkText'=>$r->link_text])];
         }
         $site=Setting::read('site'); $contact=Setting::read('contact'); $about=Setting::read('about'); $social=Setting::read('social'); $consent=Setting::read('consent'); $analytics=Setting::read('analytics');
+        $rail=IconRail::validate(Setting::read('icon-rail'));
         $notice=Setting::read('impressum'); $privacy=Setting::read('privacy');
         $manifest=['schemaVersion'=>'1.0.0','mode'=>'prototype','sources'=>[],'assets'=>$assets,'projects'=>$projects,'tracks'=>$tracks,
             'site'=>['language'=>'en','title'=>$site['title']??'','description'=>$site['description']??'',
@@ -84,6 +85,7 @@ class ManifestExporter
                 'productionDomain'=>$site['productionDomain']??null,'artistLinks'=>$this->links($social['artistLinks']??[]),
                 'profileLinks'=>$this->profileLinks($social['profileLinks']??[]),
                 'socialLinks'=>array_values(array_map(fn($link)=>Arr::only($link,['provider','label','url','visible','sort_order']),$social['links']??[])),
+                'iconRail'=>$rail,
                 'consent'=>['version'=>(int)($consent['version']??1),'necessary'=>true,'externalMedia'=>(bool)($consent['externalMedia']??true),'analytics'=>(bool)($consent['analytics']??false),'marketing'=>(bool)($consent['marketing']??false),'bannerText'=>(string)($consent['bannerText']??''),'privacyLink'=>(string)($consent['privacyLink']??'/privacy/')],
                 'analytics'=>['enabled'=>(bool)($analytics['enabled']??false),'provider'=>(string)($analytics['provider']??'none'),'measurementId'=>($analytics['provider']??null)==='ga4'?($analytics['measurementId']??null):null,'siteDomain'=>($analytics['provider']??null)==='plausible'?($analytics['siteDomain']??null):null],
                 ...(!empty($about['collective']['name']) && !empty($about['collective']['url']) && !empty($about['collective']['membershipText'])?['collective'=>[

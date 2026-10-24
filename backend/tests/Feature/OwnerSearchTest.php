@@ -52,6 +52,9 @@ class OwnerSearchTest extends TestCase
         $this->assertTrue($provider->getResults('galeri')->getCategories()->has('Hilfe / Handbuch'));
         $this->assertTrue($provider->getResults('analytycs')->getCategories()->has('Website'));
         $this->assertTrue($provider->getResults('suchmachine')->getCategories()->has('Website'));
+        $spotify=$provider->getResults('Spotify')->getCategories()->flatten();
+        $this->assertTrue($spotify->contains(fn($result)=>$result->title==='Navigation & Symbole'));
+        $this->assertFalse($spotify->contains(fn($result)=>$result->title==='Social Links'));
     }
 
     public function test_help_search_is_help_only_and_supports_fuzzy_terms(): void
@@ -64,6 +67,14 @@ class OwnerSearchTest extends TestCase
         $this->assertNotEmpty($help->search('verofentlichen'));
         $this->assertSame([], $help->search('Au milieu'));
         $this->assertStringContainsString('/admin/help', Help::getUrl());
+        $this->assertNotContains('Social Links',$help->categories());
+        $this->assertFalse(collect($help->articles())->contains(fn($article)=>str_contains($article['url']??'','/admin/social')));
+    }
+
+    public function test_legacy_social_page_is_not_registered_in_owner_navigation(): void
+    {
+        $this->assertFalse(\App\Filament\Pages\Social::shouldRegisterNavigation());
+        $this->assertTrue(\App\Filament\Pages\NavigationIcons::shouldRegisterNavigation());
     }
 
     public function test_private_and_internal_fields_are_not_searchable(): void

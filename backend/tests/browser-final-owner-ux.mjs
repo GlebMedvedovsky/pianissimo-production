@@ -39,7 +39,7 @@ try {
     ["Galerie", "Galerie sortieren"],
     ["Trailer", "Trailer"],
     ["Credits", "Credits bearbeiten"],
-    ["Spotify", "Social Links"],
+    ["Spotify", "Navigation & Symbole"],
     ["SEO", "SEO"],
     ["Suchmaschine", "SEO"],
     ["noindex", "Index / noindex"],
@@ -64,7 +64,7 @@ try {
   await page.waitForFunction(() => {
     const box = document.querySelector(".fi-global-search-results-ctn");
     return (
-      box?.innerText.includes("Social Links") &&
+      box?.innerText.includes("Navigation & Symbole") &&
       !box?.innerText.includes("Projekte")
     );
   });
@@ -75,7 +75,7 @@ try {
   );
   await page.keyboard.press("Enter");
   await page.waitForURL((url) => url.toString() !== beforeKeyboardOpen);
-  assert.match(page.url(), /\/admin\/(contact|social|help)/);
+  assert.match(page.url(), /\/admin\/(navigation-icons|help)/);
   await globalSearch("Cookie", "Cookie / Consent");
   await topSearch.press("Escape");
   await page

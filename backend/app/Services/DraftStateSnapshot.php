@@ -123,6 +123,7 @@ class DraftStateSnapshot
     {
         $applied=collect($applied)->keyBy('id');$current=collect($current)->keyBy('id');
         $fields=['site'=>['title','description','productionDomain','language'],'home'=>['media'],'music'=>['media'],'directing'=>['media'],'about'=>['biography','media','collective'],'contact'=>array_keys($manifest['site']['contacts']??[]),'social'=>['artistLinks','profileLinks','links'],'impressum'=>['text','status'],'privacy'=>['text','status'],'seo'=>['description']];
+        if(isset($manifest['site']['iconRail']))$fields['icon-rail']=['style','items'];
         if(isset($manifest['site']['consent']))$fields['consent']=['essential','externalMedia','analytics','marketing','bannerText','privacyLink','version'];
         if(isset($manifest['site']['analytics']))$fields['analytics']=['enabled','provider','measurementId','siteDomain'];
         foreach($fields as $id=>$keys){$old=$current->get($id);$next=$applied->get($id);if(!$next)continue;$oldData=json_decode($old['data']??'[]',true)?:[];$nextData=json_decode($next['data']??'[]',true)?:[];foreach($keys as $key)if(array_key_exists($key,$nextData))$oldData[$key]=$nextData[$key];$next['data']=json_encode($oldData,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);$next['created_at']=$old['created_at']??$next['created_at'];$next['updated_at']=$old['updated_at']??$next['updated_at'];$applied[$id]=$next;}

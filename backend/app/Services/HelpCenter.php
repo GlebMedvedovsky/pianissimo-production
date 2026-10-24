@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Filament\Pages\{About, Analytics, Consent, Dashboard, Help, Home, Publication, Seo, Social};
+use App\Filament\Pages\{About, Analytics, Consent, Dashboard, Help, Home, NavigationIcons, Publication, Seo};
 use App\Filament\Resources\{CvEntryResource, ExternalServiceResource, MediaAssetResource, ProjectResource, TrackResource, UserResource};
 
 class HelpCenter
@@ -11,14 +11,14 @@ class HelpCenter
 
     public function categories(): array
     {
-        return ['Erste Schritte', 'Medien', 'Projekte', 'Tracks', 'About / CV', 'Social Links', 'SEO', 'Cookie / Consent', 'Analytics', 'System'];
+        return ['Erste Schritte', 'Medien', 'Projekte', 'Tracks', 'About / CV', 'Navigation & Symbole', 'SEO', 'Cookie / Consent', 'Analytics', 'System'];
     }
 
     public function articles(): array
     {
         $m = MediaAssetResource::getUrl('index'); $mc = MediaAssetResource::getUrl('create');
         $p = ProjectResource::getUrl('index'); $t = TrackResource::getUrl('index'); $cv = CvEntryResource::getUrl('index');
-        $pub = Publication::getUrl(); $about = About::getUrl(); $social = Social::getUrl(); $seo = Seo::getUrl();
+        $pub = Publication::getUrl(); $about = About::getUrl(); $icons = NavigationIcons::getUrl(); $seo = Seo::getUrl();
         $consent = Consent::getUrl(); $analytics = Analytics::getUrl(); $users = UserResource::getUrl('index');
         $saved = 'Die Änderung bleibt zunächst im CMS-Entwurf. Der aktive Website-Stand ändert sich erst nach Prüfen und Übernehmen.';
         $a = fn ($id, $category, $title, $purpose, $path, $steps, $after = null, $important = 'Speichern allein veröffentlicht nichts.', $url = null, $label = 'Öffnen', $keywords = [], $example = null) => compact('id', 'category', 'title', 'purpose', 'path', 'steps', 'after', 'important', 'url', 'label', 'keywords', 'example');
@@ -74,10 +74,10 @@ class HelpCenter
             $a('cv-hinzufuegen','About / CV','CV-Eintrag hinzufügen','Eine Lebenslaufstation ergänzen.','Inhalte → CV / Lebenslauf → Erstellen',['Vergeben Sie ID, Zeitraum und Titel.','Ergänzen Sie optionale Angaben.','Setzen Sie Reihenfolge und Status.','Speichern und prüfen Sie.'],$saved,'Die Reihenfolge ist eine Zahl.',$cv,'CV öffnen',['vita']),
             $a('cv-aendern','About / CV','CV-Eintrag ändern/löschen','Eine Station korrigieren oder entfernen.','Inhalte → CV / Lebenslauf',['Öffnen und bearbeiten Sie den Eintrag.','Zum Löschen wählen Sie die markierte Aktion und bestätigen Sie.','Prüfen Sie die Vorschau.'],$saved,'Vor dem Löschen bewusst prüfen.',$cv,'CV öffnen',['entfernen']),
 
-            $a('social-hinzufuegen','Social Links','Social Link hinzufügen','Ein Profil ergänzen.','Website → Social Links',['Wählen Sie „Social Link hinzufügen“.','Wählen Sie Anbieter, Bezeichnung und URL.','Legen Sie Sichtbarkeit fest.','Speichern und prüfen Sie.'],$saved,'Für unbekannte Dienste „other“ wählen.',$social,'Social Links bearbeiten',['spotify']),
-            $a('social-ausblenden','Social Links','Social Link ausblenden','Ein Profil ohne Löschen verbergen.','Website → Social Links',['Deaktivieren Sie „Sichtbar“.','Speichern und prüfen Sie.'],$saved,'Ausblenden ist rückgängig zu machen.',$social,'Social Links bearbeiten',['hidden']),
-            $a('social-loeschen','Social Links','Social Link löschen','Einen Profileintrag entfernen.','Website → Social Links',['Öffnen Sie den Eintrag.','Wählen Sie die Löschen-Aktion.','Speichern und prüfen Sie.'],$saved,'Für spätere Nutzung besser ausblenden.',$social,'Social Links bearbeiten',['entfernen']),
-            $a('social-sortieren','Social Links','Social Links sortieren','Die öffentliche Reihenfolge festlegen.','Website → Social Links',['Nutzen Sie „Ziehen zum Sortieren“.','Ordnen, speichern und prüfen Sie die Einträge.'],$saved,'Ausgeblendete Einträge behalten ihren Platz.',$social,'Social Links bearbeiten',['reorder']),
+            $a('symbolstil','Navigation & Symbole','Symbolstil wählen','Einen einheitlichen Stil für die gesamte Seitenleiste wählen.','Website → Navigation & Symbole',['Wählen Sie Outline, Rounded, Filled oder Accent.','Vergleichen Sie die sofort aktualisierte Vorschau.','Speichern und prüfen Sie die Website-Vorschau.'],$saved,'Der Stil gilt immer für alle Symbole; es gibt keine Einzelstile.',$icons,'Navigation & Symbole bearbeiten',['icons','style']),
+            $a('symbol-link','Navigation & Symbole','Ziel eines Symbols ändern','Eine öffentliche E-Mail-Adresse oder einen Profil-Link aktualisieren.','Website → Navigation & Symbole',['Öffnen Sie den passenden Eintrag.','Ändern Sie „Ziel / Link“.','Speichern und prüfen Sie die Vorschau.'],$saved,'Beim Mail-Symbol wird nur das öffentliche Ziel geändert, niemals SMTP oder der interne Formular-Empfänger.',$icons,'Navigation & Symbole bearbeiten',['spotify','mail']),
+            $a('symbol-ausblenden','Navigation & Symbole','Symbol ausblenden','Ein Symbol ohne Datenverlust verbergen.','Website → Navigation & Symbole',['Deaktivieren Sie „Sichtbar“.','Kontrollieren Sie die blasse Darstellung in der Vorschau.','Speichern und prüfen Sie.'],$saved,'Ausblenden ist rückgängig zu machen.',$icons,'Navigation & Symbole bearbeiten',['hidden']),
+            $a('symbol-sortieren','Navigation & Symbole','Symbole sortieren','Die Reihenfolge der Seitenleiste festlegen.','Website → Navigation & Symbole',['Nutzen Sie „Ziehen zum Sortieren“ oder die Pfeiltasten.','Ordnen, speichern und prüfen Sie die Einträge.'],$saved,'Ausgeblendete Einträge behalten ihren Platz.',$icons,'Navigation & Symbole bearbeiten',['reorder']),
 
             $a('seo-einfach','SEO','SEO einfach erklärt','Titel, Beschreibungen und Linkvorschauen pflegen.','Website → SEO',['Prüfen Sie globale Standardwerte.','Nutzen Sie Projektwerte nur für Abweichungen.','Lassen Sie noindex während Vorbereitung aktiv.'],$saved,'SEO verspricht kein Ranking.',$seo,'SEO bearbeiten',['google','suchmachine']),
             $a('seo-titel','SEO','SEO-Titel vs sichtbare Überschrift','Dokumenttitel und sichtbare Überschrift unterscheiden.','Projekt → SEO',['Formulieren Sie den Browser-/Suchdarstellungstitel.','Ändern Sie die sichtbare Überschrift unter „Inhalt“.','Speichern und prüfen Sie beides.'],$saved,'SEO-Titel ist kein H1/H2/H3 und ersetzt die Projektüberschrift nicht.',$p,'Projekte öffnen',['h1']),

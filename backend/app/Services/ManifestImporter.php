@@ -91,6 +91,7 @@ class ManifestImporter
                 'about'=>['title'=>'About','biography'=>$site['biography'],'media'=>MediaSlotPolicy::hydrate('about',['media'=>$site['mediaSlots']['about']])['media'],'visible'=>true,'theme'=>'follow-section','getInTouch'=>'Get in touch','collective'=>$site['collective']??[]],
                 'contact'=>[...$site['contacts'],'recipient'=>null,'footer'=>'','legalIdentity'=>''],
                 'social'=>['artistLinks'=>$site['artistLinks']??[],'profileLinks'=>$site['profileLinks']??[],'links'=>$site['socialLinks']??$this->legacySocialLinks($site)],
+                'icon-rail'=>IconRail::fromManifestSite($site),
                 'impressum'=>['text'=>$site['legal']['notice'],'status'=>$site['legal']['approved']?'published':'draft'],
                 'privacy'=>['text'=>$site['legal']['privacy'],'status'=>$site['legal']['approved']?'published':'draft'],
                 'consent'=>['essential'=>true,'externalMedia'=>$site['consent']['externalMedia']??true,'analytics'=>$site['consent']['analytics']??false,'marketing'=>$site['consent']['marketing']??false,'bannerText'=>$site['consent']['bannerText']??'','privacyLink'=>$site['consent']['privacyLink']??'/privacy/','version'=>$site['consent']['version']??1,'status'=>'draft'],
@@ -99,6 +100,8 @@ class ManifestImporter
                 'analytics'=>['enabled'=>$site['analytics']['enabled']??false,'provider'=>$site['analytics']['provider']??'none','measurementId'=>$site['analytics']['measurementId']??null,'siteDomain'=>$site['analytics']['siteDomain']??null],
                 'appearance'=>['dark'=>'#141414','light'=>'#F3F0EA','accent'=>'#A66A3F'],
             ];
+            $bootstrapRail=Setting::find('icon-rail');
+            if ($bootstrapRail && !ImportRecord::find('Setting:icon-rail') && collect($bootstrapRail->data['items']??[])->every(fn($item)=>empty($item['destination']))) $bootstrapRail->delete();
             foreach ($settings as $key=>$data) $put(Setting::class,$key,['data'=>$data]);
             return $report;
         });

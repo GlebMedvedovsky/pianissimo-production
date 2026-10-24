@@ -140,6 +140,7 @@ class ContentValidator
         $ref($m['site']['collective']['logoAssetId']??null,['image'],'Kollektiv-Logo');
         $urls=[$m['site']['productionDomain'],...array_values((array)($m['site']['artistLinks']??[])),...array_values((array)($m['site']['profileLinks']??[])),...array_column($m['site']['socialLinks']??[],'url'),$m['site']['collective']['url']??null];
         foreach (['instagram','spotify','samples'] as $key) $urls[]=$m['site']['contacts'][$key];
+        foreach (($m['site']['iconRail']['items']??[]) as $item) if (($item['type']??null)!=='mail') $urls[]=$item['destination']??null;
         foreach ($m['site']['cv'] as $r) $urls[]=$r['link']??null;
         foreach ($m['projects'] as $p) $urls=[...$urls,...array_values((array)$p['platformLinks']),...array_values((array)($p['externalLinks']??[])),$p['externalFilm']['url']??null];
         foreach ($m['tracks'] as $t) $urls=[...$urls,...array_values((array)$t['platformOverrides'])];

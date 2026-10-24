@@ -46,7 +46,7 @@
                 <x-filament::link :href="$owner['links']['projectCreate']">Projekt hinzufügen</x-filament::link>
                 <x-filament::link :href="$owner['links']['mediaCreate']">Medium hochladen</x-filament::link>
                 <x-filament::link :href="$owner['links']['about']">About bearbeiten</x-filament::link>
-                <x-filament::link :href="$owner['links']['social']">Social Links bearbeiten</x-filament::link>
+                <x-filament::link :href="$owner['links']['icons']">Navigation & Symbole bearbeiten</x-filament::link>
             </div>
         </x-filament::section>
         <x-filament::section heading="SEO-Status">

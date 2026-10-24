@@ -897,6 +897,81 @@
             "additionalProperties": false
           }
         },
+        "iconRail": {
+          "type": "object",
+          "properties": {
+            "style": {
+              "type": "string",
+              "enum": [
+                "outline",
+                "rounded",
+                "filled",
+                "accent"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "mail",
+                      "instagram",
+                      "imdb",
+                      "spotify",
+                      "music-hub",
+                      "crew-united",
+                      "tidal",
+                      "apple-music",
+                      "samples",
+                      "deezer",
+                      "youtube",
+                      "vimeo",
+                      "soundcloud",
+                      "letterboxd",
+                      "website",
+                      "other"
+                    ]
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "destination": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "visible": {
+                    "type": "boolean"
+                  },
+                  "sort_order": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "type",
+                  "label",
+                  "destination",
+                  "visible",
+                  "sort_order"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "style",
+            "items"
+          ],
+          "additionalProperties": false
+        },
         "collective": {
           "type": "object",
           "properties": {

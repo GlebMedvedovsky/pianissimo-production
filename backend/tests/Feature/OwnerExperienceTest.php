@@ -28,6 +28,7 @@ class OwnerExperienceTest extends TestCase
         Livewire::test(Dashboard::class)
             ->assertSee('Website-Status')->assertSee('Inhalte')->assertSee('SEO-Status')->assertSee('Analytics')
             ->assertSee('Website-Vorschau öffnen')->assertSee('Änderungen prüfen')
+            ->assertSeeHtml('Navigation & Symbole bearbeiten')->assertSeeHtml(\App\Filament\Pages\NavigationIcons::getUrl())->assertDontSee('Social Links bearbeiten')
             ->assertSeeHtml('<strong>'.MediaAsset::count().'</strong><br>Medien in der Bibliothek')->assertSeeHtml('<strong>'.count(app(ManifestExporter::class)->package()['manifest']['assets']).'</strong> Medien im aktuellen Website-Paket')
             ->assertSee('Alternativtexte ergänzen')->assertSee('Suchmaschinen sind noch ausgeschlossen')->assertSee('Canonical')
             ->assertSeeHtml(ProjectResource::getUrl('create'))->assertSeeHtml(MediaAssetResource::getUrl('create'))

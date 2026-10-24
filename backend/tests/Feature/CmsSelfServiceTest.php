@@ -2,7 +2,7 @@
 namespace Tests\Feature;
 
 use App\Models\{AuditEvent,MediaAsset,Membership,Project,Publication,Setting,User};
-use App\Services\{DraftStateSnapshot,FrontendPublication,ManifestExporter,ManifestImporter,MediaStorage,MediaUsageResolver};
+use App\Services\{DraftStateSnapshot,FrontendPublication,IconRail,IconRailPreview,ManifestExporter,ManifestImporter,MediaStorage,MediaUsageResolver};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -91,6 +91,55 @@ class CmsSelfServiceTest extends TestCase
         $this->expectException(\DomainException::class); app(ManifestExporter::class)->package();
     }
 
+    public function test_unified_icon_rail_defaults_preserve_existing_destinations(): void
+    {
+        $rail=Setting::read('icon-rail');
+        $this->assertSame('outline',$rail['style']);
+        $items=collect($rail['items'])->keyBy('type');
+        $this->assertSame($this->input['site']['contacts']['email'],$items['mail']['destination']);
+        $this->assertSame($this->input['site']['contacts']['instagram'],$items['instagram']['destination']);
+        $this->assertSame($this->input['site']['profileLinks']['imdb'],$items['imdb']['destination']);
+        $this->assertSame($this->input['site']['artistLinks']['spotify'],$items['spotify']['destination']);
+        $this->assertSame($this->input['site']['contacts']['samples'],$items['samples']['destination']);
+        $this->assertCount(count(IconRail::TYPES),$items);
+    }
+
+    public function test_navigation_icons_save_controls_style_visibility_order_and_public_mail_only(): void
+    {
+        $this->admin();
+        Setting::put('contact',[...Setting::read('contact'),'recipient'=>'smtp-recipient@example.test']);
+        $smtpBefore=config('mail.mailers.smtp');
+        $items=Setting::read('icon-rail')['items'];
+        $mail=array_values(array_filter($items,fn($item)=>$item['type']==='mail'))[0];
+        $instagram=array_values(array_filter($items,fn($item)=>$item['type']==='instagram'))[0];
+        $mail['destination']='rail-public@example.test';$instagram['visible']=false;
+        $remaining=array_values(array_filter($items,fn($item)=>!in_array($item['type'],['mail','instagram'],true)));
+        $items=[$instagram,$mail,...$remaining];foreach($items as $order=>&$item)$item['sort_order']=$order;unset($item);
+        Livewire::test(\App\Filament\Pages\NavigationIcons::class)->fillForm(['style'=>'accent','items'=>$items])->call('save')->assertHasNoFormErrors();
+        $manifest=app(ManifestExporter::class)->package()['manifest'];
+        $this->assertSame('accent',$manifest['site']['iconRail']['style']);
+        $this->assertSame(['instagram','mail'],array_column(array_slice($manifest['site']['iconRail']['items'],0,2),'type'));
+        $this->assertFalse($manifest['site']['iconRail']['items'][0]['visible']);
+        $this->assertSame('rail-public@example.test',$manifest['site']['iconRail']['items'][1]['destination']);
+        $this->assertArrayNotHasKey('style',$manifest['site']['iconRail']['items'][1]);
+        $this->assertSame('smtp-recipient@example.test',Setting::read('contact')['recipient']);
+        $this->assertSame($smtpBefore,config('mail.mailers.smtp'));
+        $this->assertStringNotContainsString('smtp-recipient@example.test',json_encode($manifest));
+    }
+
+    public function test_icon_rail_rejects_unsafe_protocol_and_preview_reflects_style_and_visibility(): void
+    {
+        $rail=Setting::read('icon-rail');$rail['style']='filled';
+        $rail['items'][0]['visible']=false;
+        $preview=(string)IconRailPreview::html($rail);
+        $this->assertStringContainsString('rail-preview--filled',$preview);
+        $this->assertStringContainsString('is-hidden',$preview);
+        $rail['items'][1]['destination']='javascript:alert(1)';$rail['items'][1]['visible']=true;
+        Setting::put('icon-rail',$rail);
+        $this->expectException(\DomainException::class);
+        app(ManifestExporter::class)->package();
+    }
+
     public function test_social_page_audits_add_and_remove_without_urls(): void
     {
         $this->admin();
@@ -101,6 +150,24 @@ class CmsSelfServiceTest extends TestCase
         $this->assertTrue(AuditEvent::where('object_type','settings')->where('object_id','social')->where('action','add')->exists());
         $this->assertTrue(AuditEvent::where('object_type','settings')->where('object_id','social')->where('action','remove')->exists());
         $this->assertStringNotContainsString('https://',AuditEvent::where('object_id','social')->get()->toJson());
+    }
+
+    public function test_hidden_legacy_social_page_cannot_change_canonical_icon_rail(): void
+    {
+        $this->admin();
+        $before=Setting::read('icon-rail');
+        Livewire::test(\App\Filament\Pages\Social::class)->fillForm(['links'=>[
+            ['provider'=>'vimeo','label'=>'Legacy Vimeo','url'=>'https://vimeo.com/legacy','visible'=>true,'sort_order'=>0],
+        ]])->call('save')->assertHasNoFormErrors();
+        $this->assertSame($before,Setting::read('icon-rail'));
+        $this->assertSame($before,app(ManifestExporter::class)->package()['manifest']['site']['iconRail']);
+    }
+
+    public function test_export_fails_closed_without_canonical_icon_rail(): void
+    {
+        Setting::whereKey('icon-rail')->delete();
+        $this->expectException(\DomainException::class);
+        app(ManifestExporter::class)->package();
     }
 
     public function test_candidate_apply_and_rollback_restore_manifest_and_media_bytes(): void

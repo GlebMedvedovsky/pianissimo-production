@@ -72,6 +72,34 @@ const socialLink = z.object({
   visible: z.boolean(),
   sort_order: z.number().int(),
 });
+export const iconRailStyles = ["outline", "rounded", "filled", "accent"] as const;
+export const iconRailTypes = [
+  "mail", "instagram", "imdb", "spotify", "music-hub", "crew-united", "tidal", "apple-music", "samples",
+  "deezer", "youtube", "vimeo", "soundcloud", "letterboxd", "website", "other",
+] as const;
+const iconRailItem = z.object({
+  type: z.enum(iconRailTypes),
+  label: z.string().min(1).max(100),
+  destination: z.string().nullable(),
+  visible: z.boolean(),
+  sort_order: z.number().int(),
+}).superRefine((item, context) => {
+  if (item.visible && !item.destination) context.addIssue({ code: "custom", path: ["destination"], message: "Visible rail items need a destination" });
+  if (!item.destination) return;
+  if (item.type === "mail") {
+    if (!z.email().safeParse(item.destination).success) context.addIssue({ code: "custom", path: ["destination"], message: "Mail rail destination must be an email address" });
+  } else if (!url.safeParse(item.destination).success) context.addIssue({ code: "custom", path: ["destination"], message: "Rail destinations must use HTTP(S)" });
+});
+const iconRail = z.object({
+  style: z.enum(iconRailStyles),
+  items: z.array(iconRailItem).superRefine((items, context) => {
+    const seen = new Set<string>();
+    items.forEach((item, index) => {
+      if (seen.has(item.type)) context.addIssue({ code: "custom", path: [index, "type"], message: "Duplicate rail item type" });
+      seen.add(item.type);
+    });
+  }),
+});
 const collective = z.object({
   name: z.string().min(1),
   url,
@@ -239,6 +267,7 @@ export const manifestSchema = z.object({
     artistLinks: links.optional(),
     profileLinks: profileLinks.optional(),
     socialLinks: z.array(socialLink).optional(),
+    iconRail: iconRail.optional(),
     collective: collective.optional(),
     consent: consent.optional(),
     analytics: analytics.optional(),

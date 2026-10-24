@@ -1,24 +1,16 @@
 ---
 import Logo from './Logo.astro';import Icon from './Icon.astro';import {siteConfig} from '../config/site.config';import {content as activeContent} from '../lib/content/data';import type {Manifest} from '../../../contracts/content';
-import {socialIcon} from '../lib/social';
+import {railHref,railIcon,resolveIconRail} from '../lib/iconRail';
 interface Props {section?:string;content?:Manifest}
 const {section,content=activeContent}=Astro.props;
-const contacts=content.site.contacts;
-const profiles=content.site.profileLinks||{};
-const managedSocial=(content.site.socialLinks||[]).filter(link=>link.visible).sort((a,b)=>a.sort_order-b.sort_order);
+const rail=resolveIconRail(content.site);
+const railItems=rail.items.filter(item=>item.visible&&item.destination).sort((a,b)=>a.sort_order-b.sort_order);
 ---
 <a class="skip-link" href="#content">Skip to content</a>
 <header class:list={['site-header',{'site-header--portfolio':section==='music'||section==='directing'}]}>
  <a class="brand" href="/" aria-label="Pianissimo Production home" data-brand-home><Logo header/><span>PIANISSIMO<small>PRODUCTION</small></span></a>
  <nav aria-label="Main navigation"><a href="/film-music/" aria-current={section==='music'?'page':undefined} data-direction="left">{siteConfig.navigation.music}</a><a href="/directing/" aria-current={section==='directing'?'page':undefined} data-direction="right">{siteConfig.navigation.directing}</a><a href="/#about" data-about>{siteConfig.navigation.about}</a><button data-contact>{siteConfig.navigation.contact}</button></nav>
 </header>
-<aside class="social-rail" aria-label="Contact and social links">
- <button data-contact aria-label="Contact by email" title="Contact"><Icon name="mail"/></button>
- {managedSocial.length>0?managedSocial.map(link=><a href={link.url} target="_blank" rel="noreferrer" aria-label={link.label} title={link.label}><Icon name={socialIcon[link.provider]||'arrowUpRight'}/></a>):<>
-  {contacts.instagram&&<a href={contacts.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram"><Icon name="instagram"/></a>}
-  {profiles.musicHub&&<a href={profiles.musicHub} target="_blank" rel="noreferrer" aria-label="Music Hub" title="Music Hub"><Icon name="musicHub"/></a>}
-  {profiles.imdb&&<a class="profile-link" href={profiles.imdb} target="_blank" rel="noreferrer" aria-label="IMDb profile" title="IMDb profile"><Icon name="imdb"/></a>}
-  {profiles.crewUnited&&<a class="profile-link profile-link--crew" href={profiles.crewUnited} target="_blank" rel="noreferrer" aria-label="Crew United profile" title="Crew United profile"><Icon name="crewUnited"/></a>}
- </>}
- {contacts.samples&&<a href={contacts.samples} target="_blank" rel="noreferrer" aria-label="Samples unterm Sofa" title="Samples unterm Sofa"><Icon name="sofa"/></a>}
+<aside class="social-rail" aria-label="Contact and social links" data-icon-style={rail.style}>
+ {railItems.map(item=><a href={railHref(item)} target={item.type==='mail'?undefined:'_blank'} rel={item.type==='mail'?undefined:'noreferrer'} aria-label={item.label} title={item.label}><Icon name={railIcon[item.type]||'arrowUpRight'}/></a>)}
 </aside>

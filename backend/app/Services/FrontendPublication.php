@@ -140,6 +140,8 @@ class FrontendPublication
                     if(($old[$provider]['sort_order']??null)!==($link['sort_order']??null))$out[]=$link['label'].' Reihenfolge geändert';
                 }
                 foreach ($old as $provider=>$link) if(!$new->has($provider))$out[]='− Social Link: '.$link['label'];
+            } elseif ($path==='/site/iconRail') {
+                $out[]='Navigation & Symbole: Stil, Sichtbarkeit, Links oder Reihenfolge geändert';
             } elseif (preg_match('#^/assets/([^/]+)/(path|sha256)$#',$path,$m)) $out[]='Media „'.$m[1].'“: Datei ersetzt';
             elseif (preg_match('#^/assets/([^/]+)$#',$path,$m)) $out[]=($change['before']===null?'+ Neues Medium: ':'− Medium entfernt: ').$m[1];
             elseif (preg_match('#^/projects/([^/]+)(.*)$#',$path,$m)) {

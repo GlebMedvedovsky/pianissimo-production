@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Filament\Pages\{About, Analytics, Appearance, Consent, Contact, Dashboard, Directing, Help, Home, Impressum, Licenses, Music, Privacy, Publication, Seo, Site, Social};
+use App\Filament\Pages\{About, Analytics, Appearance, Consent, Contact, Dashboard, Directing, Help, Home, Impressum, Licenses, Music, NavigationIcons, Privacy, Publication, Seo, Site};
 use App\Filament\Resources\{CvEntryResource, ExternalServiceResource, MediaAssetResource, ProjectResource, TrackResource, UserResource};
 use App\Models\{CvEntry, MediaAsset, Project, Track};
 use Filament\GlobalSearch\GlobalSearchResult;
@@ -91,8 +91,8 @@ class OwnerGlobalSearchProvider implements GlobalSearchProvider
             $this->entry('Website', 'Startseite → Bild oder Video', Home::getUrl(), 'Startseite', ['Hero Darstellung Bild Video Poster'], ['home foto']),
             $this->entry('Website', 'Film Music', Music::getUrl(), 'Bereich', ['Menübezeichnung Bild Video Poster Projekte'], ['filmmusik composer']),
             $this->entry('Website', 'Directing', Directing::getUrl(), 'Bereich', ['Menübezeichnung Bild Video Poster Projekte'], ['regie director']),
-            $this->entry('Website', 'Kontakt', Contact::getUrl(), 'Kontaktseite', ['öffentliche E Mail Instagram Spotify Footer'], ['contact']),
-            $this->entry('Website', 'Social Links', Social::getUrl(), 'Profile', ['Spotify Instagram Vimeo YouTube hinzufügen ausblenden löschen sortieren'], ['socials profile']),
+            $this->entry('Website', 'Kontakt', Contact::getUrl(), 'Kontaktseite', ['Kontaktformular Empfänger Footer öffentliche E Mail'], ['contact']),
+            $this->entry('Website', 'Navigation & Symbole', NavigationIcons::getUrl(), 'Symbolleiste', ['Mail Spotify Instagram IMDb Music Hub Crew United Tidal Apple Music Samples sichtbar ausblenden Link sortieren Symbolstil Vorschau'], ['socials profile icons']),
             $this->entry('Website', 'SEO', Seo::getUrl(), 'Globale Vorgaben', ['Suchmaschinen Titel Meta Canonical OG Bild robots index noindex'], ['google suchmachine suchmaschine']),
             $this->entry('Website', 'Website-Farben', Appearance::getUrl(), 'Darstellung', ['Hintergrund Akzent hell dunkel'], ['design farbe']),
             $this->entry('Website', 'Analytics', Analytics::getUrl(), 'Besucherstatistik', ['GA4 Plausible Bericht Export Consent'], ['statistik analytycs']),

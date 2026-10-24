@@ -13,7 +13,7 @@ abstract class SettingsPage extends Page implements HasForms
     protected string $view='cms.settings';
     protected static string $settingsKey;
     public ?array $data=[];
-    public function mount(): void { $data=Setting::read(static::$settingsKey);if(in_array(static::$settingsKey,['home','music','directing','about'],true))$data=MediaSlotPolicy::hydrate(static::$settingsKey,$data);if(static::$settingsKey==='consent'&&!array_key_exists('version',$data))$data['version']=1;$this->form->fill($data); }
+    public function mount(): void { $data=Setting::read(static::$settingsKey);if(static::$settingsKey==='icon-rail'&&$data===[])$data=\App\Services\IconRail::fromManifestSite(['contacts'=>Setting::read('contact'),'artistLinks'=>Setting::read('social')['artistLinks']??[],'profileLinks'=>Setting::read('social')['profileLinks']??[],'socialLinks'=>Setting::read('social')['links']??[]]);if(in_array(static::$settingsKey,['home','music','directing','about'],true))$data=MediaSlotPolicy::hydrate(static::$settingsKey,$data);if(static::$settingsKey==='consent'&&!array_key_exists('version',$data))$data['version']=1;$this->form->fill($data); }
     public function form(Schema $schema): Schema { return $schema->components(SettingsForm::fields(static::$settingsKey))->statePath('data'); }
     protected function getHeaderActions(): array
     {
